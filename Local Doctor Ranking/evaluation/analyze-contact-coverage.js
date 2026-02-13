@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_FILE = path.join(__dirname, 'merged_all_sources_latest.json');
+const DATA_FILE = path.join(__dirname, '../data/merged_all_sources_latest.json');
 
 /**
  * Extract source from record

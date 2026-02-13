@@ -23,8 +23,8 @@ except ImportError:
 ROOT_DIR = Path(__file__).resolve().parent.parent
 WEIGHTS_PATH = ROOT_DIR / "ranking-weights-optuna-stage-a.json"
 BEST_WEIGHTS_PATH = ROOT_DIR / "best-stage-a-recall-weights.json"
-CACHE_V2 = ROOT_DIR / "benchmark-session-context-cache-v2.json"
-SPLIT_FILE = ROOT_DIR / "benchmark-split.json"
+CACHE_V2 = ROOT_DIR / "benchmarks" / "benchmark-session-context-cache-v2.json"
+SPLIT_FILE = ROOT_DIR / "benchmarks" / "benchmark-split.json"
 STAGE_A_N = 150
 N_TRIALS = int(os.environ.get("N_TRIALS", "50"))
 TUNE_FIELDS = os.environ.get("TUNE_FIELDS", "0") == "1"
@@ -50,7 +50,7 @@ def run_stage_a_recall(weights_path: Path) -> float:
     """Run Node script; return Stage A recall @150 (single float from stdout)."""
     cmd = [
         "node",
-        str(ROOT_DIR / "evaluate-stage-a-recall.js"),
+        str(ROOT_DIR / "evaluation" / "evaluate-stage-a-recall.js"),
         f"--weights={weights_path}",
         f"--cache={CACHE_V2}",
         f"--n={STAGE_A_N}",

@@ -28,9 +28,9 @@ const {
   calculateNDCG,
 } = require('./parallel-ranking-package/testing/utils/measurements');
 
-const BENCHMARK_FILE = 'benchmark-test-cases-all-specialties.json';
-const SPLIT_FILE = 'benchmark-split.json';
-const CACHE_FILE = 'benchmark-session-context-cache.json';
+const BENCHMARK_FILE = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
+const SPLIT_FILE = path.join(__dirname, '../benchmarks/benchmark-split.json');
+const CACHE_FILE = path.join(__dirname, '../benchmarks/benchmark-session-context-cache.json');
 const WEIGHTS_FILE = 'ranking-weights.json';
 const WORKERS = Math.max(1, parseInt(process.env.WORKERS || '4', 10));
 const SHORTLIST_SIZE = 12;

@@ -11,9 +11,9 @@
 const path = require('path');
 const fs = require('fs');
 
-const REASONS_FILE = 'benchmark-ground-truth-reasons.json';
-const CACHE_FILE = 'benchmark-session-context-cache.json';
-const REPORT_FILE = 'benchmark-reasoning-comparison-report.json';
+const REASONS_FILE = path.join(__dirname, '../benchmarks/benchmark-ground-truth-reasons.json');
+const CACHE_FILE = path.join(__dirname, '../benchmarks/benchmark-session-context-cache.json');
+const REPORT_FILE = path.join(__dirname, 'benchmark-reasoning-comparison-report.json');
 
 const STOPWORDS = new Set([
   'in', 'of', 'and', 'the', 'or', 'to', 'for', 'with', 'on', 'at', 'by',

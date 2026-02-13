@@ -41,7 +41,7 @@ const { loadMergedData } = require('./apply-ranking');
 const { getAllSpecialties, getSpecialtyStats } = require('./specialty-filter');
 
 // Import recommendation tracker
-const tracker = require('./recommendation-tracker');
+const tracker = require('./scripts/recommendation-tracker');
 
 const app = express();
 const PORT = process.env.SERVER_PORT || 3000;
@@ -78,7 +78,7 @@ const loadData = () => {
   try {
     const startTime = Date.now();
     // Use the latest integrated file (prefer integrated_practitioners_reddit_bupa_latest.json when present)
-    const dataDir = __dirname;
+    const dataDir = path.join(__dirname, 'data');
     const integratedPath = path.join(dataDir, 'integrated_practitioners_reddit_bupa_latest.json');
     const latestPath = path.join(dataDir, 'merged_all_sources_latest.json');
     const fallbackPath = path.join(dataDir, 'merged_all_sources_2026-02-02T13-47-20.json');
@@ -344,7 +344,7 @@ app.post('/api/rank', async (req, res) => {
       if (typeof rankingConfig === 'string') {
         const configPath = path.isAbsolute(rankingConfig) 
           ? rankingConfig 
-          : path.join(__dirname, rankingConfig);
+          : path.join(__dirname, 'optimization', rankingConfig);
         if (fs.existsSync(configPath)) {
           config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         } else {

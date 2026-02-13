@@ -9,8 +9,8 @@
 const path = require('path');
 const fs = require('fs');
 
-const BENCHMARK_FILE = 'benchmark-test-cases-all-specialties.json';
-const SPLIT_FILE = 'benchmark-split.json';
+const BENCHMARK_FILE = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
+const SPLIT_FILE = path.join(__dirname, '../benchmarks/benchmark-split.json');
 const HOLDOUT_PER_SPECIALTY = 5;
 
 function main() {

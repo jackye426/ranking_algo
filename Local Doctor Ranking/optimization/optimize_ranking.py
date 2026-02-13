@@ -30,7 +30,7 @@ def run_evaluator(subset: str, weights_path: Path) -> float:
     """Run Node evaluator on train or holdout; return metric (NDCG@12)."""
     cmd = [
         "node",
-        str(ROOT_DIR / "evaluate-ranking-subset.js"),
+        str(ROOT_DIR / "evaluation" / "evaluate-ranking-subset.js"),
         f"--{subset}",
         "--metric=ndcg12",
         "--use-cache",

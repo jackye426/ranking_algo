@@ -16,7 +16,7 @@ const { findPractitionerByName } = require('./parallel-ranking-package/testing/u
 const OpenAI = require('openai');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const BENCHMARK_FILE = 'benchmark-test-cases-all-specialties.json';
+const BENCHMARK_FILE = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
 const DEFAULT_OUTPUT = 'benchmark-pick-verification.json';
 const WORKERS = Math.max(1, parseInt(process.env.WORKERS || '2', 10));
 const DEFAULT_MODEL = 'gpt-5.1';

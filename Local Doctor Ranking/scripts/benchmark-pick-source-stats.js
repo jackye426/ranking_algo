@@ -16,9 +16,9 @@ const fs = require('fs');
 const { getBM25Shortlist, rankPractitionersBM25, normalizeMedicalQuery } = require('./parallel-ranking-package/testing/services/local-bm25-service');
 const { createNameToIdMap, resolveGroundTruthNames, findPractitionerByName } = require('./parallel-ranking-package/testing/utils/name-to-id-mapper');
 
-const BENCHMARK_FILE = 'benchmark-test-cases-all-specialties.json';
-const CACHE_FILE = 'benchmark-session-context-cache.json';
-const OUTPUT_FILE = 'benchmark-pick-source-stats.json';
+const BENCHMARK_FILE = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
+const CACHE_FILE = path.join(__dirname, '../benchmarks/benchmark-session-context-cache.json');
+const OUTPUT_FILE = path.join(__dirname, '../benchmarks/benchmark-pick-source-stats.json');
 
 const CANDIDATE_POOL_STRATEGY = process.env.CANDIDATE_POOL_STRATEGY || 'hybrid_bm25';
 const HYBRID_RANKING_TOP = 18;

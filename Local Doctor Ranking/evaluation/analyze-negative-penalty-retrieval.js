@@ -18,8 +18,8 @@ const {
 } = require('./parallel-ranking-package/testing/services/local-bm25-service');
 const { createNameToIdMap, resolveGroundTruthNames } = require('./parallel-ranking-package/testing/utils/name-to-id-mapper');
 
-const BENCHMARK_FILE = 'benchmark-test-cases-all-specialties.json';
-const CACHE_FILE = 'benchmark-session-context-cache-v2.json';
+const BENCHMARK_FILE = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
+const CACHE_FILE = path.join(__dirname, '../benchmarks/benchmark-session-context-cache-v2.json');
 const WEIGHTS_FILE = 'best-stage-a-recall-weights.json';
 
 const SPECIALTY_TO_JSON = {

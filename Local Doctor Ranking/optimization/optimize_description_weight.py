@@ -23,8 +23,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 BASE_WEIGHTS = ROOT_DIR / "best-stage-a-recall-weights.json"
 WEIGHTS_PATH = ROOT_DIR / "ranking-weights-optuna-desc.json"
 BEST_OUT_PATH = ROOT_DIR / "best-stage-a-recall-weights-desc-tuned.json"
-CACHE_V2 = ROOT_DIR / "benchmark-session-context-cache-v2.json"
-SPLIT_FILE = ROOT_DIR / "benchmark-split.json"
+CACHE_V2 = ROOT_DIR / "benchmarks" / "benchmark-session-context-cache-v2.json"
+SPLIT_FILE = ROOT_DIR / "benchmarks" / "benchmark-split.json"
 STAGE_A_N = 150
 N_TRIALS = int(os.environ.get("N_TRIALS", "30"))
 
@@ -32,7 +32,7 @@ N_TRIALS = int(os.environ.get("N_TRIALS", "30"))
 def run_stage_a_recall(weights_path: Path) -> float:
     cmd = [
         "node",
-        str(ROOT_DIR / "evaluate-stage-a-recall.js"),
+        str(ROOT_DIR / "evaluation" / "evaluate-stage-a-recall.js"),
         f"--weights={weights_path}",
         f"--cache={CACHE_V2}",
         f"--n={STAGE_A_N}",

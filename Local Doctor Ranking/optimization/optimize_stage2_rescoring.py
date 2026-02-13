@@ -26,8 +26,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 BASE_WEIGHTS = ROOT_DIR / "best-stage-a-recall-weights-desc-tuned.json"
 WEIGHTS_PATH = ROOT_DIR / "ranking-weights-optuna-stage2.json"
 BEST_OUT_PATH = ROOT_DIR / "best-stage2-rescoring-weights.json"
-CACHE_V2 = ROOT_DIR / "benchmark-session-context-cache-v2.json"
-SPLIT_FILE = ROOT_DIR / "benchmark-split.json"
+CACHE_V2 = ROOT_DIR / "benchmarks" / "benchmark-session-context-cache-v2.json"
+SPLIT_FILE = ROOT_DIR / "benchmarks" / "benchmark-split.json"
 
 N_TRIALS = int(os.environ.get("N_TRIALS", "40"))
 METRIC = os.environ.get("METRIC", "recall_precision")
@@ -56,7 +56,7 @@ RESCORE_RANGES = {
 def run_evaluator(weights_path: Path) -> float:
     cmd = [
         "node",
-        str(ROOT_DIR / "evaluate-ranking-subset.js"),
+        str(ROOT_DIR / "evaluation" / "evaluate-ranking-subset.js"),
         "--train",
         f"--metric={METRIC}",
         "--use-cache",

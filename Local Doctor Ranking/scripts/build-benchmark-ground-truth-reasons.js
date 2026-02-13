@@ -17,8 +17,8 @@ const { createNameToIdMap, findPractitionerByName } = require('./parallel-rankin
 const OpenAI = require('openai');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const BENCHMARK_FILE = 'benchmark-test-cases-all-specialties.json';
-const REASONS_OUTPUT = 'benchmark-ground-truth-reasons.json';
+const BENCHMARK_FILE = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
+const REASONS_OUTPUT = path.join(__dirname, '../benchmarks/benchmark-ground-truth-reasons.json');
 const WORKERS = Math.max(1, parseInt(process.env.WORKERS || '4', 10));
 const REASONING_MODEL = process.env.BENCHMARK_REASONING_MODEL || 'gpt-4o-mini';
 

@@ -68,7 +68,7 @@ def run_evaluator(weights_path: Path) -> float:
     EVAL_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         "node",
-        str(ROOT_DIR / "evaluate-excellent-fit-llm.js"),
+        str(ROOT_DIR / "evaluation" / "evaluate-excellent-fit-llm.js"),
         "--use-cache",
         f"--weights={weights_path}",
         f"--limit={LIMIT}",

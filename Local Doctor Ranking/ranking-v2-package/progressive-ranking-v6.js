@@ -354,7 +354,7 @@ async function rankPractitionersProgressive(practitioners, userQuery, options = 
     if (typeof rankingConfig === 'string') {
       const configPath = path.isAbsolute(rankingConfig) 
         ? rankingConfig 
-        : path.join(parentDir, rankingConfig);
+        : path.join(parentDir, 'optimization', rankingConfig);
       if (fs.existsSync(configPath)) {
         config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       } else {

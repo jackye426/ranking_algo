@@ -9,9 +9,9 @@ const fs = require('fs');
 const path = require('path');
 
 // Configuration
-const EXISTING_MERGED_FILE = 'merged_all_sources_20260124_150256.json';
-const DIETITIANS_FILE = process.argv[2] || 'bda_dietitian_rows.csv'; // Pass filename as argument
-const OUTPUT_FILE = `merged_all_sources_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.json`;
+const EXISTING_MERGED_FILE = path.join(__dirname, '../data/merged_all_sources_20260124_150256.json');
+const DIETITIANS_FILE = process.argv[2] ? (path.isAbsolute(process.argv[2]) ? process.argv[2] : path.join(__dirname, '../data', process.argv[2])) : path.join(__dirname, '../data/bda_dietitians_rows.csv');
+const OUTPUT_FILE = path.join(__dirname, '../data', `merged_all_sources_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.json`);
 
 /**
  * Parse CSV file and convert to array of objects
@@ -514,9 +514,9 @@ function mergeData(existingData, dietitians) {
  */
 function main() {
   try {
-    const dietitiansFilePath = path.join(__dirname, DIETITIANS_FILE);
-    const mergedFilePath = path.join(__dirname, EXISTING_MERGED_FILE);
-    const outputPath = path.join(__dirname, OUTPUT_FILE);
+    const dietitiansFilePath = DIETITIANS_FILE;
+    const mergedFilePath = EXISTING_MERGED_FILE;
+    const outputPath = OUTPUT_FILE;
     
     // Load data
     const dietitians = loadDietitians(dietitiansFilePath);

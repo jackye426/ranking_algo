@@ -7,7 +7,7 @@ from statistics import mean, median, stdev
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 OPTUNA_DB = ROOT_DIR / "optimization" / "optuna_excellent_fit.db"
-BASELINE_FILE = ROOT_DIR / "excellent-fit-baseline.json"
+BASELINE_FILE = ROOT_DIR / "evaluation" / "excellent-fit-baseline.json"
 OUTPUT_FILE = ROOT_DIR / "optimization" / "optuna_analysis.json"
 REPORT_FILE = ROOT_DIR / "optimization" / "OPTUNA_RESULTS_ANALYSIS.md"
 

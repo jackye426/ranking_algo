@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 OPTUNA_DB = ROOT_DIR / "optimization" / "optuna_excellent_fit.db"
-BENCHMARK_FILE = ROOT_DIR / "benchmark-ground-truth-reasons.json"
+BENCHMARK_FILE = ROOT_DIR / "benchmarks" / "benchmark-ground-truth-reasons.json"
 
 # Check benchmark size
 try:

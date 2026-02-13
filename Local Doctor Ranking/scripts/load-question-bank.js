@@ -137,7 +137,7 @@ if (require.main === module) {
   bank.forEach(({ specialty, questions }) => {
     console.log(`  ${specialty}: ${questions.length} questions`);
   });
-  const outPath = path.join(__dirname, 'benchmark-questions-loaded.json');
+  const outPath = path.join(__dirname, '../benchmarks/benchmark-questions-loaded.json');
   writeQuestionBankJson(outPath);
   console.log(`\nWritten: ${outPath}`);
 }

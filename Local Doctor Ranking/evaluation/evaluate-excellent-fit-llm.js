@@ -26,8 +26,8 @@ const { getBM25Shortlist } = require('./parallel-ranking-package/testing/service
 const OpenAI = require('openai');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const BENCHMARK_FILE = 'benchmark-test-cases-all-specialties.json';
-const CACHE_FILE = 'benchmark-session-context-cache-v2.json';
+const BENCHMARK_FILE = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
+const CACHE_FILE = path.join(__dirname, '../benchmarks/benchmark-session-context-cache-v2.json');
 const DEFAULT_OUTPUT = 'excellent-fit-evaluation.json';
 const DEFAULT_MODEL = 'gpt-5.1';
 const WORKERS = Math.max(1, parseInt(process.env.WORKERS || '2', 10));

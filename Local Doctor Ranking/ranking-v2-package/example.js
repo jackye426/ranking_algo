@@ -24,7 +24,7 @@ async function example() {
   
   const results = await rankPractitioners(practitioners, userQuery, {
     shortlistSize: 12,
-    rankingConfig: path.join(__dirname, '..', 'best-stage-a-recall-weights-desc-tuned.json'), // Optional: use custom weights
+    rankingConfig: path.join(__dirname, '..', 'optimization', 'best-stage-a-recall-weights-desc-tuned.json'), // Optional: use custom weights
   });
   
   console.log(`Query: "${userQuery}"`);

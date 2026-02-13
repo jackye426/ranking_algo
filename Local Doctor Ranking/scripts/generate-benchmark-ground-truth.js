@@ -245,7 +245,7 @@ const MAX_BIO_CHARS = 1e7;
 /** Number of questions to process in parallel (LLM calls). Respects TPM; 2–4 is usually safe. */
 const CONCURRENCY = Math.max(1, parseInt(process.env.WORKERS || '3', 10));
 
-const OUTPUT_FILENAME = 'benchmark-test-cases-all-specialties.json';
+const OUTPUT_FILENAME = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
 
 const SYSTEM_PICK_5 = `You are a medical search evaluator. You will receive a patient query and a list of candidate cards (JSON array). Each card has a single identifier you must use in your answer: practitioner_id.
 

@@ -215,7 +215,7 @@ async function main() {
   }
   
   // Load data
-  const dataFilePath = path.join(__dirname, 'merged_all_sources_20260124_150256.json');
+  const dataFilePath = path.join(__dirname, 'data', 'merged_all_sources_20260124_150256.json');
   if (!fs.existsSync(dataFilePath)) {
     console.error(`[Error] Data file not found: ${dataFilePath}`);
     process.exit(1);
