@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 npm-debug.log*
 
@@ -30,5 +30,29 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+*.sqlite
+*.sqlite3
+
 # Recommendation tracker (can be regenerated)
 recommendation-tracker.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Analysis outputs
+*.csv
+!**/Benchmark question bank*.csv

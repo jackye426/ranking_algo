@@ -1,0 +1,24 @@
+{
+  "name": "parallel-ranking-algorithm",
+  "version": "1.0.0",
+  "description": "Parallel ranking algorithm with intent-aware query expansion and adaptive negative keywords",
+  "main": "algorithm/session-context-variants.js",
+  "scripts": {
+    "test": "cd testing && npm test"
+  },
+  "keywords": [
+    "ranking",
+    "bm25",
+    "search",
+    "medical",
+    "intent-classification"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "openai": "^6.5.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

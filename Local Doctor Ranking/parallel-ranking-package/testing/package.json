@@ -1,0 +1,23 @@
+{
+  "name": "ranking-variant-testing",
+  "version": "1.0.0",
+  "description": "Local testing framework for ranking algorithm variants",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js || node -r esm node_modules/.bin/jest || echo \"Jest not installed. Install with: npm install --save-dev jest\""
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "openai": "^6.5.0",
+    "dotenv": "^16.5.0"
+  },
+  "keywords": [
+    "bm25",
+    "ranking",
+    "testing"
+  ],
+  "author": "",
+  "license": "ISC"
+}

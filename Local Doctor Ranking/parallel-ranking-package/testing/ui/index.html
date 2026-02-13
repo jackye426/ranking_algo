@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ranking Variant Testing</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+    
+    .chat-section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .chat-messages {
+      min-height: 200px;
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 15px;
+      background: #fafafa;
+    }
+    
+    .message {
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    
+    .message.user {
+      background: #e3f2fd;
+      text-align: right;
+    }
+    
+    .message.assistant {
+      background: #f1f8e9;
+    }
+    
+    .message-role {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    
+    .chat-input {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .chat-input input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .chat-input button {
+      padding: 10px 20px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .chat-input button:hover {
+      background: #1976D2;
+    }
+    
+    .chat-input button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .run-button {
+      padding: 12px 24px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      margin-top: 15px;
+    }
+    
+    .run-button:hover {
+      background: #45a049;
+    }
+    
+    .run-button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .results-section {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .variant-column {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .variant-header {
+      border-bottom: 2px solid #2196F3;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .variant-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2196F3;
+      margin-bottom: 5px;
+    }
+    
+    .variant-meta {
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .query-section {
+      margin-bottom: 15px;
+    }
+    
+    .query-box {
+      background: #f5f5f5;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      border-left: 3px solid #2196F3;
+    }
+    
+    .query-box.final-query {
+      border-left-color: #4CAF50;
+      background: #f1f8e9;
+    }
+    
+    .query-box.intent-box {
+      border-left-color: #9c27b0;
+      background: #f3e5f5;
+    }
+    
+    .intent-value {
+      font-weight: bold;
+      color: #7b1fa2;
+      text-transform: capitalize;
+    }
+    
+    .query-label {
+      font-weight: bold;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .query-value {
+      font-size: 13px;
+      word-break: break-word;
+      margin-bottom: 8px;
+      color: #333;
+      font-family: 'Courier New', monospace;
+      background: white;
+      padding: 8px;
+      border-radius: 3px;
+    }
+    
+    .query-explanation {
+      font-size: 11px;
+      color: #666;
+      font-style: italic;
+      margin-top: 5px;
+    }
+    
+    .result-card {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: #fafafa;
+    }
+    
+    .result-card.ground-truth-match {
+      border: 2px solid #4CAF50;
+      background: #f1f8e9;
+    }
+    
+    .result-rank {
+      display: inline-block;
+      background: #2196F3;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    
+    .result-name {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    
+    .result-specialty {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    
+    .result-score {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 10px;
+    }
+    
+    .result-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .flag-button {
+      padding: 5px 10px;
+      background: #ff9800;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    .flag-button.flagged {
+      background: #f44336;
+    }
+    
+    .booking-button {
+      padding: 5px 10px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    .booking-button.selected {
+      background: #2e7d32;
+    }
+    
+    .flag-note {
+      margin-top: 10px;
+      padding: 8px;
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 3px;
+      font-size: 12px;
+      display: none;
+    }
+    
+    .flag-note.visible {
+      display: block;
+    }
+    
+    .flag-note textarea {
+      width: 100%;
+      min-height: 60px;
+      padding: 5px;
+      border: 1px solid #ddd;
+    }
+    
+    .profile-json-section {
+      margin-top: 10px;
+      border-top: 1px solid #ddd;
+      padding-top: 10px;
+    }
+    
+    .profile-json-toggle {
+      padding: 5px 10px;
+      background: #9e9e9e;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .profile-json-toggle:hover {
+      background: #757575;
+    }
+    
+    .profile-json-content {
+      margin-top: 10px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      max-height: 500px;
+      overflow-y: auto;
+      position: relative;
+    }
+    
+    .profile-json {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #333;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .copy-json-button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 5px 10px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    
+    .copy-json-button:hover {
+      background: #1976D2;
+    }
+    
+    .batch-evaluation-results {
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .summary-table table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    
+    .summary-table th,
+    .summary-table td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    
+    .summary-table th {
+      background: #2196F3;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .summary-table tr:nth-child(even) {
+      background: #f5f5f5;
+    }
+    
+    .evaluation-metrics {
+      margin-top: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .measurements-section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .measurements-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    
+    .precision-display {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #e8f5e9;
+      border-radius: 4px;
+    }
+    
+    .export-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    .export-button {
+      padding: 10px 20px;
+      background: #9c27b0;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .export-button:hover {
+      background: #7b1fa2;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+    
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Ranking Variant Testing</h1>
+    
+    <div class="chat-section">
+      <h2>Test Conversation</h2>
+      <div style="margin-bottom: 15px;">
+        <label for="benchmarkSelector" style="display: block; margin-bottom: 5px; font-weight: bold;">Benchmark Test Cases:</label>
+        <select id="benchmarkSelector" style="width: 100%; padding: 8px; margin-bottom: 10px;" onchange="loadBenchmarkCase()">
+          <option value="">-- Select a benchmark test case --</option>
+        </select>
+        <button class="run-button" onclick="runBatchEvaluation()" style="margin-right: 10px;">Run All Benchmark Tests</button>
+        <button class="run-button" onclick="clearBenchmark()">Clear</button>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Enter your message..." />
+        <button id="sendButton" onclick="sendMessage()">Send</button>
+      </div>
+      <button class="run-button" id="runButton" onclick="runAllVariants()" disabled>Run All Variants</button>
+    </div>
+    
+    <div id="resultsSection" class="results-section" style="display: none;">
+      <!-- Results will be inserted here -->
+    </div>
+    
+    <div class="measurements-section" id="measurementsSection" style="display: none;">
+      <div class="measurements-title">Measurements</div>
+      <div class="precision-display" id="precisionDisplay"></div>
+      <div class="export-buttons">
+        <button class="export-button" onclick="exportResults('json')">Export JSON</button>
+        <button class="export-button" onclick="exportResults('csv')">Export CSV</button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    const API_BASE = 'http://localhost:3001';
+    let messages = [];
+    let currentResults = null;
+    let measurements = {
+      precisionAt3: {},
+      relevanceFlags: {},
+      bookingProxy: {}
+    };
+    
+    // Initialize with welcome message
+    function initChat() {
+      const welcomeMessage = {
+        role: 'assistant',
+        content: 'Hi, how are you doing today? 👋\n\nI\'m here to help you find the right care.\n\nTo help me find the best fit for you, could you tell me what brings you here today?\n\n(For example: a condition, a procedure, or something you\'ve been feeling.) 💙'
+      };
+      messages = [welcomeMessage];
+      renderMessages();
+      
+      // Load benchmark test cases
+      loadBenchmarkCases();
+    }
+    
+    function renderMessages() {
+      const container = document.getElementById('chatMessages');
+      container.innerHTML = messages.map(msg => `
+        <div class="message ${msg.role}">
+          <div class="message-role">${msg.role === 'user' ? 'You' : 'Assistant'}</div>
+          <div>${msg.content.replace(/\n/g, '<br>')}</div>
+        </div>
+      `).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+    
+    function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      
+      if (!text) return;
+      
+      messages.push({
+        role: 'user',
+        content: text
+      });
+      
+      input.value = '';
+      renderMessages();
+      
+      // Enable run button after at least 2 messages
+      if (messages.length >= 2) {
+        document.getElementById('runButton').disabled = false;
+      }
+    }
+    
+    document.getElementById('chatInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+    
+    async function runAllVariants() {
+      const runButton = document.getElementById('runButton');
+      runButton.disabled = true;
+      runButton.textContent = 'Running...';
+      
+      const resultsSection = document.getElementById('resultsSection');
+      resultsSection.innerHTML = '<div class="loading">Running all variants...</div>';
+      resultsSection.style.display = 'grid';
+      
+      try {
+        const userQuery = messages.filter(m => m.role === 'user').pop()?.content || '';
+        
+        // Include ground truth names if available (from benchmark test case)
+        const requestBody = {
+          userQuery,
+          messages,
+          location: null,
+          filters: {}
+        };
+        
+        if (currentResults?.groundTruthNames) {
+          requestBody.groundTruthNames = currentResults.groundTruthNames;
+        }
+        
+        const response = await fetch(`${API_BASE}/test/run-all-variants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to run variants');
+        }
+        
+        currentResults = data;
+        
+        // Store ground truth IDs if provided
+        if (data.groundTruthIds) {
+          currentResults.groundTruthIds = data.groundTruthIds;
+        }
+        
+        renderResults(data.variants, data.evaluation);
+        showMeasurements();
+        
+      } catch (error) {
+        resultsSection.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      } finally {
+        runButton.disabled = false;
+        runButton.textContent = 'Run All Variants';
+      }
+    }
+    
+    function getQueryExplanation(variantName, enrichedQuery) {
+      const explanations = {
+        algorithmic: 'Session context enrichment only: concatenates insights (symptoms, preferences, specialty, urgency) from AI summarization. No AI query expansion. No intent classification. Uses q_patient directly for BM25.',
+        parallel: 'Two-stage retrieval: (A) BM25 with q_patient ONLY (no expansion), (B) Rescoring with intent_terms as boosts. Parallel goal/specificity + clinical intent classification + insights → BM25 (clean query) → Rescoring (intent terms). Adaptive ranking: uses rescoring score as primary when query is ambiguous, modified BM25 when clear. Negative terms enabled when clear, disabled when ambiguous.',
+        parallel_general_goal_specificity: 'Two-stage retrieval: (A) BM25 with q_patient ONLY (no expansion), (B) Rescoring with intent_terms as boosts. Parallel general goal/specificity classification (specialty-agnostic) + insights → BM25 (clean query) → Rescoring (intent terms). Uses goal (diagnostic_workup/procedure_intervention/ongoing_management/second_opinion) + specificity (symptom_only/confirmed_diagnosis/named_procedure) instead of clinical intent lanes.'
+      };
+      return explanations[variantName] || '';
+    }
+    
+    // Load benchmark test cases on page load
+    async function loadBenchmarkCases() {
+      try {
+        const response = await fetch(`${API_BASE}/test/benchmark-cases`);
+        const data = await response.json();
+        
+        if (data.success && data.testCases) {
+          const selector = document.getElementById('benchmarkSelector');
+          
+          // Group by set
+          const set1 = data.testCases.filter(tc => !tc.set || tc.set === 1);
+          const set2 = data.testCases.filter(tc => tc.set === 2);
+          
+          // Add Set 1
+          if (set1.length > 0) {
+            const optgroup1 = document.createElement('optgroup');
+            optgroup1.label = 'Benchmark Set 1 (General Cardiology)';
+            set1.forEach(testCase => {
+              const option = document.createElement('option');
+              option.value = testCase.id;
+              option.textContent = `${testCase.id}: ${testCase.name}`;
+              optgroup1.appendChild(option);
+            });
+            selector.appendChild(optgroup1);
+          }
+          
+          // Add Set 2
+          if (set2.length > 0) {
+            const optgroup2 = document.createElement('optgroup');
+            optgroup2.label = 'Benchmark Set 2 (Specialized Pathways)';
+            set2.forEach(testCase => {
+              const option = document.createElement('option');
+              option.value = testCase.id;
+              option.textContent = `${testCase.id}: ${testCase.name}`;
+              optgroup2.appendChild(option);
+            });
+            selector.appendChild(optgroup2);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load benchmark cases:', error);
+      }
+    }
+    
+    // Load a benchmark test case
+    async function loadBenchmarkCase() {
+      const selector = document.getElementById('benchmarkSelector');
+      const testCaseId = selector.value;
+      
+      if (!testCaseId) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/test/benchmark-cases`);
+        const data = await response.json();
+        
+        if (data.success) {
+          const testCase = data.testCases.find(tc => tc.id === testCaseId);
+          if (testCase) {
+            // Load test case into chat
+            messages = testCase.conversation || [{ role: 'user', content: testCase.userQuery }];
+            renderMessages();
+            document.getElementById('runButton').disabled = false;
+            
+            // Store ground truth for evaluation
+            currentResults = {
+              groundTruthIds: testCase.groundTruthIds,
+              groundTruthNames: testCase.groundTruth
+            };
+            
+            // Auto-run evaluation
+            runAllVariants();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load benchmark case:', error);
+      }
+    }
+    
+    // Run batch evaluation
+    async function runBatchEvaluation() {
+      const resultsSection = document.getElementById('resultsSection');
+      resultsSection.innerHTML = '<div class="loading">Running batch evaluation on all benchmark test cases...</div>';
+      resultsSection.style.display = 'block';
+      
+      try {
+        const response = await fetch(`${API_BASE}/test/batch-evaluate-benchmark`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Batch evaluation failed');
+        }
+        
+        // Display batch evaluation results
+        displayBatchEvaluationResults(data);
+      } catch (error) {
+        console.error('Batch evaluation error:', error);
+        resultsSection.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      }
+    }
+    
+    // Display batch evaluation results
+    function displayBatchEvaluationResults(data) {
+      const resultsSection = document.getElementById('resultsSection');
+      
+      let html = '<div class="batch-evaluation-results">';
+      html += '<h2>Batch Evaluation Summary</h2>';
+      
+      // Summary table
+      html += '<div class="summary-table">';
+      html += '<table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">';
+      html += '<thead><tr><th>Metric</th><th>Algorithmic</th><th>Parallel</th><th>Parallel (Goal/Specificity)</th></tr></thead>';
+      html += '<tbody>';
+      
+      const summary = data.summary;
+      const formatMetric = (value) => {
+        if (value === null || value === undefined) return 'N/A';
+        return value.toFixed(3);
+      };
+      
+      html += `<tr><td>Avg Precision@3</td><td>${formatMetric(summary.averagePrecisionAt3.algorithmic)}</td><td>${formatMetric(summary.averagePrecisionAt3.parallel)}</td><td>${formatMetric(summary.averagePrecisionAt3.parallel_general_goal_specificity)}</td></tr>`;
+      html += `<tr><td>Avg Precision@5</td><td>${formatMetric(summary.averagePrecisionAt5.algorithmic)}</td><td>${formatMetric(summary.averagePrecisionAt5.parallel)}</td><td>${formatMetric(summary.averagePrecisionAt5.parallel_general_goal_specificity)}</td></tr>`;
+      html += `<tr><td>Avg Recall@5</td><td>${formatMetric(summary.averageRecallAt5.algorithmic)}</td><td>${formatMetric(summary.averageRecallAt5.parallel)}</td><td>${formatMetric(summary.averageRecallAt5.parallel_general_goal_specificity)}</td></tr>`;
+      html += `<tr><td>Avg MRR</td><td>${formatMetric(summary.averageMRR.algorithmic)}</td><td>${formatMetric(summary.averageMRR.parallel)}</td><td>${formatMetric(summary.averageMRR.parallel_general_goal_specificity)}</td></tr>`;
+      html += `<tr><td>Avg NDCG</td><td>${formatMetric(summary.averageNDCG.algorithmic)}</td><td>${formatMetric(summary.averageNDCG.parallel)}</td><td>${formatMetric(summary.averageNDCG.parallel_general_goal_specificity)}</td></tr>`;
+      
+      html += '</tbody></table></div>';
+      
+      // Individual test case results
+      html += '<h3>Individual Test Case Results</h3>';
+      html += '<div style="max-height: 600px; overflow-y: auto;">';
+      data.results.forEach(result => {
+        html += `<div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px;">`;
+        html += `<h4>${result.testCaseName}</h4>`;
+        html += `<p><strong>Query:</strong> ${result.userQuery}</p>`;
+        html += '<table style="width: 100%; font-size: 12px; border-collapse: collapse;">';
+        html += '<thead><tr><th>Variant</th><th>P@3</th><th>P@5</th><th>R@5</th><th>MRR</th><th>NDCG</th></tr></thead>';
+        html += '<tbody>';
+        
+        ['algorithmic', 'parallel', 'parallel_general_goal_specificity'].forEach(variantName => {
+          const eval = result.evaluation?.[variantName];
+          if (eval) {
+            html += `<tr>`;
+            html += `<td>${variantName === 'parallel_general_goal_specificity' ? 'Parallel (Goal/Specificity)' : variantName}</td>`;
+            html += `<td>${(eval.precisionAt3 || 0).toFixed(3)}</td>`;
+            html += `<td>${(eval.precisionAt5 || 0).toFixed(3)}</td>`;
+            html += `<td>${(eval.recallAt5 || 0).toFixed(3)}</td>`;
+            html += `<td>${(eval.mrr || 0).toFixed(3)}</td>`;
+            html += `<td>${(eval.ndcg || 0).toFixed(3)}</td>`;
+            html += `</tr>`;
+          }
+        });
+        
+        html += '</tbody></table></div>';
+      });
+      html += '</div>';
+      html += '</div>';
+      
+      resultsSection.innerHTML = html;
+    }
+    
+    function clearBenchmark() {
+      document.getElementById('benchmarkSelector').value = '';
+      currentResults = null;
+    }
+    
+    function renderResults(variants, evaluation = null) {
+      const resultsSection = document.getElementById('resultsSection');
+      
+      resultsSection.innerHTML = variants.map(variant => `
+        <div class="variant-column">
+          <div class="variant-header">
+            <div class="variant-name">
+              ${variant.name === 'parallel_general_goal_specificity' 
+                ? 'Parallel (Goal/Specificity)' 
+                : variant.name === 'parallel'
+                  ? 'Parallel (No Negatives)'
+                  : variant.name.charAt(0).toUpperCase() + variant.name.slice(1)} Expansion
+            </div>
+            <div class="variant-meta">
+              Processing time: ${variant.processingTime}ms
+            </div>
+          </div>
+          <div class="query-section">
+            <div class="query-box">
+              <div class="query-label">Patient Query (q_patient):</div>
+              <div class="query-value">${variant.queryInfo?.q_patient || variant.enrichedQuery || 'N/A'}</div>
+              <div class="query-explanation">
+                Original user query (verbatim, used for BM25 retrieval)
+              </div>
+            </div>
+            ${variant.queryInfo?.safe_lane_terms && variant.queryInfo.safe_lane_terms.length > 0 ? `
+            <div class="query-box">
+              <div class="query-label">Safe Lane Terms (for BM25):</div>
+              <div class="query-value">${variant.queryInfo.safe_lane_terms.join(', ')}</div>
+              <div class="query-explanation">
+                2-4 high-signal terms added to BM25 query (symptoms/conditions, not procedures)
+              </div>
+            </div>
+            ` : ''}
+            ${variant.queryInfo ? `
+            <div class="query-box final-query">
+              <div class="query-label">BM25 Query (q_bm25):</div>
+              <div class="query-value">${variant.queryInfo.q_bm25 || variant.queryInfo.finalQuery || 'N/A'}</div>
+              <div class="query-explanation">
+                ${variant.queryInfo.normalizationAliases && variant.queryInfo.normalizationAliases.length > 0
+                  ? `✓ Equivalence normalization applied: ${variant.queryInfo.normalizationAliases.join(', ')}<br>(abbrev↔full, spelling variants only - no concept injection)`
+                  : variant.queryInfo.medicalExpansionApplied
+                    ? '✓ Medical term expansion applied (legacy)'
+                    : 'No normalization applied'}
+                <br>Used for Stage A: BM25 retrieval (retrieves top 50)
+                ${variant.queryInfo.q_bm25_before && variant.queryInfo.q_bm25_before !== variant.queryInfo.q_bm25
+                  ? `<br><small style="color: #666;">Before normalization: ${variant.queryInfo.q_bm25_before.substring(0, 100)}${variant.queryInfo.q_bm25_before.length > 100 ? '...' : ''}</small>`
+                  : ''}
+              </div>
+            </div>
+            ` : ''}
+            ${variant.queryInfo?.intent_terms && variant.queryInfo.intent_terms.length > 0 ? `
+            <div class="query-box intent-box">
+              <div class="query-label">Intent Terms (for Rescoring):</div>
+              <div class="query-value">${variant.queryInfo.intent_terms.slice(0, 8).join(', ')}${variant.queryInfo.intent_terms.length > 8 ? '...' : ''}</div>
+              <div class="query-explanation">
+                Used for Stage B: Post-retrieval rescoring (boosts/penalties, not query terms)
+                <br>Total: ${variant.queryInfo.intent_terms.length} terms
+              </div>
+            </div>
+            ` : ''}
+            ${variant.queryInfo?.anchor_phrases && variant.queryInfo.anchor_phrases.length > 0 ? `
+            <div class="query-box" style="background: #fff3cd; border: 1px solid #ffc107;">
+              <div class="query-label">Anchor Phrases (Boosted):</div>
+              <div class="query-value" style="font-weight: bold;">${variant.queryInfo.anchor_phrases.join(', ')}</div>
+              <div class="query-explanation">
+                Explicit conditions/diseases/procedures extracted from query. Appended to BM25 query (repetition helps) + additive boost in rescoring.
+              </div>
+            </div>
+            ` : ''}
+            ${variant.intentData ? `
+            <div class="query-box intent-box">
+              ${variant.intentData.primary_intent ? `
+              <div class="query-label">Clinical Intent:</div>
+              <div class="query-value intent-value">${variant.intentData.primary_intent}</div>
+              ` : ''}
+              ${variant.intentData.goal && variant.intentData.specificity ? `
+              <div class="query-label" style="margin-top: ${variant.intentData.primary_intent ? '10px' : '0'};">
+                ${variant.name === 'parallel_general_goal_specificity' ? 'Goal/Specificity:' : 'Goal/Specificity:'}
+              </div>
+              <div class="query-value intent-value">
+                ${variant.intentData.goal || 'N/A'} / ${variant.intentData.specificity || 'N/A'} (confidence: ${((variant.intentData.confidence || 0) * 100).toFixed(0)}%)
+              </div>
+              ` : ''}
+              ${!variant.intentData.primary_intent && !variant.intentData.goal ? `
+              <div class="query-label">Clinical Intent:</div>
+              <div class="query-value intent-value">N/A</div>
+              ` : ''}
+              <div class="query-explanation" style="margin-top: 10px;">
+                ${variant.intentData.negative_terms && variant.intentData.negative_terms.length > 0
+                  ? `Negative terms (down-rank): ${variant.intentData.negative_terms.slice(0, 5).join(', ')}${variant.intentData.negative_terms.length > 5 ? '...' : ''}`
+                  : variant.name === 'parallel'
+                    ? '<strong style="color: #d32f2f;">⚠️ Negative terms DISABLED (for comparison)</strong>'
+                    : 'No negative terms defined'}
+              </div>
+            </div>
+            ` : ''}
+          </div>
+          ${evaluation && evaluation[variant.name] ? `
+          <div class="evaluation-metrics">
+            <div class="query-box" style="background: #e8f5e9; border: 1px solid #4CAF50;">
+              <div class="query-label">Evaluation Metrics:</div>
+              <div style="font-size: 12px; line-height: 1.8;">
+                <strong>Precision@3:</strong> ${(evaluation[variant.name].precisionAt3 || 0).toFixed(3)}<br>
+                <strong>Precision@5:</strong> ${(evaluation[variant.name].precisionAt5 || 0).toFixed(3)}<br>
+                <strong>Recall@5:</strong> ${(evaluation[variant.name].recallAt5 || 0).toFixed(3)}<br>
+                <strong>MRR:</strong> ${(evaluation[variant.name].mrr || 0).toFixed(3)}<br>
+                <strong>NDCG:</strong> ${(evaluation[variant.name].ndcg || 0).toFixed(3)}<br>
+                ${evaluation[variant.name].positionMetrics ? `
+                <strong>Position Metrics:</strong><br>
+                &nbsp;&nbsp;Avg Position: ${evaluation[variant.name].positionMetrics.averagePosition?.toFixed(1) || 'N/A'}<br>
+                &nbsp;&nbsp;Min Position: ${evaluation[variant.name].positionMetrics.minPosition || 'N/A'}<br>
+                &nbsp;&nbsp;In Top 3: ${evaluation[variant.name].positionMetrics.inTop3}/${evaluation[variant.name].positionMetrics.totalFound}<br>
+                &nbsp;&nbsp;In Top 5: ${evaluation[variant.name].positionMetrics.inTop5}/${evaluation[variant.name].positionMetrics.totalFound}
+                ` : ''}
+              </div>
+            </div>
+          </div>
+          ` : ''}
+          <div>
+            ${variant.top3Results.map((result, idx) => renderResultCard(variant.name, result, idx)).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function renderResultCard(variantName, result, index) {
+      const practitioner = result.document;
+      const isFlagged = measurements.relevanceFlags[variantName]?.[index]?.flagged || false;
+      const isBookingProxy = measurements.bookingProxy[variantName] === index;
+      const profileJson = practitioner._cromwellProfile ? escapeHtml(JSON.stringify(practitioner._cromwellProfile, null, 2)) : null;
+      
+      // Check if this result is in ground truth
+      const practitionerId = practitioner.practitioner_id || practitioner.id;
+      const isGroundTruth = currentResults?.groundTruthIds?.includes(practitionerId) || false;
+      
+      return `
+        <div class="result-card ${isGroundTruth ? 'ground-truth-match' : ''}" data-variant="${variantName}" data-index="${index}">
+          <div class="result-rank">#${index + 1} ${isGroundTruth ? '✓' : ''}</div>
+          <div class="result-name">${practitioner.name || 'Unknown'} ${isGroundTruth ? '<span style="color: #4CAF50; font-weight: bold;">(Expected)</span>' : ''}</div>
+          <div class="result-specialty">${practitioner.specialty || 'N/A'}</div>
+          <div class="result-score">
+            Final Score: ${result.score.toFixed(4)}
+            ${result.rescoringInfo ? `
+              <div style="font-size: 11px; color: #666; margin-top: 3px;">
+                Rescoring: +${result.rescoringInfo.highSignalMatches} high-signal, +${result.rescoringInfo.pathwayMatches} pathway, +${result.rescoringInfo.procedureMatches} procedure
+                ${result.rescoringInfo.negativeMatches > 0 ? `, -${result.rescoringInfo.negativeMatches} negative` : ''}
+              </div>
+            ` : ''}
+          </div>
+          <div class="result-actions">
+            <button class="flag-button ${isFlagged ? 'flagged' : ''}" 
+                    onclick="toggleFlag('${variantName}', ${index})">
+              ${isFlagged ? '✓ Flagged' : 'Flag Issue'}
+            </button>
+            <button class="booking-button ${isBookingProxy ? 'selected' : ''}" 
+                    onclick="setBookingProxy('${variantName}', ${index})">
+              ${isBookingProxy ? '✓ Would Choose' : 'Would Choose'}
+            </button>
+          </div>
+          <div class="flag-note ${isFlagged ? 'visible' : ''}" id="flag-note-${variantName}-${index}">
+            <textarea placeholder="Why is this result here? (optional note)" 
+                      onchange="updateFlagNote('${variantName}', ${index}, this.value)">${measurements.relevanceFlags[variantName]?.[index]?.reason || ''}</textarea>
+          </div>
+          ${practitioner._cromwellProfile ? `
+          <div class="profile-json-section">
+            <button class="profile-json-toggle" onclick="toggleProfileJson('${variantName}-${index}')">
+              <span id="profile-json-icon-${variantName}-${index}">▶</span> View Cromwell Profile JSON
+            </button>
+            <div class="profile-json-content" id="profile-json-${variantName}-${index}" style="display: none;">
+              <pre class="profile-json" id="profile-json-text-${variantName}-${index}">${profileJson || ''}</pre>
+              <button class="copy-json-button" onclick="copyProfileJson('${variantName}-${index}')">Copy JSON</button>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+      `;
+    }
+    
+    function toggleProfileJson(id) {
+      const content = document.getElementById('profile-json-' + id);
+      const icon = document.getElementById('profile-json-icon-' + id);
+      
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.textContent = '▼';
+      } else {
+        content.style.display = 'none';
+        icon.textContent = '▶';
+      }
+    }
+    
+    function copyProfileJson(id) {
+      const content = document.getElementById('profile-json-' + id);
+      const jsonText = content.querySelector('.profile-json').textContent;
+      navigator.clipboard.writeText(jsonText).then(() => {
+        const button = content.querySelector('.copy-json-button');
+        const originalText = button.textContent;
+        button.textContent = '✓ Copied!';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy JSON. Please select and copy manually.');
+      });
+    }
+    
+    function toggleFlag(variantName, index) {
+      if (!measurements.relevanceFlags[variantName]) {
+        measurements.relevanceFlags[variantName] = {};
+      }
+      
+      const current = measurements.relevanceFlags[variantName][index];
+      if (current && current.flagged) {
+        delete measurements.relevanceFlags[variantName][index];
+      } else {
+        measurements.relevanceFlags[variantName][index] = {
+          flagged: true,
+          reason: ''
+        };
+      }
+      
+      // Re-render results to update UI
+      if (currentResults) {
+        renderResults(currentResults.variants);
+      }
+    }
+    
+    function updateFlagNote(variantName, index, note) {
+      if (!measurements.relevanceFlags[variantName]) {
+        measurements.relevanceFlags[variantName] = {};
+      }
+      if (!measurements.relevanceFlags[variantName][index]) {
+        measurements.relevanceFlags[variantName][index] = { flagged: true };
+      }
+      measurements.relevanceFlags[variantName][index].reason = note;
+    }
+    
+    function setBookingProxy(variantName, index) {
+      // Only one booking proxy per variant
+      measurements.bookingProxy[variantName] = index;
+      
+      // Re-render results
+      if (currentResults) {
+        renderResults(currentResults.variants);
+      }
+    }
+    
+    function showMeasurements() {
+      const section = document.getElementById('measurementsSection');
+      section.style.display = 'block';
+      
+      // Calculate Precision@3 if ground truth available
+      const precisionDisplay = document.getElementById('precisionDisplay');
+      precisionDisplay.innerHTML = '<strong>Precision@3:</strong> Ground truth not available (manual calculation required)';
+    }
+    
+    function exportResults(format) {
+      if (!currentResults) {
+        alert('No results to export');
+        return;
+      }
+      
+      const exportData = {
+        testCase: {
+          messages,
+          timestamp: new Date().toISOString()
+        },
+        variants: currentResults.variants.map(variant => ({
+          name: variant.name,
+          enrichedQuery: variant.enrichedQuery,
+          processingTime: variant.processingTime,
+          intentData: variant.intentData || null,
+          top3Results: variant.top3Results.map((result, idx) => ({
+            rank: idx + 1,
+            practitionerId: result.document.practitioner_id || result.document.id,
+            practitionerName: result.document.name,
+            specialty: result.document.specialty,
+            bm25Score: result.score,
+            relevanceFlagged: measurements.relevanceFlags[variant.name]?.[idx] || null,
+            bookingProxy: measurements.bookingProxy[variant.name] === idx
+          }))
+        })),
+        measurements
+      };
+      
+      if (format === 'json') {
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ranking-test-${Date.now()}.json`;
+        a.click();
+      } else if (format === 'csv') {
+        const rows = [];
+        rows.push(['Variant', 'Rank', 'Practitioner ID', 'Practitioner Name', 'Specialty', 'BM25 Score', 'Relevance Flagged', 'Flag Reason', 'Booking Proxy'].join(','));
+        
+        currentResults.variants.forEach(variant => {
+          variant.top3Results.forEach((result, idx) => {
+            const flag = measurements.relevanceFlags[variant.name]?.[idx];
+            const isBookingProxy = measurements.bookingProxy[variant.name] === idx;
+            rows.push([
+              variant.name,
+              idx + 1,
+              result.document.practitioner_id || result.document.id || '',
+              `"${(result.document.name || '').replace(/"/g, '""')}"`,
+              `"${(result.document.specialty || '').replace(/"/g, '""')}"`,
+              result.score.toFixed(4),
+              flag ? 'Yes' : 'No',
+              flag ? `"${(flag.reason || '').replace(/"/g, '""')}"` : '',
+              isBookingProxy ? 'Yes' : 'No'
+            ].join(','));
+          });
+        });
+        
+        const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ranking-test-${Date.now()}.csv`;
+        a.click();
+      }
+    }
+    
+    // Initialize on load
+    initChat();
+  </script>
+</body>
+</html>
