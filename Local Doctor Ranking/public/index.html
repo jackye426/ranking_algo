@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Doctor Ranking</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .search-box {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        
+        .search-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .search-button {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .search-button:hover {
+            background: #5568d3;
+        }
+        
+        .search-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .example-queries {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .example-query {
+            padding: 8px 15px;
+            background: #f5f5f5;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .example-query:hover {
+            background: #e0e0e0;
+        }
+        
+        .results-container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: none;
+        }
+        
+        .results-container.show {
+            display: block;
+        }
+        
+        .query-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+            line-height: 1.6;
+        }
+        
+        .query-info strong {
+            color: #667eea;
+        }
+        
+        .results-list {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .result-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .result-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+        
+        .result-rank {
+            background: #667eea;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .result-name {
+            flex: 1;
+            margin-left: 15px;
+        }
+        
+        .result-name h3 {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .result-title {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .result-score {
+            text-align: right;
+        }
+        
+        .score-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .score-label {
+            font-size: 0.8em;
+            color: #999;
+        }
+        
+        .result-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .detail-item {
+            font-size: 0.9em;
+        }
+        
+        .detail-label {
+            color: #999;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .detail-value {
+            color: #333;
+        }
+        
+        .fit-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-right: 8px;
+        }
+        
+        .fit-excellent {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .fit-good {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .fit-ill-fit {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .fit-reason {
+            font-size: 0.85em;
+            color: #555;
+            font-style: italic;
+            margin-top: 5px;
+            padding-left: 10px;
+            border-left: 2px solid #e0e0e0;
+        }
+        
+        .card-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+        .card-section-label {
+            font-size: 0.75em;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .card-section-value {
+            font-size: 0.9em;
+            color: #333;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+        }
+        .card-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9em;
+            word-break: break-all;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+        }
+        .card-link:hover {
+            text-decoration: underline;
+        }
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #e8eaf6;
+            color: #3949ab;
+            border-radius: 6px;
+            font-size: 0.8em;
+            white-space: nowrap;
+        }
+        .tag-procedure {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        .tag-condition {
+            background: #f3e5f5;
+            color: #6a1b9a;
+        }
+        .tag-more {
+            background: #f5f5f5;
+            color: #666;
+            font-size: 0.75em;
+        }
+        .about-toggle {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+        .about-toggle summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #667eea;
+            font-size: 0.9em;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .about-toggle summary::-webkit-details-marker {
+            display: none;
+        }
+        .about-toggle summary::before {
+            content: '▶';
+            font-size: 0.75em;
+            transition: transform 0.2s;
+        }
+        .about-toggle[open] summary::before {
+            transform: rotate(90deg);
+        }
+        .about-content {
+            margin-top: 10px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 0.9em;
+            color: #444;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .location-list {
+            font-size: 0.9em;
+            color: #333;
+        }
+        .location-item {
+            margin-bottom: 4px;
+        }
+        .pricing-na {
+            color: #888;
+            font-style: italic;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .stats-bar {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: white;
+            font-size: 0.9em;
+        }
+        
+        .stats-bar strong {
+            margin-right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Local Doctor Ranking</h1>
+            <p>Find the right doctor for your needs</p>
+        </div>
+        
+        <div class="stats-bar" id="statsBar">
+            Loading statistics...
+        </div>
+        
+        <div class="search-box">
+            <form class="search-form" id="searchForm">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; gap: 10px;">
+                        <input 
+                            type="text" 
+                            class="search-input" 
+                            id="queryInput" 
+                            placeholder="e.g. 'I need SVT ablation' or paste a full patient conversation"
+                            autocomplete="off"
+                            style="flex: 1;"
+                        >
+                        <button type="submit" class="search-button" id="searchButton">Search</button>
+                    </div>
+                    <p style="font-size: 12px; color: #666; margin-top: 4px;">Short query or full conversation both work; for V2/V6 the system infers goal and intent from your text.</p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px;">
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label for="variantSelector" style="color: #666; font-size: 13px; font-weight: 600;">Algorithm:</label>
+                            <select 
+                                id="variantSelector" 
+                                style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; background: white;"
+                            >
+                                <option value="v5" selected>V5 (Ideal Profile - GPT-5.1)</option>
+                                <option value="v2">V2 (Parallel - GPT-4o-mini)</option>
+                                <option value="v6">V6 (Progressive Ranking - GPT-5.1)</option>
+                                <option value="production">Production BM25 (New Features)</option>
+                            </select>
+                        </div>
+                        <div id="productionOptions" style="display: none; grid-column: 1 / -1; padding: 15px; background: #f8f9fa; border-radius: 8px; margin-top: 10px;">
+                            <div style="font-weight: 600; margin-bottom: 10px; color: #666;">Production BM25 Options:</div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="useEquivalenceNormalization" style="cursor: pointer;">
+                                    <span style="font-size: 13px;">Equivalence Normalization</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="separateQueryFromFilters" style="cursor: pointer;">
+                                    <span style="font-size: 13px;">Separate Query from Filters</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="useTwoStageRetrieval" style="cursor: pointer;">
+                                    <span style="font-size: 13px;">Two-Stage Retrieval</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label for="specialtyFilter" style="color: #666; font-size: 13px; font-weight: 600;">Specialty:</label>
+                            <input 
+                                type="text" 
+                                id="specialtyFilter" 
+                                placeholder="e.g., Cardiology (optional)"
+                                autocomplete="off"
+                                style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;"
+                            >
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label for="cityFilter" style="color: #666; font-size: 13px; font-weight: 600;">City:</label>
+                            <input
+                                type="text"
+                                id="cityFilter"
+                                placeholder="e.g., London (optional)"
+                                autocomplete="off"
+                                style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;"
+                            >
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label for="postcodeFilter" style="color: #666; font-size: 13px; font-weight: 600;">Postcode:</label>
+                            <input
+                                type="text"
+                                id="postcodeFilter"
+                                placeholder="e.g., SW5 or SW5 0TU"
+                                autocomplete="off"
+                                style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;"
+                            >
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label for="radiusFilter" style="color: #666; font-size: 13px; font-weight: 600;">Radius (miles):</label>
+                            <input
+                                type="number"
+                                id="radiusFilter"
+                                placeholder="e.g., 10"
+                                min="1"
+                                max="100"
+                                autocomplete="off"
+                                style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;"
+                            >
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label for="ageGroupFilter" style="color: #666; font-size: 13px; font-weight: 600;">Age Group:</label>
+                            <select 
+                                id="ageGroupFilter" 
+                                style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; background: white;"
+                            >
+                                <option value="">Any</option>
+                                <option value="Adult">Adult</option>
+                                <option value="Paediatric">Paediatric</option>
+                                <option value="Child">Child</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label for="genderFilter" style="color: #666; font-size: 13px; font-weight: 600;">Gender:</label>
+                            <select 
+                                id="genderFilter" 
+                                style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; background: white;"
+                            >
+                                <option value="">Any</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label for="languageFilter" style="color: #666; font-size: 13px; font-weight: 600;">Language:</label>
+                            <input 
+                                type="text" 
+                                id="languageFilter" 
+                                placeholder="e.g., English (optional)"
+                                autocomplete="off"
+                                style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;"
+                            >
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; display: flex; align-items: center; gap: 15px;">
+                        <button type="button" id="clearFilters" style="padding: 8px 15px; background: #f5f5f5; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; font-size: 13px;">Clear All Filters</button>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: #666;">
+                            <input type="checkbox" id="evaluateFitCheckbox" style="width: 18px; height: 18px; cursor: pointer;">
+                            <span>Evaluate fit quality with AI (excellent/good/ill-fit)</span>
+                        </label>
+                    </div>
+                </div>
+            </form>
+            
+            <div class="example-queries">
+                <span style="color: #666; margin-right: 10px;">Example queries:</span>
+                <span class="example-query" onclick="setQuery('I need SVT ablation')">SVT ablation</span>
+                <span class="example-query" onclick="setQuery('I have chest pain')">Chest pain</span>
+                <span class="example-query" onclick="setQuery('Looking for a cardiologist for atrial fibrillation')">Cardiologist</span>
+                <span class="example-query" onclick="setQuery('I need a general surgeon for hernia repair')">Hernia repair</span>
+            </div>
+        </div>
+        
+        <div class="results-container" id="resultsContainer">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Searching through doctors...</p>
+            </div>
+            
+            <div id="resultsContent" style="display: none;">
+                <div class="query-info" id="queryInfo"></div>
+                <div class="results-list" id="resultsList"></div>
+            </div>
+            
+            <div class="error" id="error" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <script>
+        // API base URL: use same origin when served from ranking server; otherwise point to localhost:3000
+        const API_BASE = (function() {
+            const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+            if (window.location.hostname === 'localhost' && port === '3000') return ''; // same origin
+            if (window.location.protocol === 'file:') return 'http://localhost:3000'; // opened from file
+            if (window.location.hostname === 'localhost') return 'http://localhost:3000'; // other port, assume API on 3000
+            return ''; // same origin in production
+        })();
+
+        // Load stats on page load; show warning if server unreachable
+        async function loadStats() {
+            try {
+                const response = await fetch(API_BASE + '/api/stats');
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('statsBar').innerHTML = `
+                        <strong>Total Doctors: ${data.stats.total.toLocaleString()}</strong>
+                        <strong>Specialties: ${data.stats.uniqueSpecialties}</strong>
+                        <strong>With GMC: ${data.stats.withGMC.toLocaleString()}</strong>
+                    `;
+                } else {
+                    showServerWarning('Stats failed');
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+                showServerWarning('Cannot reach server');
+            }
+        }
+        function showServerWarning(reason) {
+            const bar = document.getElementById('statsBar');
+            const openUrl = 'http://localhost:3000';
+            bar.innerHTML = `<strong style="color:#c00;">${reason}.</strong> Open <a href="${openUrl}" target="_blank" rel="noopener">${openUrl}</a> and run <code>node server.js</code> in the "Local Doctor Ranking" folder.`;
+        }
+
+        // Show/hide production options based on variant selector
+        document.getElementById('variantSelector').addEventListener('change', function() {
+            const productionOptions = document.getElementById('productionOptions');
+            productionOptions.style.display = this.value === 'production' ? 'block' : 'none';
+        });
+        
+        function setQuery(query) {
+            document.getElementById('queryInput').value = query;
+            document.getElementById('queryInput').focus();
+        }
+        
+        async function search(query) {
+            const resultsContainer = document.getElementById('resultsContainer');
+            const loading = document.getElementById('loading');
+            const resultsContent = document.getElementById('resultsContent');
+            const errorDiv = document.getElementById('error');
+            const searchButton = document.getElementById('searchButton');
+            const variantSelector = document.getElementById('variantSelector').value;
+            const specialtyFilter = document.getElementById('specialtyFilter').value.trim();
+            const cityFilter = document.getElementById('cityFilter').value.trim();
+            const postcodeFilter = document.getElementById('postcodeFilter').value.trim();
+            const radiusFilter = document.getElementById('radiusFilter').value.trim();
+            const ageGroupFilter = document.getElementById('ageGroupFilter').value.trim();
+            const genderFilter = document.getElementById('genderFilter').value.trim();
+            const languageFilter = document.getElementById('languageFilter').value.trim();
+            const evaluateFit = document.getElementById('evaluateFitCheckbox').checked;
+            
+            // Show loading state
+            resultsContainer.classList.add('show');
+            loading.style.display = 'block';
+            resultsContent.style.display = 'none';
+            errorDiv.style.display = 'none';
+            searchButton.disabled = true;
+            
+            try {
+                const requestBody = {
+                    query: query,
+                    shortlistSize: 10,
+                    evaluateFit: evaluateFit,
+                    variant: variantSelector
+                };
+                
+                // Add filters if provided
+                if (specialtyFilter) {
+                    requestBody.specialty = specialtyFilter;
+                }
+                
+                // Build location filter if any location parameters are provided
+                if (cityFilter || postcodeFilter || radiusFilter) {
+                    requestBody.locationFilter = {};
+                    if (cityFilter) {
+                        requestBody.locationFilter.city = cityFilter;
+                    }
+                    if (postcodeFilter) {
+                        requestBody.locationFilter.postcode = postcodeFilter;
+                    }
+                    if (radiusFilter) {
+                        // Radius filter uses the postcode as the center point
+                        requestBody.locationFilter.radiusCenter = postcodeFilter || null;
+                        requestBody.locationFilter.radiusMiles = parseInt(radiusFilter, 10);
+                    }
+                }
+                
+                if (ageGroupFilter) {
+                    requestBody.patient_age_group = ageGroupFilter;
+                }
+                if (genderFilter) {
+                    requestBody.gender = genderFilter;
+                }
+                if (languageFilter) {
+                    requestBody.languages = [languageFilter];
+                }
+                
+                // Add V6 specific options if V6 is selected
+                if (variantSelector === 'v6') {
+                    requestBody.maxIterations = 5;
+                    requestBody.maxProfilesReviewed = 30;
+                    requestBody.batchSize = 12;
+                    requestBody.fetchStrategy = 'stage-b';
+                    requestBody.targetTopK = 3;
+                }
+                
+                // Production BM25 endpoint (use API_BASE so it works when opened from file:// or different port)
+                const endpoint = API_BASE + (variantSelector === 'production' ? '/api/rank-production' : '/api/rank');
+                
+                // Add production BM25 options if production is selected
+                if (variantSelector === 'production') {
+                    requestBody.useEquivalenceNormalization = document.getElementById('useEquivalenceNormalization').checked;
+                    requestBody.separateQueryFromFilters = document.getElementById('separateQueryFromFilters').checked;
+                    requestBody.useTwoStageRetrieval = document.getElementById('useTwoStageRetrieval').checked;
+                    requestBody.genderPreference = genderFilter || null;
+                    requestBody.insurancePreference = null; // Can add UI for this later
+                }
+                
+                let response;
+                let data;
+                try {
+                    response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                        const msg = errorData.message || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                        if (response.status === 404) {
+                            throw new Error(msg + ' Open the app at http://localhost:3000 (not file:// or another port) so API requests reach the server.');
+                        }
+                        throw new Error(msg);
+                    }
+                    
+                    data = await response.json();
+                } catch (fetchError) {
+                    console.error('Fetch error:', fetchError);
+                    let hint = '';
+                    if (fetchError.message && fetchError.message.includes('endpoint not found')) {
+                        hint = ' Open the app at http://localhost:3000 in your browser, and ensure the ranking server is running (node server.js).';
+                    } else if (fetchError.message && (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError'))) {
+                        hint = ' Start the server with: node server.js (in the Local Doctor Ranking folder).';
+                    }
+                    throw new Error(fetchError.message + hint);
+                }
+                
+                // Hide loading, show results
+                loading.style.display = 'none';
+                resultsContent.style.display = 'block';
+                
+                // Display query info with filter information
+                const queryInfo = document.getElementById('queryInfo');
+                
+                // Handle production BM25 response format
+                if (variantSelector === 'production' && data.metadata) {
+                    const meta = data.metadata;
+                    const totalCount = meta.totalPractitioners || 0;
+                    const beforeFilters = meta.practitionersBeforeFilters !== undefined ? meta.practitionersBeforeFilters : totalCount;
+                    const filtersApplied = meta.filters || {};
+                    
+                    let productionInfo = `<br><strong>Production BM25 Features:</strong>`;
+                    if (meta.equivalenceNormalizationUsed) productionInfo += ` Equivalence Normalization ✅`;
+                    if (meta.separateQueryUsed) productionInfo += ` Separate Query ✅`;
+                    if (meta.twoStageUsed) productionInfo += ` Two-Stage Retrieval ✅`;
+                    if (!meta.equivalenceNormalizationUsed && !meta.separateQueryUsed && !meta.twoStageUsed) {
+                        productionInfo += ` None (legacy mode)`;
+                    }
+                    productionInfo += `<br><strong>Duration:</strong> ${meta.duration || 'N/A'}`;
+                    
+                    const activeFilters = [];
+                    const filterDescriptionParts = [];
+                    if (filtersApplied.specialty) {
+                        activeFilters.push(`Specialty: ${filtersApplied.specialty}`);
+                        filterDescriptionParts.push(`specialty: ${filtersApplied.specialty}`);
+                    }
+                    if (filtersApplied.patient_age_group) {
+                        activeFilters.push(`Age: ${filtersApplied.patient_age_group}`);
+                        filterDescriptionParts.push(`age: ${filtersApplied.patient_age_group}`);
+                    }
+                    if (filtersApplied.genderPreference) {
+                        activeFilters.push(`Gender: ${filtersApplied.genderPreference}`);
+                        filterDescriptionParts.push(`gender: ${filtersApplied.genderPreference}`);
+                    }
+                    if (filtersApplied.insurancePreference) {
+                        activeFilters.push(`Insurance: ${filtersApplied.insurancePreference}`);
+                        filterDescriptionParts.push(`insurance: ${filtersApplied.insurancePreference}`);
+                    }
+                    if (filtersApplied.languages && filtersApplied.languages.length > 0) {
+                        activeFilters.push(`Language: ${filtersApplied.languages.join(', ')}`);
+                        filterDescriptionParts.push(`language: ${filtersApplied.languages.join(', ')}`);
+                    }
+                    if (filtersApplied.locationFilter) {
+                        const locFilter = filtersApplied.locationFilter;
+                        if (locFilter.city) {
+                            activeFilters.push(`City: ${locFilter.city}`);
+                            filterDescriptionParts.push(`in ${locFilter.city}`);
+                        }
+                        if (locFilter.postcode) {
+                            activeFilters.push(`Postcode: ${locFilter.postcode}`);
+                            filterDescriptionParts.push(`postcode ${locFilter.postcode}`);
+                        }
+                        if (locFilter.radiusMiles && locFilter.radiusCenter) {
+                            activeFilters.push(`Radius: ${locFilter.radiusMiles}mi from ${locFilter.radiusCenter}`);
+                            filterDescriptionParts.push(`within ${locFilter.radiusMiles} miles of ${locFilter.radiusCenter}`);
+                        }
+                    }
+                    const filterSummary = filterDescriptionParts.length > 0 ? ` (${filterDescriptionParts.join(', ')})` : '';
+                    if (beforeFilters !== totalCount) {
+                        productionInfo += `<br><strong>From:</strong> ${beforeFilters.toLocaleString()} total → ${totalCount.toLocaleString()} after filters`;
+                    }
+                    
+                    queryInfo.innerHTML = `
+                        <strong>Query:</strong> ${data.query}${productionInfo}<br>
+                        <strong>Profiles evaluated:</strong> ${totalCount.toLocaleString()}${filterSummary}<br>
+                        <strong>Results:</strong> ${data.results.length}<br>
+                        <strong>Filters:</strong> ${activeFilters.length > 0 ? activeFilters.join(', ') : 'None'}
+                    `;
+                } else {
+                    // Original format for V2/V5/V6
+                    const totalCount = data.queryInfo?.totalCount !== undefined ? data.queryInfo.totalCount : 0;
+                    const filteredCount = data.queryInfo?.filteredCount !== undefined ? data.queryInfo.filteredCount : totalCount;
+                    const filtersApplied = data.queryInfo?.filtersApplied || {};
+                    
+                    // Build filter summary
+                    const activeFilters = [];
+                    if (filtersApplied.manualSpecialty) activeFilters.push(`Specialty: ${filtersApplied.manualSpecialty}`);
+                    if (filtersApplied.patient_age_group) activeFilters.push(`Age: ${filtersApplied.patient_age_group}`);
+                    if (filtersApplied.gender) activeFilters.push(`Gender: ${filtersApplied.gender}`);
+                    if (filtersApplied.languages && filtersApplied.languages.length > 0) {
+                        activeFilters.push(`Language: ${filtersApplied.languages.join(', ')}`);
+                    }
+                    if (filtersApplied.locationFilter) {
+                        const locFilter = filtersApplied.locationFilter;
+                        if (locFilter.city) activeFilters.push(`City: ${locFilter.city}`);
+                        if (locFilter.postcode) activeFilters.push(`Postcode: ${locFilter.postcode}`);
+                        if (locFilter.radiusMiles && locFilter.radiusCenter) activeFilters.push(`Radius: ${locFilter.radiusMiles}mi from ${locFilter.radiusCenter}`);
+                    }
+                    
+                    const filterDescriptionParts = [];
+                    if (filtersApplied.locationFilter) {
+                        const loc = filtersApplied.locationFilter;
+                        if (loc.radiusMiles && loc.radiusCenter) filterDescriptionParts.push(`within ${loc.radiusMiles} miles of ${loc.radiusCenter}`);
+                        else if (loc.city) filterDescriptionParts.push(`in ${loc.city}`);
+                        else if (loc.postcode) filterDescriptionParts.push(`postcode ${loc.postcode}`);
+                    }
+                    if (filtersApplied.manualSpecialty) filterDescriptionParts.push(`specialty: ${filtersApplied.manualSpecialty}`);
+                    if (filtersApplied.patient_age_group) filterDescriptionParts.push(`age: ${filtersApplied.patient_age_group}`);
+                    if (filtersApplied.gender) filterDescriptionParts.push(`gender: ${filtersApplied.gender}`);
+                    if (filtersApplied.languages && filtersApplied.languages.length > 0) filterDescriptionParts.push(`language: ${filtersApplied.languages.join(', ')}`);
+                    const filterSummary = filterDescriptionParts.length > 0 ? ` (${filterDescriptionParts.join(', ')})` : '';
+                    
+                    let filterText = '';
+                    if (activeFilters.length > 0) {
+                        filterText = `<br><strong>Profiles evaluated:</strong> ${filteredCount.toLocaleString()}${filterSummary}<br><strong>Filters applied:</strong> ${activeFilters.join(' | ')}<br><strong>Ranked:</strong> ${filteredCount.toLocaleString()} of ${totalCount.toLocaleString()} doctors (${totalCount > 0 ? ((filteredCount / totalCount) * 100).toFixed(1) : 0}%)`;
+                    } else {
+                        filterText = `<br><strong>No filters applied.</strong> <strong>Profiles evaluated:</strong> ${totalCount.toLocaleString()} doctors.`;
+                    }
+                    
+                    let fitEvaluationText = '';
+                    if (data.fitEvaluation && data.fitEvaluation.evaluated) {
+                        const fitCounts = data.queryInfo.qualityBreakdown || { excellent: 0, good: 0, illFit: 0 };
+                        fitEvaluationText = `<br><strong>Fit Quality:</strong> ${fitCounts.excellent} excellent, ${fitCounts.good} good, ${fitCounts.illFit} ill-fit`;
+                        if (data.fitEvaluation.overall_reason) {
+                            fitEvaluationText += `<br><em>${data.fitEvaluation.overall_reason}</em>`;
+                        }
+                    }
+                    
+                    // Add V6 specific metadata
+                    let v6MetadataText = '';
+                    if (variantSelector === 'v6' && data.queryInfo.iterations !== undefined) {
+                        v6MetadataText = `<br><strong>V6 Progressive Ranking:</strong> ${data.queryInfo.iterations} iteration(s), ${data.queryInfo.profilesEvaluated} profiles evaluated, ${data.queryInfo.profilesFetched} profiles fetched`;
+                        v6MetadataText += `<br><strong>Termination:</strong> ${data.queryInfo.terminationReason}`;
+                        if (data.queryInfo.top3AllExcellent !== undefined) {
+                            v6MetadataText += ` | <strong>Top 3 All Excellent:</strong> ${data.queryInfo.top3AllExcellent ? '✅ Yes' : '❌ No'}`;
+                        }
+                    }
+                    
+                    queryInfo.innerHTML = `
+                        <strong>Query:</strong> ${data.query}<br>
+                        <strong>Goal:</strong> ${data.queryInfo.goal || 'N/A'} | 
+                        <strong>Specificity:</strong> ${data.queryInfo.specificity || 'N/A'} | 
+                        <strong>Confidence:</strong> ${data.queryInfo.confidence ? (data.queryInfo.confidence * 100).toFixed(0) + '%' : 'N/A'}${filterText}${fitEvaluationText}${v6MetadataText}<br>
+                        <strong>Processing Time:</strong> ${data.processingTime?.total || 'N/A'}ms${data.processingTime?.evaluation ? `<br>&nbsp;&nbsp;Ranking: ${data.processingTime.ranking}ms, Evaluation: ${data.processingTime.evaluation}ms` : ''}
+                    `;
+                }
+                
+                // Format locations for display (array of objects with hospital, address, url, website, postcode)
+                function formatLocations(locations) {
+                    if (!locations || !Array.isArray(locations) || locations.length === 0) return null;
+                    return locations.map(loc => {
+                        if (typeof loc === 'string') return loc;
+                        if (loc && typeof loc === 'object') {
+                            const parts = [loc.hospital, loc.name, loc.address, loc.city, loc.postcode].filter(Boolean);
+                            let text = parts.length ? parts.join(', ') : '';
+                            const link = loc.url || loc.website;
+                            if (link) text = text ? text + ' · ' + link : link;
+                            return text || null;
+                        }
+                        return null;
+                    }).filter(Boolean);
+                }
+                // Display results
+                const resultsList = document.getElementById('resultsList');
+                resultsList.innerHTML = data.results.map((result, idx) => {
+                    const fitBadge = result.fit_category ? `
+                        <span class="fit-badge fit-${result.fit_category}">${result.fit_category}</span>
+                    ` : '';
+                    const aiReasoning = (result.fit_reason || result.evaluation_reason) || null;
+                    const locationsFormatted = formatLocations(result.locations);
+                    const aboutText = (result.about || result.clinical_expertise_full || result.clinical_expertise || '').trim();
+                    const iterationInfo = (variantSelector === 'v6' && result.iteration_found != null) ? `
+                        <div class="iteration-info" style="font-size: 11px; color: #888; margin-top: 4px;">Found in iteration ${result.iteration_found}</div>
+                    ` : '';
+                    const scoreBreakdown = (variantSelector === 'production' && (result.bm25Score != null || result.qualityBoost != null || result.proximityBoost != null)) ? `
+                        <div class="card-section-value" style="font-size: 0.85em;">
+                            ${result.bm25Score != null ? `BM25: ${result.bm25Score.toFixed(2)}` : ''}
+                            ${result.qualityBoost != null && result.qualityBoost !== 1.0 ? ` | Quality: ${result.qualityBoost.toFixed(2)}x` : ''}
+                            ${result.proximityBoost != null && result.proximityBoost !== 1.0 ? ` | Proximity: ${result.proximityBoost.toFixed(2)}x` : ''}
+                            ${result.exactMatchBonus != null && result.exactMatchBonus > 0 ? ` | Exact: +${result.exactMatchBonus.toFixed(1)}` : ''}
+                        </div>
+                    ` : '';
+                    return `
+                    <div class="result-card">
+                        <div class="result-header">
+                            <div class="result-rank">${result.rank}</div>
+                            <div class="result-name" style="flex: 1;">
+                                <h3>${result.name}${fitBadge}</h3>
+                                <div class="result-title">${result.title || ''} ${result.specialty ? ' · ' + result.specialty : ''}</div>
+                                ${iterationInfo}
+                            </div>
+                            <div class="result-score">
+                                <div class="score-value">${typeof result.score === 'number' ? result.score.toFixed(2) : result.score || '0.00'}</div>
+                                <div class="score-label">Score</div>
+                            </div>
+                        </div>
+                        <div class="card-section">
+                            <div class="card-section-label">Profile link</div>
+                            <div class="card-section-value">
+                                ${result.profile_url ? `
+                                <a href="${result.profile_url}" target="_blank" rel="noopener noreferrer" class="card-link">🔗 ${result.profile_url}</a>
+                                ` : '<span class="pricing-na">—</span>'}
+                            </div>
+                        </div>
+                        ${(result.subspecialties && result.subspecialties.length > 0) ? `
+                        <div class="card-section">
+                            <div class="card-section-label">Subspecialties</div>
+                            <div class="card-section-value tag-list">${result.subspecialties.slice(0, 12).map(s => `<span class="tag">${String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span>`).join('')}${result.subspecialties.length > 12 ? ` <span class="tag-more">+${result.subspecialties.length - 12} more</span>` : ''}</div>
+                        </div>
+                        ` : ''}
+                        ${(result.procedures && result.procedures.length > 0) ? `
+                        <div class="card-section">
+                            <div class="card-section-label">Procedures</div>
+                            <div class="card-section-value tag-list">${result.procedures.slice(0, 10).map(p => `<span class="tag tag-procedure">${String(p).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span>`).join('')}${result.procedures.length > 10 ? ` <span class="tag-more">+${result.procedures.length - 10} more</span>` : ''}</div>
+                        </div>
+                        ` : ''}
+                        ${(result.conditions && result.conditions.length > 0) ? `
+                        <div class="card-section">
+                            <div class="card-section-label">Conditions</div>
+                            <div class="card-section-value tag-list">${result.conditions.slice(0, 10).map(c => `<span class="tag tag-condition">${String(c).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span>`).join('')}${result.conditions.length > 10 ? ` <span class="tag-more">+${result.conditions.length - 10} more</span>` : ''}</div>
+                        </div>
+                        ` : ''}
+                        <div class="card-section">
+                            <div class="card-section-label">Pricing</div>
+                            <div class="card-section-value ${result.pricing ? '' : 'pricing-na'}">${(result.pricing && String(result.pricing).trim()) ? result.pricing : 'Contact for pricing'}</div>
+                        </div>
+                        ${aiReasoning ? `
+                        <div class="card-section">
+                            <div class="card-section-label">AI reasoning</div>
+                            <div class="card-section-value fit-reason">${aiReasoning}</div>
+                        </div>
+                        ` : ''}
+                        ${(result.reddit_patient_notes || result.reddit_recommendation_level) ? `
+                        <div class="card-section reddit-feedback">
+                            <div class="card-section-label">💬 Patient Feedback</div>
+                            <div class="card-section-value">
+                                ${result.reddit_recommendation_level ? `
+                                <div class="reddit-recommendation" style="margin-bottom: 8px; padding: 6px 10px; background: #f0f7ff; border-left: 3px solid #4a90e2; border-radius: 4px; font-size: 0.9em;">
+                                    ${result.reddit_recommendation_level.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                                </div>
+                                ` : ''}
+                                ${result.reddit_patient_notes ? `
+                                <div class="reddit-notes" style="font-size: 0.9em; color: #555; line-height: 1.5;">
+                                    ${result.reddit_patient_notes.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+                        <div class="card-section">
+                            <div class="card-section-label">Location</div>
+                            <div class="card-section-value location-list">
+                                ${locationsFormatted && locationsFormatted.length > 0
+                                    ? locationsFormatted.map(l => `<div class="location-item">${l}</div>`).join('')
+                                    : '<span class="pricing-na">—</span>'}
+                            </div>
+                        </div>
+                        <details class="about-toggle">
+                            <summary>About</summary>
+                            <div class="about-content">${aboutText ? aboutText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'No details available.'}</div>
+                        </details>
+                        ${scoreBreakdown ? `<div class="card-section"><div class="card-section-label">Score breakdown</div>${scoreBreakdown}</div>` : ''}
+                        ${result.rescoringInfo ? `
+                        <div class="card-section">
+                            <div class="card-section-label">Rescoring</div>
+                            <div class="card-section-value" style="font-size: 0.85em;">
+                                ${[result.rescoringInfo.intentMatches != null && `Intent: ${result.rescoringInfo.intentMatches}`, result.rescoringInfo.anchorMatches != null && `Anchor: ${result.rescoringInfo.anchorMatches}`, result.rescoringInfo.negativeMatches != null && `Negative: ${result.rescoringInfo.negativeMatches}`, result.rescoringInfo.pathwayMatches != null && `Pathway: ${result.rescoringInfo.pathwayMatches}`].filter(Boolean).join(' · ')}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                loading.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = `Error: ${error.message}`;
+            } finally {
+                searchButton.disabled = false;
+            }
+        }
+        
+        // Clear all filters
+        document.getElementById('clearFilters').addEventListener('click', () => {
+            document.getElementById('specialtyFilter').value = '';
+            document.getElementById('cityFilter').value = '';
+            document.getElementById('postcodeFilter').value = '';
+            document.getElementById('radiusFilter').value = '';
+            document.getElementById('ageGroupFilter').value = '';
+            document.getElementById('genderFilter').value = '';
+            document.getElementById('languageFilter').value = '';
+        });
+        
+        // Form submission
+        document.getElementById('searchForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = document.getElementById('queryInput').value.trim();
+            if (query) {
+                search(query);
+            }
+        });
+        
+        // Load stats on page load
+        loadStats();
+    </script>
+</body>
+</html>

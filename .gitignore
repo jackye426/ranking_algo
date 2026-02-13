@@ -1,0 +1,34 @@
+﻿# Dependencies
+node_modules/
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+
+# Large data files
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+
+# Specifically exclude large data files
+**/merged_*.json
+**/integrated_*.json
+**/doctors_data_uk.json
+**/obstetrics-and-gynaecology.json
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Recommendation tracker (can be regenerated)
+recommendation-tracker.json
