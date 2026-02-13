@@ -11,7 +11,7 @@ const fs = require('fs');
 
 const { getSessionContextParallel, getSessionContextParallelV2 } = require('./parallel-ranking-package/algorithm/session-context-variants');
 
-const BENCHMARK_FILE = 'benchmark-test-cases-all-specialties.json';
+const BENCHMARK_FILE = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
 const USE_V2 = process.argv.includes('--v2');
 
 function getModelFromArgv() {
@@ -37,9 +37,9 @@ function getDefaultCacheFile() {
   const model = getModelFromArgv();
   if (USE_V2 && model) {
     const safe = (model || '').replace(/[/.]/g, '-');
-    return `benchmark-session-context-cache-v2-${safe}.json`;
+    return path.join(__dirname, `../benchmarks/benchmark-session-context-cache-v2-${safe}.json`);
   }
-  return USE_V2 ? 'benchmark-session-context-cache-v2.json' : 'benchmark-session-context-cache.json';
+  return USE_V2 ? path.join(__dirname, '../benchmarks/benchmark-session-context-cache-v2.json') : path.join(__dirname, '../benchmarks/benchmark-session-context-cache.json');
 }
 const CACHE_FILE = getDefaultCacheFile();
 const MODEL_OVERRIDE = getModelFromArgv();

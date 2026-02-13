@@ -14,21 +14,51 @@ This project includes:
 
 ```
 .
-├── Benchmark question bank - *.csv          # Medical specialty query datasets
+├── benchmarks/                             # Benchmark question bank CSV files
+│   ├── Benchmark question bank - cardiology.csv
+│   ├── Benchmark question bank - General Surgery.csv
+│   ├── Benchmark question bank - Obs & Gynae.csv
+│   ├── Benchmark question bank - ophthalmology.csv
+│   └── Benchmark question bank - Trauma & Orthopaedic Surgery patient queries.csv
+├── data/                                   # Data files and datasets
+│   ├── bda_dietitians_rows.csv
+│   └── test_sw5.json
 ├── Local Doctor Ranking/                    # Main ranking system
 │   ├── README.md                           # Server setup and API documentation
 │   ├── README_RANKING.md                   # Ranking algorithm guide
-│   ├── parallel-ranking-package/           # Core ranking algorithm package
+│   ├── server.js                           # Main server file
+│   ├── apply-ranking.js                    # Ranking application script
+│   ├── evaluation/                         # Evaluation scripts and results
+│   │   ├── run-baseline-evaluation.js      # Main evaluation runner
+│   │   ├── evaluate-*.js                  # Evaluation scripts
+│   │   ├── analyze-*.js                   # Analysis scripts
+│   │   ├── compare-*.js                   # Comparison scripts
+│   │   └── *.json, *.csv                  # Evaluation results and reports
+│   ├── benchmarks/                         # Benchmark test cases and results
+│   │   ├── benchmark-test-cases-*.json    # Test case definitions
+│   │   └── benchmark-baseline-*.json      # Evaluation results
+│   ├── data/                               # Doctor data files
+│   │   ├── merged_*.json                  # Merged doctor datasets
+│   │   ├── integrated_*.json              # Integrated datasets
+│   │   └── *from-data.json                # Extracted lexicons and data
+│   ├── scripts/                            # Utility and build scripts
+│   │   ├── build-*.js                     # Build and cache scripts
+│   │   ├── debug-*.js                     # Debugging scripts
+│   │   └── create-*.js                    # Data creation scripts
+│   ├── optimization/                       # Hyperparameter optimization
+│   │   ├── optimize_bm25_params.py        # BM25 parameter tuning
+│   │   ├── optimize_field_weights.py      # Field weight optimization
+│   │   ├── optimize_ranking.py            # General ranking optimization
+│   │   ├── best-*.json                    # Optimized parameter sets
+│   │   ├── ranking-weights-*.json         # Weight configurations
+│   │   └── requirements.txt                # Python dependencies
+│   ├── parallel-ranking-package/          # Core ranking algorithm package
 │   │   ├── README.md                       # Algorithm overview and quickstart
 │   │   ├── algorithm/                      # Core ranking algorithm code
 │   │   ├── testing/                        # Testing framework and UI
 │   │   └── docs/                           # Detailed documentation
-│   └── optimization/                        # Hyperparameter optimization scripts
-│       ├── optimize_bm25_params.py          # BM25 parameter tuning
-│       ├── optimize_field_weights.py        # Field weight optimization
-│       ├── optimize_ranking.py             # General ranking optimization
-│       └── requirements.txt                # Python dependencies
-└── bda_dietitians_rows.csv                 # Additional dataset
+│   └── ranking-v2-package/                # Alternative ranking package
+└── README.md                               # This file
 ```
 
 ## 🚀 Quick Start
@@ -38,6 +68,14 @@ This project includes:
 See the main ranking package documentation:
 - **[Local Doctor Ranking/README.md](Local%20Doctor%20Ranking/README.md)** - Server setup and API usage
 - **[Local Doctor Ranking/parallel-ranking-package/README.md](Local%20Doctor%20Ranking/parallel-ranking-package/README.md)** - Algorithm package overview
+
+### For Evaluation
+
+Run evaluation scripts:
+```bash
+cd "Local Doctor Ranking/evaluation"
+node run-baseline-evaluation.js
+```
 
 ### For Optimization
 
@@ -53,17 +91,19 @@ python optimize_bm25_params.py
 python optimize_field_weights.py
 ```
 
+Optimized parameters are saved in `Local Doctor Ranking/optimization/` as JSON files.
+
 ## 📊 Benchmark Question Banks
 
-The repository includes benchmark question banks for evaluating ranking performance across different medical specialties:
+The repository includes benchmark question banks for evaluating ranking performance across different medical specialties. These are located in the `benchmarks/` directory:
 
-- **Cardiology** (`Benchmark question bank - cardiology.csv`)
-- **General Surgery** (`Benchmark question bank - General Surgery.csv`)
-- **Ophthalmology** (`Benchmark question bank - ophthalmology.csv`)
-- **Obs & Gynae** (`Benchmark question bank - Obs & Gynae.csv`)
-- **Trauma & Orthopaedic Surgery** (`Benchmark question bank - Trauma & Orthopaedic Surgery patient queries.csv`)
+- **Cardiology** (`benchmarks/Benchmark question bank - cardiology.csv`)
+- **General Surgery** (`benchmarks/Benchmark question bank - General Surgery.csv`)
+- **Ophthalmology** (`benchmarks/Benchmark question bank - ophthalmology.csv`)
+- **Obs & Gynae** (`benchmarks/Benchmark question bank - Obs & Gynae.csv`)
+- **Trauma & Orthopaedic Surgery** (`benchmarks/Benchmark question bank - Trauma & Orthopaedic Surgery patient queries.csv`)
 
-These CSV files contain patient queries and expected results for algorithm evaluation.
+These CSV files contain patient queries and expected results for algorithm evaluation. Evaluation scripts are located in `Local Doctor Ranking/evaluation/` and benchmark results are stored in `Local Doctor Ranking/benchmarks/`.
 
 ## 🔧 Key Features
 

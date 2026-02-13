@@ -34,15 +34,15 @@ const {
   calculatePrecisionAtK,
 } = require('./parallel-ranking-package/testing/utils/measurements');
 
-const BENCHMARK_FILE = 'benchmark-test-cases-all-specialties.json';
-const BASELINE_OUTPUT = 'benchmark-baseline-score.json';
+const BENCHMARK_FILE = path.join(__dirname, '../benchmarks/benchmark-test-cases-all-specialties.json');
+const BASELINE_OUTPUT = path.join(__dirname, 'benchmark-baseline-score.json');
 const USE_CACHE = process.argv.includes('--use-cache');
 const SESSION_CONTEXT_V2 = process.argv.includes('--session-context-v2') || process.env.SESSION_CONTEXT_VARIANT === 'v2';
 const SESSION_CONTEXT_V3 = process.argv.includes('--session-context-v3') || process.env.SESSION_CONTEXT_VARIANT === 'v3';
 const RANKING_V4 = process.argv.includes('--v4') || process.argv.includes('--v4-multi-stage') || process.argv.includes('--v4-stage-b') || process.env.RANKING_V4 === '1';
 const RANKING_V4_MULTI_STAGE = process.argv.includes('--v4-multi-stage') || process.env.RANKING_V4_MULTI_STAGE === '1';
 const RANKING_V4_STAGE_B = process.argv.includes('--v4-stage-b') || process.env.RANKING_V4_STAGE_B === '1';
-const CACHE_FILE = RANKING_V4 ? 'benchmark-session-context-cache-v2.json' : (SESSION_CONTEXT_V3 ? 'benchmark-session-context-cache.json' : (SESSION_CONTEXT_V2 ? 'benchmark-session-context-cache-v2.json' : 'benchmark-session-context-cache.json'));
+const CACHE_FILE = RANKING_V4 ? path.join(__dirname, '../benchmarks/benchmark-session-context-cache-v2.json') : (SESSION_CONTEXT_V3 ? path.join(__dirname, '../benchmarks/benchmark-session-context-cache.json') : (SESSION_CONTEXT_V2 ? path.join(__dirname, '../benchmarks/benchmark-session-context-cache-v2.json') : path.join(__dirname, '../benchmarks/benchmark-session-context-cache.json')));
 const WORKERS = Math.max(1, parseInt(process.env.WORKERS || '4', 10));
 function getWeightsPath() {
   for (const arg of process.argv) {
@@ -147,7 +147,7 @@ function mergeV3Ranking(v1Results, simpleResults, topN = 12) {
 }
 
 async function main() {
-  const benchmarkPath = path.join(__dirname, BENCHMARK_FILE);
+  const benchmarkPath = BENCHMARK_FILE;
   if (!fs.existsSync(benchmarkPath)) {
     console.error(`Benchmark file not found: ${benchmarkPath}`);
     process.exit(1);
