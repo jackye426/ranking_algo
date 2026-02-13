@@ -120,10 +120,10 @@ def main():
     if not BASE_WEIGHTS.exists():
         print(f"Base weights not found: {BASE_WEIGHTS}", file=sys.stderr)
         sys.exit(1)
-    if not (ROOT_DIR / "benchmark-session-context-cache-v2.json").exists():
+    if not (ROOT_DIR / "benchmarks" / "benchmark-session-context-cache-v2.json").exists():
         print("benchmark-session-context-cache-v2.json not found", file=sys.stderr)
         sys.exit(1)
-    if not (ROOT_DIR / "evaluate-excellent-fit-llm.js").exists():
+    if not (ROOT_DIR / "evaluation" / "evaluate-excellent-fit-llm.js").exists():
         print("evaluate-excellent-fit-llm.js not found", file=sys.stderr)
         sys.exit(1)
 

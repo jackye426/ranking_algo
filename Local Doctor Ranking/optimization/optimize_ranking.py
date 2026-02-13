@@ -73,13 +73,13 @@ def main():
     if not WEIGHTS_PATH.exists():
         print(f"Default weights not found: {WEIGHTS_PATH}", file=sys.stderr)
         sys.exit(1)
-    split_path = ROOT_DIR / "benchmark-split.json"
+    split_path = ROOT_DIR / "benchmarks" / "benchmark-split.json"
     if not split_path.exists():
-        print(f"Split not found: {split_path}. Run node create-benchmark-split.js", file=sys.stderr)
+        print(f"Split not found: {split_path}. Run node scripts/create-benchmark-split.js", file=sys.stderr)
         sys.exit(1)
-    cache_path = ROOT_DIR / "benchmark-session-context-cache.json"
+    cache_path = ROOT_DIR / "benchmarks" / "benchmark-session-context-cache.json"
     if not cache_path.exists():
-        print(f"Cache not found: {cache_path}. Run node build-session-context-cache.js", file=sys.stderr)
+        print(f"Cache not found: {cache_path}. Run node scripts/build-session-context-cache.js", file=sys.stderr)
         sys.exit(1)
 
     study = optuna.create_study(direction="maximize")
