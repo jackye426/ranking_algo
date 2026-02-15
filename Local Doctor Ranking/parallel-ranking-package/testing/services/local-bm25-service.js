@@ -203,7 +203,7 @@ function matchProfileAgainstIdeal(actualProfile, idealProfile) {
 /**
  * Apply filter conditions (patient_age_group, languages, gender). These are filters, not weights.
  * @param {Object[]} practitioners
- * @param {Object} filters - may have patient_age_group (string), languages (string[]), gender (string)
+ * @param {Object} filters - may have patient_age_group (string), languages (string[]), gender (string), insurancePreference (string, canonical)
  * @returns {Object[]} filtered list
  */
 function applyFilterConditions(practitioners, filters) {
@@ -211,9 +211,19 @@ function applyFilterConditions(practitioners, filters) {
   const wantAge = filters.patient_age_group && String(filters.patient_age_group).trim();
   const wantLangs = Array.isArray(filters.languages) ? filters.languages.filter((l) => l && String(l).trim()) : [];
   const wantGender = filters.gender && String(filters.gender).trim();
-  if (!wantAge && wantLangs.length === 0 && !wantGender) return practitioners;
+  const wantInsurance = filters.insurancePreference && String(filters.insurancePreference).trim();
+  if (!wantAge && wantLangs.length === 0 && !wantGender && !wantInsurance) return practitioners;
 
+  const wantInsuranceLower = wantInsurance ? wantInsurance.toLowerCase() : '';
   return practitioners.filter((p) => {
+    if (wantInsurance) {
+      if (!p.insuranceProviders || p.insuranceProviders.length === 0) return false;
+      const hasMatch = p.insuranceProviders.some((ins) => {
+        const name = (ins.name || ins.displayName || '').toLowerCase().trim();
+        return name === wantInsuranceLower || name.includes(wantInsuranceLower) || wantInsuranceLower.includes(name);
+      });
+      if (!hasMatch) return false;
+    }
     if (wantAge) {
       const ageGroups = Array.isArray(p.patient_age_group) ? p.patient_age_group.map((a) => String(a).toLowerCase()) : [];
       const wantLower = wantAge.toLowerCase();

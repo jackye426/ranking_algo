@@ -301,29 +301,41 @@ function transformDietitianRecord(record, index) {
   const companyName = getCompanyName();
   const profileUrl = getProfileUrl();
   
-  // Build locations array from contact_address and geographical_areas_served
+  // Build locations array matching existing dataset shape: { hospital, address, postcode, source }
   const locations = [];
   if (contactAddress) {
     locations.push({
+      hospital: companyName || 'Practice',
       address: contactAddress,
-      type: 'practice_address'
+      postcode: '',
+      source: 'BDA Dietitian File'
     });
   }
   if (geographicalAreas) {
-    // Parse comma-separated geographical areas
     const areas = geographicalAreas.split(',').map(a => a.trim()).filter(Boolean);
     areas.forEach(area => {
       locations.push({
+        hospital: '',
         address: area,
-        type: 'service_area',
-        geographical_area: true
+        postcode: '',
+        source: 'BDA Dietitian File'
       });
     });
   }
-  
+
+  // Format clinical_expertise/clinical_interests like existing dataset for parseClinicalExpertise (BM25)
+  // Existing format: "Condition: X; Condition: Y; Clinical Interests: ..."
+  const conditionList = clinicalExpertise ? clinicalExpertise.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const conditionSegments = conditionList.map(c => `Condition: ${c}`).join('; ');
+  const clinicalInterestsFormatted = conditionSegments
+    ? `${conditionSegments}; Clinical Interests: ${clinicalExpertise}`
+    : (clinicalExpertise ? `Clinical Interests: ${clinicalExpertise}` : '');
+
+  const proceduresList = getProcedures();
+
   const transformed = {
-    id: record.id || 
-        record.practitioner_id || 
+    id: record.id ||
+        record.practitioner_id ||
         record['ID'] ||
         record['Practitioner ID'] ||
         `dietitian_${Date.now()}_${index}`,
@@ -331,20 +343,18 @@ function transformDietitianRecord(record, index) {
     title: getTitle(),
     specialty: getSpecialty(),
     specialty_source: 'BDA Dietitian File',
-    specialties: record.specialties || 
+    specialties: record.specialties ||
                  (record['Specialties'] ? (typeof record['Specialties'] === 'string' ? record['Specialties'].split(',').map(s => s.trim()) : record['Specialties']) : []) ||
                  [getSpecialty()],
-    // BDA schema: clinical_expertise is a comma-separated list (e.g., "Diabetes, IBS, Obesity")
-    // Store as-is for BM25 search (createWeightedSearchableText handles unstructured format)
-    clinical_expertise: clinicalExpertise,
-    clinical_interests: clinicalExpertise, // Also store in clinical_interests for backward compatibility
+    clinical_expertise: clinicalInterestsFormatted || clinicalExpertise,
+    clinical_interests: clinicalInterestsFormatted || clinicalExpertise,
+    procedures: proceduresList,
+    conditions: conditionList,
     about: about,
-    // Store BDA-specific fields for reference
     company_name: companyName,
     profile_url: profileUrl,
-    industry_services: industryServices, // Store separately for potential future use
-    geographical_areas_served: geographicalAreas, // Store separately for location filtering
-    procedures: getProcedures(),
+    industry_services: industryServices,
+    geographical_areas_served: geographicalAreas,
     gmc_number: getGMCNumber(),
     year_qualified: record.year_qualified || 
                     record['Year Qualified'] ||
@@ -359,10 +369,12 @@ function transformDietitianRecord(record, index) {
     qualifications: record.qualifications || 
                     (record['Qualifications'] ? (typeof record['Qualifications'] === 'string' ? record['Qualifications'].split(',').map(q => q.trim()) : record['Qualifications']) : []) ||
                     [],
-    professional_memberships: record.professional_memberships || 
-                             record.memberships ||
-                             (record['Professional Memberships'] ? (typeof record['Professional Memberships'] === 'string' ? record['Professional Memberships'].split(',').map(m => m.trim()) : record['Professional Memberships']) : []) ||
-                             [],
+    professional_memberships: (() => {
+      const raw = record.professional_memberships || record.memberships ||
+        (record['Professional Memberships'] ? (typeof record['Professional Memberships'] === 'string' ? record['Professional Memberships'].split(',').map(m => m.trim()) : record['Professional Memberships']) : []);
+      const arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+      return arr.length ? arr : ['BDA'];
+    })(),
     patient_age_group: record.patient_age_group || 
                        (record['Patient Age Group'] ? (typeof record['Patient Age Group'] === 'string' ? record['Patient Age Group'].split(',').map(a => a.trim()) : record['Patient Age Group']) : []) ||
                        [],
@@ -419,8 +431,11 @@ function loadDietitians(dietitiansFilePath) {
     } else if (data.dietitians && Array.isArray(data.dietitians)) {
       // Structure: { dietitians: [{...}, {...}] }
       dietitians = data.dietitians;
+    } else if (data.profiles && Array.isArray(data.profiles)) {
+      // Structure: { profiles: [{...}, {...}] } (e.g. bda_dietitians_profiles.json)
+      dietitians = data.profiles;
     } else {
-      throw new Error('Unknown dietitians file structure. Expected array or object with records/practitioners/dietitians array');
+      throw new Error('Unknown dietitians file structure. Expected array or object with records/practitioners/dietitians/profiles array');
     }
   }
   
@@ -559,4 +574,6 @@ module.exports = {
   loadDietitians,
   transformDietitianRecord,
   mergeData,
+  loadExistingMerged,
+  parseCSV,
 };

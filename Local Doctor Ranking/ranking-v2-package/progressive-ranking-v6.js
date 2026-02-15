@@ -291,6 +291,7 @@ async function rankPractitionersProgressive(practitioners, userQuery, options = 
     gender = null,
     manualSpecialty = null,
     locationFilter = null,
+    insurancePreference = null,
   } = options;
 
   // Track state
@@ -327,6 +328,7 @@ async function rankPractitionersProgressive(practitioners, userQuery, options = 
       gender,
       manualSpecialty,
       locationFilter,
+      insurancePreference,
     };
 
     const rankPractitioners = getRankPractitioners();

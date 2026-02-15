@@ -35,9 +35,12 @@ function filterBySpecialty(practitioners, options = {}) {
   const searchTerms = normalizedManual.split(/\s+/).filter(term => term.length > 2);
   
   const filtered = practitioners.filter(p => {
-    // Check specialty field
-    if (p.specialty && normalizeSpecialtyName(p.specialty).includes(normalizedManual)) {
-      return true;
+    // Check specialty field (bidirectional so "Physiotherapy" and "Physiotherapist" match each other)
+    if (p.specialty) {
+      const normSpec = normalizeSpecialtyName(p.specialty);
+      if (normSpec.includes(normalizedManual) || normalizedManual.includes(normSpec)) {
+        return true;
+      }
     }
     
     // Check subspecialties

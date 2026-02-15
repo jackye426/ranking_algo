@@ -1,0 +1,150 @@
+﻿        "longitude": "-6.18895199999997",
+        "latitude": "53.305616",
+        "color": "62AF44",
+        "icon_type": "960",
+        "color_description": "ðŸŸ¢ Green - Mentioned by patients in an endometriosis support community",
+        "icon_description": "â­ Star - Endometriosis surgical specialist",
+        "style_url": "#icon-960-62AF44-labelson",
+        "urls": "http://www.nikkikroon.ie/",
+        "notes": "",
+        "recommendations": ""
+      },
+      "reddit_trust_affiliations": [],
+      "isrctn_trials": [],
+      "isrctn_relational_trial_links": []
+    },
+    {
+      "id": "bupa_4381",
+      "sources": [
+        "BUPA",
+        "PHIN"
+      ],
+      "merge_date": "2026-02-14T13:58:28.469544",
+      "requires_review": false,
+      "gmc_number": "3585487",
+      "name": "Dr David Hunter",
+      "title": "Dr",
+      "first_name": "David",
+      "last_name": "Hunter",
+      "specialty": "Obstetrics and gynaecology",
+      "specialty_source": "BUPA",
+      "specialties": [
+        "Obstetrics and gynaecology",
+        "Obstetrics and gynaecology - General Gynaecology"
+      ],
+      "clinical_interests": "Menstrual disorders (menorrhagia); Pelvic disorders including gynaecological pain; Endometriosis; Minimal access / invasive surgery; Gynaecology; Female sterilisation",
+      "areas_of_interest": [
+        "Menstrual disorders (menorrhagia)",
+        "Pelvic disorders including gynaecological pain",
+        "Endometriosis",
+        "Minimal access / invasive surgery",
+        "Gynaecology",
+        "Female sterilisation"
+      ],
+      "locations": [
+        {
+          "hospital": "Kingsbridge Private Hospital",
+          "address": "801-815 Lisburn Road Belfast BT9 7GX",
+          "postcode": "BT97GX",
+          "phone": "028 9066 7878",
+          "email": "info@kingsbridgeprivatehospital.com",
+          "website": "http://www.kingsbridgeprivatehospital.com",
+          "type": "Hospital",
+          "nhs": false,
+          "nhsppu": false,
+          "source": "BUPA"
+        },
+        {
+          "hospital": "Ulster Independent Clinic",
+          "address": "245 Stranmillis Road BELFAST BT9 5JH",
+          "postcode": "BT95JH",
+          "phone": "028 9066 1212",
+          "email": "secretary@uic.org.uk",
+          "website": "http://www.ulsterindependentclinic.com",
+          "type": "Hospital",
+          "nhs": false,
+          "nhsppu": false,
+          "source": "BUPA"
+        },
+        {
+          "hospital": "Kingsbridge Private Hospital North West",
+          "address": "Churchill House Ballykelly LIMAVADY BT49 9HS",
+          "postcode": "BT499HS",
+          "phone": "028 7772 3507",
+          "email": "dorettesoal@nwih.co.uk",
+          "website": "http://www.nwih.co.uk",
+          "type": "Hospital",
+          "nhs": false,
+          "nhsppu": false,
+          "source": "BUPA"
+        },
+        {
+          "hospital": "Kingsbridge Private Hospital - Belfast",
+          "address": "Belfast, BT9 7GX",
+          "postcode": "BT9 7GX",
+          "latitude": 54.57,
+          "longitude": -5.96468,
+          "region": "Northern Ireland",
+          "source": "PHIN",
+          "hospital_id": 59884,
+          "admissions_private": 232
+        },
+        {
+          "hospital": "Kingsbridge Private Hospital Northwest",
+          "address": "Ballykelly, BT49 9HS",
+          "postcode": "BT49 9HS",
+          "latitude": 55.0447,
+          "longitude": -7.0171,
+          "region": "Northern Ireland",
+          "source": "PHIN",
+          "hospital_id": 59922,
+          "admissions_private": 45
+        }
+      ],
+      "qualifications": [
+        "MRCOG RCOG 1998",
+        "MD Queen's University Belfast 2004",
+        "MB BCH BAO Queen's University Belfast 1992",
+        "Clinical Lecturer in Gynaecological Surgery University of Teesside 2000"
+      ],
+      "languages": [],
+      "about": null,
+      "professional_memberships": [
+        "Member of the Institute of Obstetrics and Gynaecoloy of the Royal College of Physicians of IrelandUlster Obstetrical and Gynaecological SocietyBritish Society for Gynaecological EndoscopyAmerican Association of Gynaecological Laparoscopists"
+      ],
+      "nhs_base": "Consultant GynaecologistBelfast Trust",
+      "contact_phone": "07889 574428",
+      "email": "DCHunterMedicalltd@gmail.com",
+      "website": null,
+      "consultation_types": [
+        "Face-to-face consultations",
+        "Video and telephone consultations"
+      ],
+      "fee_assured": true,
+      "verified_account": false,
+      "procedures": [
+        "Laparoscopy and therapeutic procedures (including laser, diathermy and destruction e.g. endometriosis, adhesiolysis, tubal and ovarian surgery, +/-ureterolysis)",
+        "Hysteroscopy (including biopsy, dilatation, +/- cauterisation, curettage and resection of polyp(s) +/- Mirena coil insertion)",
+        "Microwave endometrial ablation (including hysteroscopy)",
+        "Total abdominal hysterectomy, +/- oophorectomy, +/- ureterolysis",
+        "Therapeutic hysteroscopic operations on uterus (including endometrial ablation excluding microwave or radiofrequency ablation) +/- Mirena coil insertion",
+        "Laparoscopic excision of endometriosis, +/-ureterolysis",
+        "Vaginal hysterectomy with laparoscopic assistance +/- ureterolysis",
+        "Introduction of a mirena coil",
+        "Excision of lesion of vagina (e.g. warts and cysts)",
+        "Endometrial biopsy or aspiration",
+        "Ovarian cystectomy +/- omental biopsy (as sole procedure and including bilateral)",
+        "Excision of lesion of vulva"
+      ],
+      "procedures_completed": [
+        {
+          "code": "Q3800",
+          "description": "Laparoscopy and therapeutic procedures (including laser, diathermy and destruction e.g. endometriosis, adhesiolysis, tubal and ovarian surgery, +/-ureterolysis)",
+          "hospital": "Kingsbridge Private Hospital",
+          "count": "5-50",
+          "count_numeric": 27.5
+        },
+        {
+          "code": "Q1800",
+          "description": "Hysteroscopy (including biopsy, dilatation, +/- cauterisation, curettage and resection of polyp(s) +/- Mirena coil insertion)",
+          "hospital": "Kingsbridge Private Hospital",

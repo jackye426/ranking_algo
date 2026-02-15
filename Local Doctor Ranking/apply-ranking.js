@@ -8,10 +8,55 @@
 require('dotenv').config({ path: './parallel-ranking-package/.env' });
 const fs = require('fs');
 const path = require('path');
+const { chain } = require('stream-chain');
+const Pick = require('stream-json/filters/Pick');
+const { streamArray } = require('stream-json/streamers/StreamArray');
 
 // Import ranking algorithm and BM25 service
 const { getSessionContextParallel } = require('./parallel-ranking-package/algorithm/session-context-variants');
 const { getBM25Shortlist } = require('./parallel-ranking-package/testing/services/local-bm25-service');
+
+// Insurance alias map (variant name -> canonical name) for filtering and display
+let insuranceAliasMapLower = {};
+try {
+  const aliasPath = path.join(__dirname, 'data', 'insurance-aliases.json');
+  if (fs.existsSync(aliasPath)) {
+    const raw = JSON.parse(fs.readFileSync(aliasPath, 'utf8'));
+    for (const [k, v] of Object.entries(raw)) {
+      if (k && v) insuranceAliasMapLower[k.toLowerCase().trim()] = v;
+    }
+  }
+} catch (e) {
+  // use empty map
+}
+
+/**
+ * Get canonical insurance name for filtering/display (uses insurance-aliases.json).
+ */
+function getCanonicalInsuranceName(raw) {
+  const k = (raw || '').trim().toLowerCase();
+  return (k && insuranceAliasMapLower[k]) ? insuranceAliasMapLower[k] : (raw || '').trim();
+}
+
+/**
+ * Build procedure_volumes_display from procedures_completed (BUPA) and procedure_volumes_phin (PHIN).
+ */
+function buildProcedureVolumesDisplay(record) {
+  const out = [];
+  const completed = record.procedures_completed || [];
+  for (const p of completed) {
+    const desc = p.description || p.procedure_group_name || '';
+    const vol = p.count_numeric != null ? p.count_numeric : (typeof p.count === 'string' && p.count ? parseFloat(p.count) : null);
+    if (desc) out.push({ name_or_description: desc, volume_count: vol, source: 'BUPA' });
+  }
+  const phin = record.procedure_volumes_phin || [];
+  for (const p of phin) {
+    const desc = p.procedure_name || p.description || p.name || '';
+    const vol = p.volume != null ? p.volume : (p.count != null ? p.count : null);
+    if (desc) out.push({ name_or_description: desc, volume_count: vol, source: 'PHIN' });
+  }
+  return out;
+}
 
 /**
  * Transform merged doctor record to practitioner format expected by BM25
@@ -59,6 +104,43 @@ function transformMergedRecord(record) {
     || (profileUrlsObj && (profileUrlsObj.cromwell || profileUrlsObj.hca || profileUrlsObj.bupa || profileUrlsObj.spire))
     || (profileUrlsObj && Object.values(profileUrlsObj).find(v => v && v.trim() && v !== 'null'))
     || (record.urls && Array.isArray(record.urls) && record.urls.length > 0 ? record.urls[0] : null);
+
+  // Insurance: top-level record.insurance (BUPA etc.) or record.phin_data.insurance (PHIN)
+  const insuranceDetails = record.insurance?.insurance_details
+    || record.phin_data?.insurance?.insurance_details
+    || [];
+  const acceptedInsurers = record.phin_data?.insurance?.accepted_insurers || [];
+  const seen = new Set();
+  const insuranceProviders = [];
+  for (const d of insuranceDetails) {
+    const raw = (d.insurer || d.name || '').trim();
+    if (!raw) continue;
+    const canonical = getCanonicalInsuranceName(raw) || raw;
+    if (seen.has(canonical.toLowerCase())) continue;
+    seen.add(canonical.toLowerCase());
+    insuranceProviders.push({
+      name: canonical,
+      displayName: canonical,
+      insurer_id: d.insurer_id,
+      raw: raw || undefined,
+    });
+  }
+  for (const a of acceptedInsurers) {
+    const raw = (typeof a === 'string' ? a : (a && (a.name || a.insurer)) || '').trim();
+    if (!raw) continue;
+    const canonical = getCanonicalInsuranceName(raw) || raw;
+    if (seen.has(canonical.toLowerCase())) continue;
+    seen.add(canonical.toLowerCase());
+    insuranceProviders.push({
+      name: canonical,
+      displayName: canonical,
+      insurer_id: typeof a === 'object' && a != null ? a.id : undefined,
+      raw: raw || undefined,
+    });
+  }
+  const procedureVolumesDisplay = buildProcedureVolumesDisplay(record);
+  const phinPatientFeedback = record.phin_data?.patient_feedback ?? record.patient_feedback ?? null;
+  const phinPatientSatisfaction = record.patient_satisfaction_phin ?? record.phin_data?.patient_satisfaction_phin ?? null;
   
   return {
     practitioner_id: record.id || `practitioner_${Math.random().toString(36).substr(2, 9)}`,
@@ -88,6 +170,8 @@ function transformMergedRecord(record) {
     memberships: record.professional_memberships || [],
     patient_age_group: record.patient_age_group || [],
     nhs_base: record.nhs_base || null,
+    nhs_posts: record.nhs_posts || [],
+    sources: record.sources || [],
     
     // Quality metrics (set defaults if not available)
     rating_value: null, // Not available in merged data
@@ -98,8 +182,20 @@ function transformMergedRecord(record) {
     total_admission_count: 0,
     procedure_count: procedureGroups.length,
     
-    // Insurance providers
-    insuranceProviders: [],
+    // Insurance providers (canonical names via alias map)
+    insuranceProviders,
+    
+    // Display-only (no ranking): Reddit, ISRCTN, research, PHIN, procedure volumes
+    reddit_patient_notes: record.reddit_patient_notes ?? null,
+    reddit_recommendation_level: record.reddit_recommendation_level ?? null,
+    reddit_recommendation_sources: record.reddit_recommendation_sources ?? null,
+    isrctn_trials: record.isrctn_trials ?? null,
+    isrctn_relational_trial_links: record.isrctn_relational_trial_links ?? null,
+    has_isrctn_trials: !!(record.isrctn_trials && record.isrctn_trials.length > 0),
+    research_interests: record.research_interests ?? null,
+    phin_patient_feedback: phinPatientFeedback,
+    phin_patient_satisfaction: phinPatientSatisfaction,
+    procedure_volumes_display: procedureVolumesDisplay,
     
     // Store original record for reference
     _originalRecord: record
@@ -107,25 +203,60 @@ function transformMergedRecord(record) {
 }
 
 /**
- * Load and transform merged data
+ * Load merged data via streaming (for files too large for readFileSync string limit)
+ */
+function loadMergedDataStreaming(dataFilePath) {
+  return new Promise((resolve, reject) => {
+    const practitioners = [];
+    const pipeline = chain([
+      fs.createReadStream(dataFilePath),
+      Pick.withParser({ filter: 'records' }),
+      streamArray(),
+    ]);
+    pipeline.on('data', (chunk) => {
+      const record = chunk.value;
+      if (record && typeof record === 'object') practitioners.push(transformMergedRecord(record));
+    });
+    pipeline.on('end', () => {
+      console.log(`[Loading] Transformed ${practitioners.length} practitioners (streaming)`);
+      console.log(`[Loading] Sample specialties:`, 
+        [...new Set(practitioners.map(p => p.specialty).filter(Boolean))].slice(0, 10)
+      );
+      resolve(practitioners);
+    });
+    pipeline.on('error', reject);
+  });
+}
+
+/**
+ * Load and transform merged data (sync for small files; streams if file would exceed Node string limit).
+ * Returns a Promise that resolves with the practitioner array (so server can await when using streaming).
  */
 function loadMergedData(dataFilePath) {
   console.log(`[Loading] Reading data from: ${dataFilePath}`);
-  
-  const rawData = fs.readFileSync(dataFilePath, 'utf8');
-  const data = JSON.parse(rawData);
-  
-  console.log(`[Loading] Total records in file: ${data.total_records || data.records?.length || 0}`);
-  
-  // Transform records to practitioner format
-  const practitioners = (data.records || []).map(transformMergedRecord);
-  
-  console.log(`[Loading] Transformed ${practitioners.length} practitioners`);
-  console.log(`[Loading] Sample specialties:`, 
-    [...new Set(practitioners.map(p => p.specialty).filter(Boolean))].slice(0, 10)
-  );
-  
-  return practitioners;
+  const stat = fs.statSync(dataFilePath);
+  const useStreaming = stat.size > 400 * 1024 * 1024; // ~400MB+: use streaming to avoid "string longer than 0x1fffffe8"
+  if (useStreaming) {
+    console.log(`[Loading] File large (${Math.round(stat.size / 1024 / 1024)}MB), using streaming parser`);
+    return loadMergedDataStreaming(dataFilePath);
+  }
+  try {
+    const rawData = fs.readFileSync(dataFilePath, 'utf8');
+    const data = JSON.parse(rawData);
+    console.log(`[Loading] Total records in file: ${data.total_records || data.records?.length || 0}`);
+    const practitioners = (data.records || []).map(transformMergedRecord);
+    console.log(`[Loading] Transformed ${practitioners.length} practitioners`);
+    console.log(`[Loading] Sample specialties:`, 
+      [...new Set(practitioners.map(p => p.specialty).filter(Boolean))].slice(0, 10)
+    );
+    return Promise.resolve(practitioners);
+  } catch (err) {
+    if (err.message && err.message.includes('Cannot create a string longer than')) {
+      console.log(`[Loading] Sync read limit hit, falling back to streaming parser`);
+      return loadMergedDataStreaming(dataFilePath);
+    }
+    return Promise.reject(err);
+  }
 }
 
 /**
@@ -263,6 +394,8 @@ if (require.main === module) {
 // Export for use as module
 module.exports = {
   loadMergedData,
+  loadMergedDataStreaming,
   transformMergedRecord,
-  rankDoctors
+  rankDoctors,
+  getCanonicalInsuranceName,
 };

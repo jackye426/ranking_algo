@@ -34,8 +34,8 @@ try {
 // Import LLM evaluation module
 const { evaluateFit } = require('./ranking-v2-package/evaluate-fit');
 
-// Import transformation function
-const { loadMergedData } = require('./apply-ranking');
+// Import transformation function and insurance canonicalization
+const { loadMergedData, getCanonicalInsuranceName } = require('./apply-ranking');
 
 // Import specialty filtering (for stats endpoint)
 const { getAllSpecialties, getSpecialtyStats } = require('./specialty-filter');
@@ -72,27 +72,23 @@ let dataStats = null;
 let loadTime = null;
 
 /**
- * Load merged doctor data
+ * Load merged doctor data (supports async when file is streamed)
  */
 const loadData = () => {
-  try {
-    const startTime = Date.now();
-    // Use the latest integrated file (prefer integrated_practitioners_reddit_bupa_latest.json when present)
-    const dataDir = path.join(__dirname, 'data');
-    const integratedPath = path.join(dataDir, 'integrated_practitioners_reddit_bupa_latest.json');
-    const latestPath = path.join(dataDir, 'merged_all_sources_latest.json');
-    const fallbackPath = path.join(dataDir, 'merged_all_sources_2026-02-02T13-47-20.json');
-    const dataFilePath = fs.existsSync(integratedPath) ? integratedPath : (fs.existsSync(latestPath) ? latestPath : fallbackPath);
-    
-    console.log('[Server] Loading doctor data from:', dataFilePath);
-    
-    if (!fs.existsSync(dataFilePath)) {
-      throw new Error(`Data file not found. Tried: ${latestPath} and ${fallbackPath}`);
-    }
-    
-    practitioners = loadMergedData(dataFilePath);
-    
-    // Calculate statistics
+  const startTime = Date.now();
+  const dataFilePath = path.join(__dirname, 'integrated_practitioners_with_isrctn_latest.json');
+  const absolutePath = path.resolve(dataFilePath);
+  console.log('[Server] Loading practitioner data from:', absolutePath);
+  if (!fs.existsSync(dataFilePath)) {
+    console.error('[Server] ❌ Failed to load data:', 
+      `Integrated data file not found at ${absolutePath}. Ensure integrated_practitioners_with_isrctn_latest.json is in the server directory.`
+    );
+    return Promise.resolve(false);
+  }
+  const result = loadMergedData(dataFilePath);
+  const apply = (prac) => {
+    practitioners = prac;
+    console.log('[Server] Loaded', practitioners.length, 'practitioners from integrated_practitioners_with_isrctn_latest.json');
     dataStats = {
       total: practitioners.length,
       withGMC: practitioners.filter(p => p.gmc_number).length,
@@ -112,26 +108,47 @@ const loadData = () => {
         .slice(0, 10)
         .map(([specialty, count]) => ({ specialty, count }))
     };
-    
     loadTime = Date.now() - startTime;
-    
     console.log('[Server] ✅ Data loaded successfully');
     console.log(`[Server] Total practitioners: ${dataStats.total}`);
     console.log(`[Server] Load time: ${loadTime}ms`);
     console.log(`[Server] Unique specialties: ${dataStats.uniqueSpecialties}`);
-    
     return true;
-  } catch (error) {
+  };
+  return Promise.resolve(result).then(apply).catch((error) => {
     console.error('[Server] ❌ Failed to load data:', error.message);
     console.error(error.stack);
     return false;
-  }
+  });
 };
 
-// Initialize on startup
-if (!loadData()) {
-  console.error('[Server] CRITICAL: Failed to load data. Server will not function correctly.');
+// Initialize on startup (loadData may be async for large files)
+loadData().then((success) => {
+  if (!success) {
+    console.error('[Server] CRITICAL: Failed to load data. Server will not function correctly.');
+    process.exit(1);
+  }
+  startServer();
+}).catch((err) => {
+  console.error('[Server] CRITICAL: Load error', err);
   process.exit(1);
+});
+
+function startServer() {
+  // Start server (data already loaded)
+  app.listen(PORT, () => {
+    console.log('\n' + '='.repeat(60));
+    console.log('🏥 Local Doctor Ranking Server');
+    console.log('='.repeat(60));
+    console.log(`📡 Server running on http://localhost:${PORT}`);
+    console.log(`📊 Total practitioners: ${dataStats.total}`);
+    console.log(`🔍 API endpoint: http://localhost:${PORT}/api/rank`);
+    console.log(`📦 Production BM25: http://localhost:${PORT}/api/rank-production (POST)`);
+    console.log(`📈 Stats endpoint: http://localhost:${PORT}/api/stats`);
+    console.log('='.repeat(60) + '\n');
+    console.log('[Server] ✅ Server started successfully - logging is working!');
+    console.log('[Server] Ready to receive requests...');
+  });
 }
 
 /** Format fees object for display (e.g. { new_appointment: 250, follow_up: 175, currency: 'GBP' }) */
@@ -212,14 +229,11 @@ app.get('/api/stats', (req, res) => {
  * }
  */
 app.post('/api/rank', async (req, res) => {
-  console.log(`[Server] ========== /api/rank Request Received ==========`);
-  console.log(`[Server] Request body keys:`, Object.keys(req.body || {}));
-  console.log(`[Server] locationFilter in request:`, req.body?.locationFilter);
   try {
-    const { 
-      query, 
-      messages = [], 
-      location = null, 
+    const body = req.body || {};
+    const {
+      messages = [],
+      location = null,
       shortlistSize = 10,
       specialty = null,
       patient_age_group = null,
@@ -227,37 +241,77 @@ app.post('/api/rank', async (req, res) => {
       languages = null,
       rankingConfig = null,
       evaluateFit: shouldEvaluateFit = false,
-      variant = 'v2', // 'v2', 'v5', or 'v6'
-      locationFilter = null, // Optional: { city, postcode, radiusCenter, radiusMiles }
-      lexiconsDir = null, // Optional: path to lexicons for V5
-      model = null, // Optional: model override for V5/V6 (defaults to gpt-5.1)
-      // V6 specific options
+      variant = 'v2',
+      locationFilter = null,
+      lexiconsDir = null,
+      model = null,
       maxIterations = 5,
       maxProfilesReviewed = 30,
       batchSize = 12,
       fetchStrategy = 'stage-b',
       targetTopK = 3,
-    } = req.body;
-    
-    // Normalize specialty filter
-    const manualSpecialty = (specialty != null && String(specialty).trim() !== '')
+      insurancePreference: insurancePreferenceRaw = null,
+      nhsMode = false,
+      mode = null,
+    } = body;
+
+    // Robust query extraction (support body.query string or body.query.text or body.text)
+    let query = body.query;
+    if (query != null && typeof query === 'object' && typeof query.text === 'string') {
+      query = query.text;
+    } else if (typeof query !== 'string') {
+      query = typeof body.text === 'string' ? body.text : '';
+    }
+    query = (query && typeof query === 'string') ? query.trim() : '';
+
+    if (!query && messages && messages.length > 0) {
+      const last = messages[messages.length - 1];
+      if (last && typeof last.content === 'string') query = last.content.trim();
+    }
+
+    if (!query) {
+      return res.status(400).json({
+        error: 'Query is required',
+        message: 'Please provide a non-empty query string',
+      });
+    }
+
+    // Infer specialty from query when not explicitly provided (so physio/dietitian queries return results)
+    let manualSpecialty = (specialty != null && String(specialty).trim() !== '')
       ? String(specialty).trim()
       : null;
-    
+    if (!manualSpecialty) {
+      const q = query.toLowerCase();
+      if (/\bphysiotherapist\b|\bphysiotherapy\b|\bpelvic\s*physio\b|\bphysio\b.*pelvic|pelvic\s+pain\s+physio|seeking\s+a\s+pelvic\s+pain\s+physiotherapist/i.test(q)) {
+        manualSpecialty = 'Physiotherapy';
+        console.log('[Server] Inferred specialty from query: Physiotherapy');
+      } else if (/\bdietitian\b|\bdietetics\b|\bnutrition\s*specialist\b/i.test(q)) {
+        manualSpecialty = 'Dietitian';
+        console.log('[Server] Inferred specialty from query: Dietitian');
+      }
+    }
+
     // Normalize languages (accept array or single string)
-    const languagesArray = languages 
+    const languagesArray = languages
       ? (Array.isArray(languages) ? languages : [languages])
       : null;
     
-    if (!query || typeof query !== 'string' || !query.trim()) {
-      return res.status(400).json({ 
-        error: 'Query is required',
-        message: 'Please provide a non-empty query string'
-      });
-    }
-    
     if (!practitioners) {
       return res.status(500).json({ error: 'Data not loaded' });
+    }
+
+    const isNhsMode = !!(nhsMode || mode === 'nhs');
+    const canonicalInsurance = (insurancePreferenceRaw && String(insurancePreferenceRaw).trim())
+      ? getCanonicalInsuranceName(insurancePreferenceRaw)
+      : null;
+    let practitionersForRanking = practitioners;
+    if (isNhsMode) {
+      practitionersForRanking = practitioners.filter(
+        (p) =>
+          (p.nhs_base && String(p.nhs_base).trim()) ||
+          (p.nhs_posts && p.nhs_posts.length > 0)
+      );
+      console.log(`[Server] NHS mode: filtered to ${practitionersForRanking.length} NHS-affiliated practitioners`);
     }
     
     const requestStartTime = Date.now();
@@ -265,6 +319,8 @@ app.post('/api/rank', async (req, res) => {
     // Build filter summary for logging
     const activeFilters = [];
     if (manualSpecialty) activeFilters.push(`specialty:${manualSpecialty}`);
+    if (isNhsMode) activeFilters.push('nhsMode:true');
+    if (canonicalInsurance) activeFilters.push(`insurance:${canonicalInsurance}`);
     if (locationFilter) {
       if (locationFilter.city) activeFilters.push(`city:${locationFilter.city}`);
       if (locationFilter.postcode) activeFilters.push(`postcode:${locationFilter.postcode}`);
@@ -283,7 +339,7 @@ app.post('/api/rank', async (req, res) => {
       // V6: Progressive ranking with iterative refinement
       try {
         console.log(`[Server] V6: Starting progressive ranking with maxIterations=${maxIterations}, maxProfilesReviewed=${maxProfilesReviewed}`);
-        rankingResult = await rankPractitionersProgressive(practitioners, query, {
+        rankingResult = await rankPractitionersProgressive(practitionersForRanking, query, {
           messages,
           location,
           shortlistSize,
@@ -292,6 +348,7 @@ app.post('/api/rank', async (req, res) => {
           patient_age_group,
           gender,
           languages: languagesArray,
+          insurancePreference: canonicalInsurance,
           rankingConfig: rankingConfig || 'best-stage-a-recall-weights-desc-tuned.json',
           maxIterations,
           maxProfilesReviewed,
@@ -320,11 +377,11 @@ app.post('/api/rank', async (req, res) => {
         }
       );
       
-      // Filter by manual specialty before ranking (if provided)
-      let filteredPractitioners = practitioners;
-      const initialCount = practitioners.length;
+      // Filter by manual specialty before ranking (if provided); start from NHS-filtered list when in NHS mode
+      let filteredPractitioners = practitionersForRanking;
+      const initialCount = practitionersForRanking.length;
       if (manualSpecialty && String(manualSpecialty).trim()) {
-        filteredPractitioners = filterBySpecialty(practitioners, { manualSpecialty: String(manualSpecialty).trim() });
+        filteredPractitioners = filterBySpecialty(practitionersForRanking, { manualSpecialty: String(manualSpecialty).trim() });
       }
 
       // Apply location filter before ranking (if provided)
@@ -352,7 +409,7 @@ app.post('/api/rank', async (req, res) => {
         }
       }
       
-      // Build filters for V5
+      // Build filters for V5 (include insurance for BM25 filter)
       const filters = {
         q_patient: sessionContext.q_patient,
         intent_terms: sessionContext.intent_terms || [],
@@ -363,6 +420,7 @@ app.post('/api/rank', async (req, res) => {
         patient_age_group: patient_age_group || null,
         languages: languagesArray,
         gender: gender || null,
+        insurancePreference: canonicalInsurance || null,
         ...(config && { rankingConfig: config }),
       };
       
@@ -409,7 +467,7 @@ app.post('/api/rank', async (req, res) => {
     } else {
       // V2: Use existing ranking package
       console.log(`[Server] /api/rank: Using V2 ranking with locationFilter:`, JSON.stringify(locationFilter));
-      rankingResult = await rankPractitioners(practitioners, query, {
+      rankingResult = await rankPractitioners(practitionersForRanking, query, {
         messages,
         location,
         shortlistSize,
@@ -418,6 +476,7 @@ app.post('/api/rank', async (req, res) => {
         patient_age_group,
         gender,
         languages: languagesArray,
+        insurancePreference: canonicalInsurance,
         rankingConfig: rankingConfig || 'best-stage-a-recall-weights-desc-tuned.json',
       });
       console.log(`[Server] /api/rank: V2 ranking completed, results: ${rankingResult.results?.length || 0}`);
@@ -469,9 +528,19 @@ app.post('/api/rank', async (req, res) => {
             || null;
         })(),
         pricing: doc._originalRecord?.fees ? formatFees(doc._originalRecord.fees) : null,
-        // Reddit patient feedback
-        reddit_patient_notes: doc._originalRecord?.reddit_patient_notes || null,
-        reddit_recommendation_level: doc._originalRecord?.reddit_recommendation_level || null,
+        // Display-only: Reddit, ISRCTN, research, PHIN, NHS, procedures (from transform)
+        reddit_patient_notes: doc.reddit_patient_notes ?? doc._originalRecord?.reddit_patient_notes ?? null,
+        reddit_recommendation_level: doc.reddit_recommendation_level ?? doc._originalRecord?.reddit_recommendation_level ?? null,
+        sources: doc.sources ?? [],
+        isrctn_trials: doc.isrctn_trials ?? null,
+        has_isrctn_trials: doc.has_isrctn_trials ?? !!(doc.isrctn_trials && doc.isrctn_trials.length > 0),
+        research_interests: doc.research_interests ?? null,
+        phin_patient_feedback: doc.phin_patient_feedback ?? doc._originalRecord?.phin_data?.patient_feedback ?? null,
+        phin_patient_satisfaction: doc.phin_patient_satisfaction ?? doc._originalRecord?.patient_satisfaction_phin ?? null,
+        nhs_base: doc.nhs_base ?? doc._originalRecord?.nhs_base ?? null,
+        nhs_posts: doc.nhs_posts ?? doc._originalRecord?.nhs_posts ?? null,
+        procedure_count: (doc.procedure_volumes_display ? doc.procedure_volumes_display.length : null) ?? doc.procedure_count ?? 0,
+        procedure_volumes: doc.procedure_volumes_display ?? [],
         // V6 specific fields
         fit_category: result.fit_category || null,
         evaluation_reason: result.evaluation_reason || null,
@@ -537,6 +606,7 @@ app.post('/api/rank', async (req, res) => {
     res.json({
       success: true,
       query: query,
+      nhsMode: isNhsMode || undefined,
       totalResults: rankingResult.results.length,
       results: results,
       queryInfo: {
@@ -559,7 +629,16 @@ app.post('/api/rank', async (req, res) => {
         specialtyFilterApplied: manualSpecialty !== null,
         locationFilter: locationFilter || null,
         locationFilterApplied: locationFilter !== null,
-        filtersApplied: rankingResult.metadata.filtersApplied,
+        filtersApplied: {
+          ...(rankingResult.metadata.filtersApplied ?? {}),
+          manualSpecialty: manualSpecialty || null,
+          locationFilter: locationFilter || null,
+          patient_age_group: patient_age_group || null,
+          languages: languagesArray || null,
+          gender: gender || null,
+          insurancePreference: canonicalInsurance || null,
+          nhsMode: isNhsMode || null,
+        },
         // V6 specific metadata
         ...(variant === 'v6' ? {
           iterations: rankingResult.metadata.iterations,
@@ -708,7 +787,7 @@ const handleRankProduction = async (req, res) => {
       specialty,
       location,
       shortlistSize = 10,
-      insurancePreference,
+      insurancePreference: insurancePreferenceRaw,
       genderPreference,
       patient_age_group,
       languages,
@@ -765,7 +844,9 @@ const handleRankProduction = async (req, res) => {
       intent_terms: Array.isArray(intent_terms) ? intent_terms : [],
       anchor_phrases: Array.isArray(anchor_phrases) ? anchor_phrases : [],
       intentData: intentData || null,
-      insurancePreference: insurancePreference || null,
+      insurancePreference: (insurancePreferenceRaw && String(insurancePreferenceRaw).trim())
+        ? getCanonicalInsuranceName(insurancePreferenceRaw)
+        : null,
       genderPreference: genderPreference || null,
       patient_age_group: patient_age_group || null,
       languages: Array.isArray(languages) ? languages : (languages ? [languages] : null),
@@ -795,7 +876,7 @@ const handleRankProduction = async (req, res) => {
     }
 
     console.log(`[Server] Production BM25 request: "${query}" | Options:`, options);
-    console.log(`[Server] Filters: specialty=${specialty}, insurance=${insurancePreference}, gender=${genderPreference}`);
+    console.log(`[Server] Filters: specialty=${specialty}, insurance=${filters.insurancePreference}, gender=${genderPreference}`);
     console.log(`[Server] LocationFilter received:`, JSON.stringify(locationFilter));
     console.log(`[Server] Practitioners before filtering: ${filteredPractitioners.length}`);
 
@@ -852,9 +933,19 @@ const handleRankProduction = async (req, res) => {
         conditions: orig?.conditions || [],
         procedures: doc?.procedure_groups?.map(pg => typeof pg === 'object' ? pg.procedure_group_name : pg) || orig?.procedures || [],
         subspecialties: doc?.subspecialties || (orig?.specialties || []).filter(s => s && String(s).trim() !== (doc?.specialty || '')),
-        // Reddit patient feedback
-        reddit_patient_notes: orig?.reddit_patient_notes || null,
-        reddit_recommendation_level: orig?.reddit_recommendation_level || null
+        // Display-only: Reddit, ISRCTN, research, PHIN, NHS, procedures
+        reddit_patient_notes: doc?.reddit_patient_notes ?? orig?.reddit_patient_notes ?? null,
+        reddit_recommendation_level: doc?.reddit_recommendation_level ?? orig?.reddit_recommendation_level ?? null,
+        sources: doc?.sources ?? [],
+        isrctn_trials: doc?.isrctn_trials ?? null,
+        has_isrctn_trials: doc?.has_isrctn_trials ?? !!(doc?.isrctn_trials && doc.isrctn_trials.length > 0),
+        research_interests: doc?.research_interests ?? null,
+        phin_patient_feedback: doc?.phin_patient_feedback ?? orig?.phin_data?.patient_feedback ?? null,
+        phin_patient_satisfaction: doc?.phin_patient_satisfaction ?? orig?.patient_satisfaction_phin ?? null,
+        nhs_base: doc?.nhs_base ?? orig?.nhs_base ?? null,
+        nhs_posts: doc?.nhs_posts ?? orig?.nhs_posts ?? null,
+        procedure_count: (doc?.procedure_volumes_display?.length) ?? doc?.procedure_count ?? 0,
+        procedure_volumes: doc?.procedure_volumes_display ?? [],
       };
     });
 
@@ -872,7 +963,7 @@ const handleRankProduction = async (req, res) => {
           specialty,
           location,
           locationFilter,
-          insurancePreference,
+          insurancePreference: filters.insurancePreference,
           genderPreference,
           patient_age_group,
           languages
@@ -936,21 +1027,6 @@ app.get('/', (req, res) => {
       }
     });
   }
-});
-
-// Start server
-app.listen(PORT, () => {
-  console.log('\n' + '='.repeat(60));
-  console.log('🏥 Local Doctor Ranking Server');
-  console.log('='.repeat(60));
-  console.log(`📡 Server running on http://localhost:${PORT}`);
-  console.log(`📊 Total practitioners: ${dataStats.total}`);
-  console.log(`🔍 API endpoint: http://localhost:${PORT}/api/rank`);
-  console.log(`📦 Production BM25: http://localhost:${PORT}/api/rank-production (POST)`);
-  console.log(`📈 Stats endpoint: http://localhost:${PORT}/api/stats`);
-  console.log('='.repeat(60) + '\n');
-  console.log('[Server] ✅ Server started successfully - logging is working!');
-  console.log('[Server] Ready to receive requests...');
 });
 
 // Graceful shutdown

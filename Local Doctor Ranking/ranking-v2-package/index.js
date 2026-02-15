@@ -24,6 +24,7 @@ const fs = require('fs');
 const parentDir = path.resolve(__dirname, '..');
 const { getSessionContextParallelV2 } = require(path.join(parentDir, 'parallel-ranking-package/algorithm/session-context-variants'));
 const { getBM25Shortlist } = require(path.join(parentDir, 'parallel-ranking-package/testing/services/local-bm25-service'));
+const { getCanonicalInsuranceName } = require(path.join(parentDir, 'apply-ranking'));
 
 /**
  * Rank practitioners using V2 ranking algorithm
@@ -79,6 +80,7 @@ async function rankPractitioners(practitioners, userQuery, options = {}) {
     gender = null,
     manualSpecialty = null,
     locationFilter = null,
+    insurancePreference = null,
   } = options;
 
   // Load ranking config if provided as a file path
@@ -108,7 +110,7 @@ async function rankPractitioners(practitioners, userQuery, options = {}) {
       location,
       {
         lexiconsDir,
-        specialty: specialty || undefined,
+        specialty: specialty || manualSpecialty || undefined,
       }
     );
   }
@@ -128,11 +130,22 @@ async function rankPractitioners(practitioners, userQuery, options = {}) {
   }
 
   // Step 3: Prepare filters for BM25 ranking (includes age group, gender, languages)
+  let anchorPhrases = sessionContext.anchor_phrases || sessionContext.intentData?.anchor_phrases || [];
+  if (manualSpecialty && String(manualSpecialty).trim()) {
+    const spec = String(manualSpecialty).trim().toLowerCase();
+    if (spec === 'physiotherapy' || spec === 'physiotherapist') {
+      const physioAnchors = ['physiotherapy', 'pelvic pain', 'pelvic floor'];
+      anchorPhrases = [...new Set([...physioAnchors, ...(Array.isArray(anchorPhrases) ? anchorPhrases : [])])];
+    } else if (spec === 'dietitian') {
+      const dietAnchors = ['dietitian', 'nutrition', 'dietetics'];
+      anchorPhrases = [...new Set([...dietAnchors, ...(Array.isArray(anchorPhrases) ? anchorPhrases : [])])];
+    }
+  }
   const filters = {
     q_patient: sessionContext.q_patient || sessionContext.enrichedQuery,
     safe_lane_terms: sessionContext.safe_lane_terms || [],
     intent_terms: sessionContext.intent_terms || [],
-    anchor_phrases: sessionContext.anchor_phrases || sessionContext.intentData?.anchor_phrases || null,
+    anchor_phrases: anchorPhrases.length > 0 ? anchorPhrases : (sessionContext.anchor_phrases || sessionContext.intentData?.anchor_phrases || null),
     searchQuery: sessionContext.enrichedQuery,
     intentData: sessionContext.intentData || null,
     variantName: 'parallel-v2',
@@ -140,6 +153,7 @@ async function rankPractitioners(practitioners, userQuery, options = {}) {
     patient_age_group: patient_age_group || null,
     languages: Array.isArray(languages) ? languages : (languages ? [languages] : null),
     gender: gender || null,
+    insurancePreference: insurancePreference ? getCanonicalInsuranceName(insurancePreference) : null,
     ...(config && { rankingConfig: config }),
   };
 
@@ -203,6 +217,7 @@ function rankPractitionersSync(practitioners, sessionContext, options = {}) {
     gender = null,
     manualSpecialty = null,
     locationFilter = null,
+    insurancePreference = null,
   } = options;
 
   // Load ranking config if provided as a file path
@@ -233,7 +248,7 @@ function rankPractitionersSync(practitioners, sessionContext, options = {}) {
     filteredPractitioners = filterByLocation(filteredPractitioners, locationFilter);
   }
 
-  // Prepare filters (includes age group, gender, languages)
+  // Prepare filters (includes age group, gender, languages, insurance)
   const filters = {
     q_patient: sessionContext.q_patient || sessionContext.enrichedQuery,
     safe_lane_terms: sessionContext.safe_lane_terms || [],
@@ -246,6 +261,7 @@ function rankPractitionersSync(practitioners, sessionContext, options = {}) {
     patient_age_group: patient_age_group || null,
     languages: Array.isArray(languages) ? languages : (languages ? [languages] : null),
     gender: gender || null,
+    insurancePreference: insurancePreference ? getCanonicalInsuranceName(insurancePreference) : null,
     ...(config && { rankingConfig: config }),
   };
 

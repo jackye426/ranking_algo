@@ -11,6 +11,7 @@ npm-debug.log*
 !package.json
 !package-lock.json
 !tsconfig.json
+!**/insurance-aliases.json
 
 # Specifically exclude large data files
 **/merged_*.json
