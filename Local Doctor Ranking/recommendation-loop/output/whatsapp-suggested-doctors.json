@@ -1,0 +1,767 @@
+{
+  "builtAt": "2026-02-18T11:46:53.240Z",
+  "totalUniqueDoctors": 50,
+  "totalRecommendationOccurrences": 62,
+  "doctors": [
+    {
+      "name": "Mr Amer Raza",
+      "normalizedName": "amer raza",
+      "email": "pa@chelseawellwomen.co.uk",
+      "whatsappTally": 3,
+      "whatsappNumbers": [
+        "+44 7713 287244",
+        "+44 7715 605615",
+        "+44 7979 220019"
+      ],
+      "location": "Cromwell Hospital (London)",
+      "title": "Consultant Gynaecologist, Advanced Laparoscopic & Robotic Endometriosis Surgery (MDT-led)",
+      "query": null,
+      "geographyCluster": [
+        "Bridgend south wales"
+      ]
+    },
+    {
+      "name": "Mr Anthony Griffiths",
+      "normalizedName": "anthony griffiths",
+      "email": "ruthsmithcgs@outlook.com",
+      "whatsappTally": 3,
+      "whatsappNumbers": [
+        "+44 7713 287244",
+        "+44 7715 605615",
+        "+44 7891 147080"
+      ],
+      "location": "Spire Cardiff Hospital & St Joseph’s Private Hospital (Wales)",
+      "title": "Consultant Obstetrician & Gynaecologist, BSGE-Accredited Endometriosis Surgeon",
+      "query": null,
+      "geographyCluster": [
+        "Bridgend south wales",
+        "South Wales"
+      ]
+    },
+    {
+      "name": "Mr Denis Tsepov",
+      "normalizedName": "denis tsepov",
+      "email": "tsepov.info@gmail.com",
+      "whatsappTally": 3,
+      "whatsappNumbers": [
+        "+44 7713 287244",
+        "+44 7927 214602",
+        "+44 7979 220019"
+      ],
+      "location": "London Bridge Hospital / Harley Street (London)",
+      "title": "Consultant Gynaecological Surgeon, BSGE-accredited Endometriosis Referral Centre (2022), Advanced Pelvic & Robotic Surgery",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Mr Michael Adamczyk",
+      "normalizedName": "michael adamczyk",
+      "email": "adamczykpa@hcahealthcare.co.uk",
+      "whatsappTally": 3,
+      "whatsappNumbers": [
+        "+44 7715 605615",
+        "+44 7927 214602",
+        "+44 7979 220019"
+      ],
+      "location": "CEMIG London & HCA The Lister Hospital (London)",
+      "title": "Consultant Gynaecologist & Advanced Endometriosis Surgeon",
+      "query": null,
+      "geographyCluster": [
+        "Bridgend south wales"
+      ]
+    },
+    {
+      "name": "Mr Haider Jan",
+      "normalizedName": "haider jan",
+      "email": "pa@migynaecology.com",
+      "whatsappTally": 2,
+      "whatsappNumbers": [
+        "+44 7713 287244",
+        "+44 7791 873148"
+      ],
+      "location": "Spire St Anthony’s Hospital / Parkside Hospital (London)",
+      "title": "Consultant Obstetrician & Gynaecologist, Lead Surgeon of a BSGE-accredited Endometriosis Centre",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Mr Richard Penketh",
+      "normalizedName": "richard penketh",
+      "email": "secretary@penketh.org.uk",
+      "whatsappTally": 2,
+      "whatsappNumbers": [
+        "+44 7715 605615",
+        "+44 7891 147080"
+      ],
+      "location": "Sancta Maria Hospital (Swansea) & Spire Cardiff Hospital",
+      "title": "Consultant Gynaecologist & Endometriosis Surgeon",
+      "query": null,
+      "geographyCluster": [
+        "Bridgend south wales",
+        "South Wales"
+      ]
+    },
+    {
+      "name": "Mr Vasileios Minas",
+      "normalizedName": "vasileios minas",
+      "email": "secretary.minas@gmail.com",
+      "whatsappTally": 2,
+      "whatsappNumbers": [
+        "+44 7715 605615",
+        "+44 7979 220019"
+      ],
+      "location": "Centre for Endometriosis and Minimally Invasive Gynaecology (St Peter’s / Runnymede)",
+      "title": "BSGE-Accredited Endometriosis Centre Lead & Advanced Laparoscopic Surgeon",
+      "query": null,
+      "geographyCluster": [
+        "Bridgend south wales"
+      ]
+    },
+    {
+      "name": "Sarah McKenna",
+      "normalizedName": "sarah mckenna",
+      "email": "",
+      "whatsappTally": 2,
+      "whatsappNumbers": [
+        "+44 7531 230836",
+        "+44 7788 255133"
+      ],
+      "location": "London (London Bridge) | Online",
+      "title": "Advanced Gastroenterology Dietitian",
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": [
+        "Oxford"
+      ]
+    },
+    {
+      "name": "Andrea Bille",
+      "normalizedName": "andrea bille",
+      "email": "MrBillePA@hcahealthcare.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7927 214602"
+      ],
+      "location": "London Bridge Hospital (HCA) | In-person",
+      "title": "Consultant Thoracic Surgeon",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Angus Thomson",
+      "normalizedName": "angus thomson",
+      "email": "medpa2017@gmail.com",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7745 745080"
+      ],
+      "location": "Spire South Bank Hospital (Worcester)",
+      "title": "Consultant Gynaecologist – Worcestershire BSGE-Accredited Endometriosis Centre",
+      "query": null,
+      "geographyCluster": [
+        "Worcester"
+      ]
+    },
+    {
+      "name": "Bethany Willson",
+      "normalizedName": "bethany willson",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7531 230836"
+      ],
+      "location": "Online",
+      "title": "Specialist Gastroenterology Dietitian",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Dr Bhushan Mokoonlall",
+      "normalizedName": "bhushan mokoonlall",
+      "email": "info@northwayclinic.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7874 877866"
+      ],
+      "location": "Northway Clinic (London) / Canary Wharf Clinic (London)",
+      "title": "Consultant Gynaecologist with Hormonal & Whole-Patient Focus",
+      "query": null,
+      "geographyCluster": [
+        "Northumberland"
+      ]
+    },
+    {
+      "name": "Dr Efe Ejenavi",
+      "normalizedName": "efe ejenavi",
+      "email": "l.frewin-smith@medmin.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7790 035152"
+      ],
+      "location": "Birmingham (Harborne) | In-person",
+      "title": "Consultant Gastroenterologist",
+      "query": null,
+      "geographyCluster": [
+        "Birmingham as close as",
+        "Right now"
+      ]
+    },
+    {
+      "name": "Dr Imran Ghanghro",
+      "normalizedName": "imran ghanghro",
+      "email": "ghanghromedics@gmail.com",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7790 035152"
+      ],
+      "location": "Little Aston | In-person",
+      "title": "Consultant Gastroenterologist",
+      "query": null,
+      "geographyCluster": [
+        "Birmingham as close as",
+        "Right now"
+      ]
+    },
+    {
+      "name": "Dr Justin Chu",
+      "normalizedName": "justin chu",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7712 134360"
+      ],
+      "location": "The Harborne Hospital, Birmingham",
+      "title": null,
+      "query": [
+        "Patient with a 6-year history of infertility actively trying to conceive, with irregular menstrual cycles due to PCOS, confirmed endometriosis and adenomyosis, and persistent post-laparoscopy symptoms. No prior fertility specialist input, no ovulation induction (e.g. Letrozole or Clomid), and no assisted reproductive treatment to date. Partner previously fertile (3 children from prior relationship). Seeking a reproductive medicine consultant experienced in managing complex fertility cases involving PCOS, endometriosis, and adenomyosis, with expertise in ovulation induction, implantation optimisation, and integrated endometriosis-aware fertility care."
+      ],
+      "geographyCluster": [
+        "West Midlands",
+        "My partner"
+      ]
+    },
+    {
+      "name": "Dr Kirsty Munro",
+      "normalizedName": "kirsty munro",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7874 877866"
+      ],
+      "location": "Spire Edinburgh – Murrayfield Hospital / BSGE Accredited Centre (Edinburgh)",
+      "title": "Consultant Gynaecologist & Lead Endometriosis Specialist",
+      "query": null,
+      "geographyCluster": [
+        "Northumberland"
+      ]
+    },
+    {
+      "name": "Dr Samuel Smith",
+      "normalizedName": "samuel smith",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7790 035152"
+      ],
+      "location": "Birmingham (Harborne) | In-person",
+      "title": "Consultant Gastroenterologist",
+      "query": null,
+      "geographyCluster": [
+        "Birmingham as close as",
+        "Right now"
+      ]
+    },
+    {
+      "name": "Eloise Garbutt",
+      "normalizedName": "eloise garbutt",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7951 344688"
+      ],
+      "location": "The Gut Health Clinic – Central London / Online",
+      "title": null,
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": null
+    },
+    {
+      "name": "Estelle Kearney",
+      "normalizedName": "estelle kearney",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7531 230836"
+      ],
+      "location": "London (London Bridge) | Online",
+      "title": "Specialist Gut Health Dietitian",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Excellence Physiotherapy (Women’s Health Team)",
+      "normalizedName": "excellence physiotherapy (women’s health team)",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7951 344688"
+      ],
+      "location": "Belgravia / Monument / Clapham",
+      "title": null,
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": null
+    },
+    {
+      "name": "Jo Dyson (Becky Aston Physiotherapy Team)",
+      "normalizedName": "jo dyson (becky aston physiotherapy team)",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7788 255133"
+      ],
+      "location": "Becky Aston Physiotherapy Clinic (Milton Keynes)",
+      "title": "Pelvic Health Physiotherapist — bladder/bowel/sexual dysfunction + persistent pelvic pain",
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": [
+        "Oxford"
+      ]
+    },
+    {
+      "name": "Mathilde Renard Physiotherapy",
+      "normalizedName": "mathilde renard physiotherapy",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7951 344688"
+      ],
+      "location": "86 Harley Street (W1G) / St John’s Wood (NW8)",
+      "title": "Specialist Pelvic Health Physiotherapist – Endometriosis & Chronic Pelvic Pain",
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": null
+    },
+    {
+      "name": "Miss Cecilia Bottomley",
+      "normalizedName": "cecilia bottomley",
+      "email": "admin@clairemellon.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7791 873148"
+      ],
+      "location": "Portland Hospital / Harley Street | In-person",
+      "title": "Consultant Gynaecologist (Benign Gynaecology & Ultrasound)",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Miss Cordula Henggeler",
+      "normalizedName": "cordula henggeler",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7951 344688"
+      ],
+      "location": "Walthamstow (E17) / Online",
+      "title": null,
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": null
+    },
+    {
+      "name": "Miss Courtney Hall",
+      "normalizedName": "courtney hall",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7951 344688"
+      ],
+      "location": "OM Therapy, Dalston (London E8) / Royal Free Hospital (part-time)",
+      "title": "Pelvic Health & Musculoskeletal Physiotherapist",
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": null
+    },
+    {
+      "name": "Miss Fatima Husain",
+      "normalizedName": "fatima husain",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7712 134360"
+      ],
+      "location": "Spire Thames Valley Hospital, Slough / Windsor",
+      "title": null,
+      "query": [
+        "Patient with a 6-year history of infertility actively trying to conceive, with irregular menstrual cycles due to PCOS, confirmed endometriosis and adenomyosis, and persistent post-laparoscopy symptoms. No prior fertility specialist input, no ovulation induction (e.g. Letrozole or Clomid), and no assisted reproductive treatment to date. Partner previously fertile (3 children from prior relationship). Seeking a reproductive medicine consultant experienced in managing complex fertility cases involving PCOS, endometriosis, and adenomyosis, with expertise in ovulation induction, implantation optimisation, and integrated endometriosis-aware fertility care."
+      ],
+      "geographyCluster": [
+        "West Midlands",
+        "My partner"
+      ]
+    },
+    {
+      "name": "Miss Jessica Preshaw",
+      "normalizedName": "jessica preshaw",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7745 709600"
+      ],
+      "location": "Spire Bristol Hospital / North Bristol NHS Trust",
+      "title": "Consultant Gynaecologist – Endometriosis & Pelvic Pain Specialist",
+      "query": null,
+      "geographyCluster": [
+        "Bristol region for"
+      ]
+    },
+    {
+      "name": "Miss Nadine Di Donato",
+      "normalizedName": "nadine di donato",
+      "email": "sharon.phillips@ppsec.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7791 873148"
+      ],
+      "location": "Harley Street / Princess Grace Hospital / Portsmouth | In-person",
+      "title": "Consultant Gynaecologist & Laparoscopic Surgeon",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Miss Silvia Carta",
+      "normalizedName": "silvia carta",
+      "email": "carta.pa@privatecare.health",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7979 220019"
+      ],
+      "location": "Kingston Hospital NHS Trust / New Victoria Hospital (Kingston upon Thames)",
+      "title": "Consultant Gynaecologist (BSGE member)",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Mohan Kumar Singapura Gangaiah",
+      "normalizedName": "mohan kumar singapura gangaiah",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7745 745080"
+      ],
+      "location": "Spire Little Aston Hospital (Birmingham)",
+      "title": "Consultant Gynaecologist – Advanced Laparoscopic Surgery",
+      "query": null,
+      "geographyCluster": [
+        "Worcester"
+      ]
+    },
+    {
+      "name": "Mr David Rowlands",
+      "normalizedName": "david rowlands",
+      "email": "WRLmedicalsecretaries@spirehealthcare.com",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7791 873148"
+      ],
+      "location": "Spire Murrayfield Hospital Wirral | In-person",
+      "title": "Consultant Gynaecologist & Advanced Endometriosis Surgeon",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Mr Elias Kovoor",
+      "normalizedName": "elias kovoor",
+      "email": "Debbie.coleman@kims.org.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7788 255133"
+      ],
+      "location": "HCA UK at The Shard / London Bridge Hospital (London)",
+      "title": "Consultant Gynaecologist & Advanced Laparoscopic/Robotic Endometriosis Surgeon (BSGE-certified)",
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": [
+        "Oxford"
+      ]
+    },
+    {
+      "name": "Mr Islam Gamaleldin",
+      "normalizedName": "islam gamaleldin",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7745 709600"
+      ],
+      "location": "Spire Bristol Hospital / Southmead Hospital (Bristol)",
+      "title": "Consultant Gynaecologist & Endometriosis Specialist",
+      "query": null,
+      "geographyCluster": [
+        "Bristol region for"
+      ]
+    },
+    {
+      "name": "Mr Jonathan Rogers",
+      "normalizedName": "jonathan rogers",
+      "email": "Beaconsmedical@gmail.com",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7874 877866"
+      ],
+      "location": "Spire Cardiff Hospital, Cardiff",
+      "title": "Consultant Gynaecologist & Menopause Specialist with Endometriosis Focus",
+      "query": null,
+      "geographyCluster": [
+        "Northumberland"
+      ]
+    },
+    {
+      "name": "Mr Kenneth Emmanuel (Experienced Endometriosis Gynaecologist – Alternative)",
+      "normalizedName": "kenneth emmanuel (experienced endometriosis gynaecologist – alternative)",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7745 709600"
+      ],
+      "location": "Spire Bristol Hospital",
+      "title": "Consultant Obstetrician & Gynaecologist",
+      "query": null,
+      "geographyCluster": [
+        "Bristol region for"
+      ]
+    },
+    {
+      "name": "Mr Kirana Arambage",
+      "normalizedName": "kirana arambage",
+      "email": "gynae.secretary.ka@gmail.com",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7599 681982"
+      ],
+      "location": "John Radcliffe Hospital / Nuffield Health The Manor Hospital (Oxford)",
+      "title": "Consultant Gynaecologist, Advanced Minimal Access & Complex Endometriosis Surgery (BSGE Centre)",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Mr Lukasz Polanski",
+      "normalizedName": "lukasz polanski",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7712 134360"
+      ],
+      "location": "Spire Cambridge Lea Hospital & Bourn Hall Fertility Clinic",
+      "title": null,
+      "query": [
+        "Patient with a 6-year history of infertility actively trying to conceive, with irregular menstrual cycles due to PCOS, confirmed endometriosis and adenomyosis, and persistent post-laparoscopy symptoms. No prior fertility specialist input, no ovulation induction (e.g. Letrozole or Clomid), and no assisted reproductive treatment to date. Partner previously fertile (3 children from prior relationship). Seeking a reproductive medicine consultant experienced in managing complex fertility cases involving PCOS, endometriosis, and adenomyosis, with expertise in ovulation induction, implantation optimisation, and integrated endometriosis-aware fertility care."
+      ],
+      "geographyCluster": [
+        "West Midlands",
+        "My partner"
+      ]
+    },
+    {
+      "name": "Mr Martin Hirsch",
+      "normalizedName": "martin hirsch",
+      "email": "admin@oxfordgynaecology.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7599 681982"
+      ],
+      "location": "John Radcliffe Hospital / Nuffield Health The Manor Hospital (Oxford)",
+      "title": "Consultant Gynaecologist & Endometriosis Specialist Surgeon (BSGE Centre)",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Mr Oliver O’Donovan",
+      "normalizedName": "oliver o’donovan",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7745 709600"
+      ],
+      "location": "Spire Bristol Hospital / St Michael’s Hospital (Bristol)",
+      "title": "Consultant Gynaecologist – Lead of a BSGE-Accredited Endometriosis Centre",
+      "query": null,
+      "geographyCluster": [
+        "Bristol region for"
+      ]
+    },
+    {
+      "name": "Mr Shaheen Khazali",
+      "normalizedName": "shaheen khazali",
+      "email": "KhazaliPA@HCAhealthcare.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7979 220019"
+      ],
+      "location": "The Lister Hospital (Chelsea) / The Runnymede Hospital (Chertsey)",
+      "title": "Consultant Gynaecologist & Endometriosis Specialist (Lead Surgeon, BSGE-accredited CEMIG)",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Mr Simon M Phillips",
+      "normalizedName": "simon m phillips",
+      "email": "secretary@surgerycardiff.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7891 147080"
+      ],
+      "location": "Spire Cardiff Hospital (also Nuffield Health Cardiff Bay / Vale Hospital)",
+      "title": "Consultant Colorectal Surgeon",
+      "query": null,
+      "geographyCluster": [
+        "South Wales"
+      ]
+    },
+    {
+      "name": "Mr Tahir Mahmood",
+      "normalizedName": "tahir mahmood",
+      "email": "doreen@fifemedicalsecretarial.onmicrosoft.com",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7874 877866"
+      ],
+      "location": "Spire Murrayfield Hospital / Spire Shawfair Park Hospital (Edinburgh)",
+      "title": "Consultant Obstetrician & Gynaecologist with Endometriosis & Pelvic Pain Expertise",
+      "query": null,
+      "geographyCluster": [
+        "Northumberland"
+      ]
+    },
+    {
+      "name": "Mr Yadava Jeve",
+      "normalizedName": "yadava jeve",
+      "email": "secretary@p4fertility.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7712 134360"
+      ],
+      "location": "The Priory Hospital, Edgbaston, Birmingham",
+      "title": null,
+      "query": [
+        "Patient with a 6-year history of infertility actively trying to conceive, with irregular menstrual cycles due to PCOS, confirmed endometriosis and adenomyosis, and persistent post-laparoscopy symptoms. No prior fertility specialist input, no ovulation induction (e.g. Letrozole or Clomid), and no assisted reproductive treatment to date. Partner previously fertile (3 children from prior relationship). Seeking a reproductive medicine consultant experienced in managing complex fertility cases involving PCOS, endometriosis, and adenomyosis, with expertise in ovulation induction, implantation optimisation, and integrated endometriosis-aware fertility care."
+      ],
+      "geographyCluster": [
+        "West Midlands",
+        "My partner"
+      ]
+    },
+    {
+      "name": "Mrs Helen Molloy",
+      "normalizedName": "helen molloy",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7951 344688"
+      ],
+      "location": "Healthy Woman Physio – Epsom (Surrey) / Online",
+      "title": "Pelvic Health Physiotherapist – Endometriosis & Chronic Pelvic Pain",
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": null
+    },
+    {
+      "name": "Mrs Kalaivani Lingam",
+      "normalizedName": "kalaivani lingam",
+      "email": "derby.ppm@nuffield.com",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7791 873148"
+      ],
+      "location": "Nuffield Health Derby Hospital / Royal Derby Hospital | In-person",
+      "title": "Consultant Gynaecologist",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Mrs Katrina Louise Scott",
+      "normalizedName": "katrina louise scott",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7951 344688"
+      ],
+      "location": "Ashford & St Peter’s Hospitals NHS Foundation Trust (London region)",
+      "title": "Lead Specialist Pelvic Health Physiotherapist",
+      "query": [
+        "The patient has diagnosed endometriosis and has previously undergone surgery but continues to experience constant, unpredictable pelvic pain with flare-ups that are sometimes triggered by exercise. She reports reduced energy levels and would like support in understanding whether her pain may be related to pelvic floor tension, nerve sensitisation, muscular imbalance, or other factors. Her goal is to learn how to manage and reduce flare-ups, exercise safely without exacerbating symptoms, and improve overall quality of life, while avoiding further surgery. She is seeking a pelvic pain physiotherapist with specific experience in endometriosis and post-surgical pelvic pain management."
+      ],
+      "geographyCluster": null
+    },
+    {
+      "name": "Ms Salma Noor",
+      "normalizedName": "salma noor",
+      "email": "info@womenshealthservices.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7874 877866"
+      ],
+      "location": "Ramsay Fitzwilliam Hospital (Peterborough) / Ramsay Boston West Hospital",
+      "title": "Consultant Gynaecologist & Endometriosis / Menstrual Disorder Specialist",
+      "query": null,
+      "geographyCluster": [
+        "Northumberland"
+      ]
+    },
+    {
+      "name": "Professor Bassel Wattar",
+      "normalizedName": "bassel wattar",
+      "email": "",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7712 134360"
+      ],
+      "location": "Spire St Anthony’s Hospital, North Cheam (London/Surrey)",
+      "title": null,
+      "query": [
+        "Patient with a 6-year history of infertility actively trying to conceive, with irregular menstrual cycles due to PCOS, confirmed endometriosis and adenomyosis, and persistent post-laparoscopy symptoms. No prior fertility specialist input, no ovulation induction (e.g. Letrozole or Clomid), and no assisted reproductive treatment to date. Partner previously fertile (3 children from prior relationship). Seeking a reproductive medicine consultant experienced in managing complex fertility cases involving PCOS, endometriosis, and adenomyosis, with expertise in ovulation induction, implantation optimisation, and integrated endometriosis-aware fertility care."
+      ],
+      "geographyCluster": [
+        "West Midlands",
+        "My partner"
+      ]
+    },
+    {
+      "name": "Professor Christian Becker",
+      "normalizedName": "christian becker",
+      "email": "admin@oxfordwomenshealth.co.uk",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7599 681982"
+      ],
+      "location": "John Radcliffe Hospital / Nuffield Health The Manor Hospital (Oxford)",
+      "title": "Consultant Gynaecologist, Lead – Oxford Endometriosis CaRe Centre",
+      "query": null,
+      "geographyCluster": null
+    },
+    {
+      "name": "Yousri Afifi",
+      "normalizedName": "yousri afifi",
+      "email": "katie.jordan@theendionitisclinic.com",
+      "whatsappTally": 1,
+      "whatsappNumbers": [
+        "+44 7745 745080"
+      ],
+      "location": "The Harborne Hospital (Birmingham)",
+      "title": "Director, Birmingham Endometriosis Centre",
+      "query": null,
+      "geographyCluster": [
+        "Worcester"
+      ]
+    }
+  ]
+}

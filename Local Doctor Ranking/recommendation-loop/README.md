@@ -2,6 +2,12 @@
 
 This folder holds everything for closing the loop between **algorithm output** and **what we actually send to patients** (e.g. via WhatsApp), so we can improve ranking and track patient-facing recommendations.
 
+## What we commit
+
+- **`output/whatsapp-suggested-doctors.json`** – Master list of doctors suggested in WhatsApp (deduplicated, with email and tally). Built by `scripts/build-whatsapp-suggested-doctors.js`.
+- **Session storage** – The **tracker** (`scripts/recommendation-tracker.js`) stores the **session phone number** (patient/WhatsApp contact) per run so we can match runs to WhatsApp chats. Tracker data (`data/recommendation-tracker.json`) is regenerable and can stay local.
+- **WhatsApp export parsing** – `scripts/parse-whatsapp-recommendations.js` parses a single exported WhatsApp chat (`_chat.txt`). `scripts/parse-all-whatsapp-sessions.js` parses all sessions in `whatsapp-sessions/`. Export chats into `whatsapp-sessions/<contact>/_chat.txt`, then run the build script to refresh `output/whatsapp-suggested-doctors.json`.
+
 ## Contents
 
 - **`data/`** – Tracker JSON and other intermediate/raw data (e.g. `recommendation-tracker.json`, `whatsapp-sessions-parsed.json`).

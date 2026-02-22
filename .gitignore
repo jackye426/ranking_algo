@@ -41,6 +41,9 @@ __pycache__/
 
 # Recommendation tracker (can be regenerated)
 recommendation-tracker.json
+# Allow recommendation-loop output and blacklist (committed for reference)
+!**/recommendation-loop/output/whatsapp-suggested-doctors.json
+!**/recommendation-loop/data/doctor-blacklist.json
 
 # Python
 __pycache__/

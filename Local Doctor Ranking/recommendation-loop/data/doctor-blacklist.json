@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-02-20",
+  "blacklistedDoctors": [
+    {
+      "name": "Dr. Austin Ugwumadu",
+      "normalizedName": "austin ugwumadu",
+      "blacklistedDate": "2026-02-20",
+      "notes": "Blacklisted - should not be recommended",
+      "reason": "Blacklisted"
+    }
+  ]
+}
