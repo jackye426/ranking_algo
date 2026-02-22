@@ -294,6 +294,15 @@ async function rankPractitionersProgressive(practitioners, userQuery, options = 
     insurancePreference = null,
   } = options;
 
+  // 🚫 BLACKLIST FILTER - Apply FIRST (exclude blacklisted doctors)
+  // Never surface blacklisted practitioners
+  const beforeBlacklist = practitioners.length;
+  practitioners = practitioners.filter(p => !(p.blacklisted === true));
+  const blacklistedCount = beforeBlacklist - practitioners.length;
+  if (blacklistedCount > 0) {
+    console.log(`[V6 Progressive] 🚫 Filtered out ${blacklistedCount} blacklisted practitioner(s)`);
+  }
+
   // Track state
   let currentResults = [];
   let allEvaluatedProfiles = [];

@@ -72,6 +72,7 @@ Rules:
  * @param {Object} options - Configuration options
  * @param {string} options.model - LLM model to use (default: 'gpt-5.1')
  * @param {number} options.maxPractitioners - Maximum number of practitioners to evaluate (default: 12)
+ * @param {Object} [options.checklistContext] - Optional V7 checklist context to include in prompt: { filter_values: string[], reasoning: string }
  * 
  * @returns {Promise<Object>} Evaluation results:
  *   {
@@ -89,6 +90,7 @@ async function evaluateFit(userQuery, practitioners, options = {}) {
   const {
     model = DEFAULT_MODEL,
     maxPractitioners = 12,
+    checklistContext = null,
   } = options;
 
   if (!userQuery || typeof userQuery !== 'string' || !userQuery.trim()) {
@@ -106,7 +108,14 @@ async function evaluateFit(userQuery, practitioners, options = {}) {
   const summaries = practitionersToEvaluate.map((p) => buildPractitionerSummary(p));
   const summariesJson = JSON.stringify(summaries, null, 2);
 
-  const userContent = `Patient query:\n"${userQuery}"\n\nRecommended practitioners (our ranking's top ${practitionersToEvaluate.length}; in order, with profiles):\n${summariesJson}\n\nFor each doctor, categorize them as "excellent", "good", or "ill-fit" for this query.`;
+  let userContent = `Patient query:\n"${userQuery}"\n\nRecommended practitioners (our ranking's top ${practitionersToEvaluate.length}; in order, with profiles):\n${summariesJson}\n\nFor each doctor, categorize them as "excellent", "good", or "ill-fit" for this query.`;
+  if (checklistContext && (checklistContext.filter_values?.length > 0 || checklistContext.reasoning)) {
+    const checklistText = [
+      checklistContext.filter_values?.length ? `Sought competencies (checklist): ${checklistContext.filter_values.slice(0, 15).join('; ')}${(checklistContext.filter_values.length > 15 ? '...' : '')}` : '',
+      checklistContext.reasoning ? `Context: ${checklistContext.reasoning}` : '',
+    ].filter(Boolean).join('\n');
+    userContent += `\n\n${checklistText}`;
+  }
 
   try {
     const response = await openai.chat.completions.create({

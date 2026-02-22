@@ -113,6 +113,26 @@ const inferGenderFromTitle = (practitioner) => {
  * @param {string} insurancePreference - User's insurance provider name
  * @returns {Array} - Filtered list of practitioners who accept this insurance
  */
+/**
+ * Filter out blacklisted practitioners
+ * @param {Array} practitioners - List of practitioners
+ * @returns {Array} - Filtered list of practitioners (blacklisted ones removed)
+ */
+const filterByBlacklist = (practitioners) => {
+  const beforeCount = practitioners.length;
+  const filteredPractitioners = practitioners.filter(practitioner => {
+    // Exclude practitioners with blacklisted flag set to true
+    return !(practitioner.blacklisted === true);
+  });
+  
+  const filteredCount = beforeCount - filteredPractitioners.length;
+  if (filteredCount > 0) {
+    console.log(`[BM25 Blacklist Filter] 🚫 Filtered out ${filteredCount} blacklisted practitioner(s)`);
+  }
+  
+  return filteredPractitioners;
+};
+
 const filterByInsurance = (practitioners, insurancePreference) => {
   // If no insurance preference specified, return all practitioners
   if (!insurancePreference) {
@@ -1105,11 +1125,16 @@ export const getBM25Shortlist = (practitioners, filters, shortlistSize = 10, geo
   // }
   // console.log('─'.repeat(65)); // Debug log - commented for production
   
-  // 🎯 INSURANCE FILTER - Apply FIRST (most restrictive)
-  // Hard filter: Only show practitioners who accept the specified insurance
+  // 🚫 BLACKLIST FILTER - Apply FIRST (exclude blacklisted doctors)
+  // Hard filter: Never show blacklisted practitioners
   // console.log('\n[BM25 Service] 🔄 STARTING FILTER PIPELINE...'); // Debug log - commented for production
   let practitionersToRank = practitioners;
   
+  // Always apply blacklist filter first
+  practitionersToRank = filterByBlacklist(practitionersToRank);
+  
+  // 🎯 INSURANCE FILTER - Apply SECOND (most restrictive)
+  // Hard filter: Only show practitioners who accept the specified insurance
   if (filters.insurancePreference) {
     // console.log('[BM25 Service] 🏥 ➤ INSURANCE FILTER ACTIVE'); // Debug log - commented for production
     // console.log('[BM25 Service]    Insurance required:', filters.insurancePreference); // Debug log - commented for production
@@ -1759,6 +1784,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getProgressiveRankingV6,
     DEFAULT_RANKING_CONFIG,
     // Helper functions (not exported in ES6, but available for testing)
+    filterByBlacklist,
     filterByInsurance,
     filterByGenderPreference,
     calculateRelevantAdmissionCount,

@@ -12,7 +12,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Import V2 ranking package
-const { rankPractitioners, rankPractitionersProgressive } = require('./ranking-v2-package');
+const { rankPractitioners, rankPractitionersProgressive, rankPractitionersProgressiveV7 } = require('./ranking-v2-package');
 
 // Import V5 session context
 const { getSessionContextV5 } = require('./parallel-ranking-package/algorithm/session-context-variants');
@@ -34,14 +34,14 @@ try {
 // Import LLM evaluation module
 const { evaluateFit } = require('./ranking-v2-package/evaluate-fit');
 
-// Import transformation function and insurance canonicalization
-const { loadMergedData, getCanonicalInsuranceName } = require('./apply-ranking');
+// Import transformation function, insurance canonicalization, and V7 data loader
+const { loadMergedData, getCanonicalInsuranceName, loadV7Data } = require('./apply-ranking');
 
 // Import specialty filtering (for stats endpoint)
 const { getAllSpecialties, getSpecialtyStats } = require('./specialty-filter');
 
-// Import recommendation tracker
-const tracker = require('./scripts/recommendation-tracker');
+// Import recommendation tracker (feedback loop: top 10 + AI reasoning)
+const tracker = require('./recommendation-loop/scripts/recommendation-tracker');
 
 const app = express();
 const PORT = process.env.SERVER_PORT || 3000;
@@ -70,6 +70,9 @@ app.use((req, res, next) => {
 let practitioners = null;
 let dataStats = null;
 let loadTime = null;
+// V7: merged normalized + canonical practitioners (loaded on first V7 request)
+let v7Practitioners = null;
+let v7LoadPromise = null;
 
 /**
  * Load merged doctor data (supports async when file is streamed)
@@ -122,34 +125,34 @@ const loadData = () => {
   });
 };
 
-// Initialize on startup (loadData may be async for large files)
-loadData().then((success) => {
-  if (!success) {
-    console.error('[Server] CRITICAL: Failed to load data. Server will not function correctly.');
-    process.exit(1);
-  }
-  startServer();
-}).catch((err) => {
-  console.error('[Server] CRITICAL: Load error', err);
-  process.exit(1);
-});
-
+// Start server immediately; load data in background so the server is responsive right away
 function startServer() {
-  // Start server (data already loaded)
   app.listen(PORT, () => {
     console.log('\n' + '='.repeat(60));
     console.log('🏥 Local Doctor Ranking Server');
     console.log('='.repeat(60));
     console.log(`📡 Server running on http://localhost:${PORT}`);
-    console.log(`📊 Total practitioners: ${dataStats.total}`);
+    console.log(`📊 Data: loading in background (GET /api/status to check readiness)`);
     console.log(`🔍 API endpoint: http://localhost:${PORT}/api/rank`);
     console.log(`📦 Production BM25: http://localhost:${PORT}/api/rank-production (POST)`);
     console.log(`📈 Stats endpoint: http://localhost:${PORT}/api/stats`);
     console.log('='.repeat(60) + '\n');
-    console.log('[Server] ✅ Server started successfully - logging is working!');
-    console.log('[Server] Ready to receive requests...');
+    console.log('[Server] ✅ Server started - data loading in background...');
   });
 }
+
+startServer();
+
+// Load main data in background (required for v2/v5/v6 and default). V7 is not preloaded (too large); it loads on first V7 request.
+loadData().then((success) => {
+  if (success) {
+    console.log(`[Server] ✅ Main data ready: ${practitioners.length} practitioners (load time: ${loadTime}ms)`);
+  } else {
+    console.error('[Server] ❌ Main data load failed. /api/rank will return 503 until retried or server restarted.');
+  }
+}).catch((err) => {
+  console.error('[Server] ❌ Main data load error', err.message);
+});
 
 /** Format fees object for display (e.g. { new_appointment: 250, follow_up: 175, currency: 'GBP' }) */
 function formatFees(fees) {
@@ -180,12 +183,29 @@ app.get('/api/health', (req, res) => {
 });
 
 /**
+ * GET /api/status
+ * Data readiness for ranking (use this to show "Loading..." in UI or poll before /api/rank)
+ */
+app.get('/api/status', (req, res) => {
+  res.json({
+    dataReady: practitioners !== null,
+    v7Ready: v7Practitioners !== null,
+    totalPractitioners: practitioners?.length ?? null,
+    v7Practitioners: v7Practitioners?.length ?? null,
+    loadTimeMs: loadTime ?? null,
+  });
+});
+
+/**
  * GET /api/stats
  * Returns data statistics
  */
 app.get('/api/stats', (req, res) => {
   if (!practitioners) {
-    return res.status(500).json({ error: 'Data not loaded' });
+    return res.status(503).json({
+      error: 'Data loading',
+      message: 'Practitioner data is still loading. Call GET /api/status to check readiness, or retry in a moment.',
+    });
   }
   
   const specialtyStats = getSpecialtyStats(practitioners);
@@ -218,7 +238,7 @@ app.get('/api/stats', (req, res) => {
  *   "shortlistSize": 10, // optional, default 10
  *   "rankingConfig": null, // optional: path to ranking weights JSON file
  *   "evaluateFit": false, // optional: if true, LLM evaluates fit quality (excellent/good/ill-fit)
- *   "variant": "v2", // optional: "v2", "v5", or "v6" (default: "v2")
+ *   "variant": "v2", // optional: "v2", "v5", "v6", or "v7" (default: "v2")
  *   // V6 specific options:
  *   "maxIterations": 5, // optional, default 5
  *   "maxProfilesReviewed": 30, // optional, default 30
@@ -253,6 +273,7 @@ app.post('/api/rank', async (req, res) => {
       insurancePreference: insurancePreferenceRaw = null,
       nhsMode = false,
       mode = null,
+      sessionPhoneNumber = null,
     } = body;
 
     // Robust query extraction (support body.query string or body.query.text or body.text)
@@ -297,7 +318,10 @@ app.post('/api/rank', async (req, res) => {
       : null;
     
     if (!practitioners) {
-      return res.status(500).json({ error: 'Data not loaded' });
+      return res.status(503).json({
+        error: 'Data loading',
+        message: 'Practitioner data is still loading. Call GET /api/status to check readiness, or retry in a moment.',
+      });
     }
 
     const isNhsMode = !!(nhsMode || mode === 'nhs');
@@ -305,8 +329,18 @@ app.post('/api/rank', async (req, res) => {
       ? getCanonicalInsuranceName(insurancePreferenceRaw)
       : null;
     let practitionersForRanking = practitioners;
+    
+    // 🚫 BLACKLIST FILTER - Apply FIRST (exclude blacklisted doctors)
+    // Never surface blacklisted practitioners
+    const beforeBlacklist = practitionersForRanking.length;
+    practitionersForRanking = practitionersForRanking.filter(p => !(p.blacklisted === true));
+    const blacklistedCount = beforeBlacklist - practitionersForRanking.length;
+    if (blacklistedCount > 0) {
+      console.log(`[Server] 🚫 Filtered out ${blacklistedCount} blacklisted practitioner(s)`);
+    }
+    
     if (isNhsMode) {
-      practitionersForRanking = practitioners.filter(
+      practitionersForRanking = practitionersForRanking.filter(
         (p) =>
           (p.nhs_base && String(p.nhs_base).trim()) ||
           (p.nhs_posts && p.nhs_posts.length > 0)
@@ -362,6 +396,75 @@ app.post('/api/rank', async (req, res) => {
         console.error('[Server] V6 Error:', v6Error);
         console.error('[Server] V6 Error Stack:', v6Error.stack);
         throw new Error(`V6 Progressive Ranking failed: ${v6Error.message}`);
+      }
+    } else if (variant === 'v7') {
+      // V7: Load dataset on first request (not at startup – too large), then run progressive ranking with checklist
+      try {
+        if (!v7LoadPromise) {
+          const v7BaseDir = path.resolve(__dirname, '..');
+          v7LoadPromise = (async () => {
+            try {
+              const v7Path = path.join(v7BaseDir, 'V7 dataset', 'practitioners_normalized.json');
+              if (!fs.existsSync(v7Path)) {
+                console.log('[Server] V7 dataset not found.');
+                return null;
+              }
+              console.log('[Server] V7: Loading dataset (first request)...');
+              const { practitioners: v7List } = loadV7Data({
+                baseDir: v7BaseDir,
+                normalizedDataPath: path.join(v7BaseDir, 'V7 dataset', 'practitioners_normalized.json'),
+                canonicalDataPath: path.join(v7BaseDir, 'V7 dataset', 'practitioners_canonical.json'),
+              });
+              v7Practitioners = v7List;
+              console.log('[Server] V7 data loaded:', v7Practitioners.length, 'practitioners');
+              return v7Practitioners;
+            } catch (e) {
+              console.warn('[Server] V7 data load failed:', e.message);
+              return null;
+            }
+          })();
+        }
+        const v7List = await v7LoadPromise;
+        if (!v7List || v7List.length === 0) {
+          return res.status(503).json({
+            error: 'V7 data not ready',
+            message: 'V7 dataset failed to load or is unavailable. Check server logs.',
+          });
+        }
+        let v7ForRanking = v7List;
+        if (isNhsMode) {
+          v7ForRanking = v7List.filter(
+            (p) => (p.nhs_base && String(p.nhs_base).trim()) || (p.nhs_posts && p.nhs_posts.length > 0)
+          );
+        }
+        console.log(`[Server] V7: Starting progressive ranking with checklist (maxIterations=${maxIterations}, maxProfilesReviewed=${maxProfilesReviewed})`);
+        rankingResult = await rankPractitionersProgressiveV7(v7ForRanking, query, {
+          messages,
+          location,
+          shortlistSize,
+          manualSpecialty,
+          locationFilter,
+          patient_age_group,
+          gender,
+          languages: languagesArray,
+          insurancePreference: canonicalInsurance,
+          rankingConfig: rankingConfig || 'best-stage-a-recall-weights-desc-tuned.json',
+          maxIterations,
+          maxProfilesReviewed,
+          batchSize,
+          fetchStrategy,
+          targetTopK,
+          model: model || 'gpt-5.1',
+          useChecklist: true,
+          checklistBoostWeight: 1.2,
+          checklistMatchThreshold: 0.3,
+          includeChecklistInLLM: true,
+        });
+        console.log(`[Server] V7: Completed - iterations=${rankingResult.metadata.iterations}, checklist_boost_applied=${rankingResult.metadata.checklist_boost_applied}`);
+      } catch (v7Error) {
+        console.error('[Server] V7 Error:', v7Error);
+        console.error('[Server] V7 Error Stack:', v7Error.stack);
+        throw new Error(`V7 Progressive Ranking failed: ${v7Error.message}`);
       }
     } else if (variant === 'v5') {
       // V5: Use ideal profile generation
@@ -537,6 +640,7 @@ app.post('/api/rank', async (req, res) => {
         research_interests: doc.research_interests ?? null,
         phin_patient_feedback: doc.phin_patient_feedback ?? doc._originalRecord?.phin_data?.patient_feedback ?? null,
         phin_patient_satisfaction: doc.phin_patient_satisfaction ?? doc._originalRecord?.patient_satisfaction_phin ?? null,
+        phin_remote_consultation: doc.phin_remote_consultation ?? doc._originalRecord?.phin_data?.remote_consultation ?? null,
         nhs_base: doc.nhs_base ?? doc._originalRecord?.nhs_base ?? null,
         nhs_posts: doc.nhs_posts ?? doc._originalRecord?.nhs_posts ?? null,
         procedure_count: (doc.procedure_volumes_display ? doc.procedure_volumes_display.length : null) ?? doc.procedure_count ?? 0,
@@ -588,18 +692,48 @@ app.post('/api/rank', async (req, res) => {
       }
     }
     
-    // Record query and top 5 doctors for tracking (non-blocking)
-    const top5 = results.slice(0, 5).map(r => ({
+    // Record query and top 10 doctors + AI fit (excellent/good/ill_fit) + reasoning for tracking (non-blocking)
+    const top10 = results.slice(0, 10).map(r => ({
       id: r.id,
       name: r.name,
       rank: r.rank,
       score: r.score,
-      specialty: r.specialty
+      specialty: r.specialty,
+      fit_category: r.fit_category ?? null,
+      fit_reason: r.fit_reason ?? null
     }));
-    
-    tracker.recordQuery(query, top5).catch(err => {
-      console.error('[Tracker] Failed to record query:', err.message);
-    });
+    const aiReasoning = results.some(r => r.fit_reason != null)
+      ? {
+          perDoctor: results.slice(0, 10).map(r => ({
+            name: r.name,
+            fit_category: r.fit_category ?? null,
+            brief_reason: r.fit_reason ?? null
+          }))
+        }
+      : null;
+    const isTestMode = body.testMode === true;
+    if (!isTestMode) {
+      // Build filter conditions object (only include non-null/non-empty values)
+      const filterConditions = {};
+      if (manualSpecialty) filterConditions.specialty = manualSpecialty;
+      if (locationFilter && typeof locationFilter === 'object') filterConditions.locationFilter = locationFilter;
+      if (canonicalInsurance) filterConditions.insurancePreference = canonicalInsurance;
+      if (gender) filterConditions.genderPreference = gender;
+      if (patient_age_group) filterConditions.patient_age_group = patient_age_group;
+      if (languagesArray && languagesArray.length > 0) filterConditions.languages = languagesArray;
+      if (isNhsMode) filterConditions.nhsMode = true;
+      if (rankingConfig) filterConditions.rankingConfig = typeof rankingConfig === 'string' ? rankingConfig : 'custom';
+
+      tracker.recordQuery(query, top10, {
+        aiReasoning,
+        sessionPhoneNumber: sessionPhoneNumber != null ? String(sessionPhoneNumber).trim() : null,
+        filterConditions: Object.keys(filterConditions).length > 0 ? filterConditions : null,
+      }).catch(err => {
+        console.error('[Tracker] Failed to record query:', err.message);
+      });
+    } else {
+      console.log('[Tracker] Test mode: not recording this run.');
+    }
     
     const totalTime = Date.now() - requestStartTime;
     
@@ -639,7 +773,7 @@ app.post('/api/rank', async (req, res) => {
           insurancePreference: canonicalInsurance || null,
           nhsMode: isNhsMode || null,
         },
-        // V6 specific metadata
+        // V6 / V7 specific metadata
         ...(variant === 'v6' ? {
           iterations: rankingResult.metadata.iterations,
           profilesEvaluated: rankingResult.metadata.profilesEvaluated,
@@ -648,10 +782,20 @@ app.post('/api/rank', async (req, res) => {
           qualityBreakdown: rankingResult.metadata.qualityBreakdown,
           top3AllExcellent: results.slice(0, 3).every(r => r.fit_category === 'excellent'),
         } : {}),
+        ...(variant === 'v7' ? {
+          iterations: rankingResult.metadata.iterations,
+          profilesEvaluated: rankingResult.metadata.profilesEvaluated,
+          profilesFetched: rankingResult.metadata.profilesFetched,
+          terminationReason: rankingResult.metadata.terminationReason,
+          qualityBreakdown: rankingResult.metadata.qualityBreakdown,
+          top3AllExcellent: results.slice(0, 3).every(r => r.fit_category === 'excellent'),
+          checklist: rankingResult.metadata.checklist || { filter_values: [], matched_taxonomy_entries: [] },
+          checklist_boost_applied: !!rankingResult.metadata.checklist_boost_applied,
+        } : {}),
       },
-      fitEvaluation: variant === 'v6' ? {
+      fitEvaluation: (variant === 'v6' || variant === 'v7') ? {
         evaluated: true,
-        note: 'V6 includes built-in LLM evaluation',
+        note: variant === 'v7' ? 'V7 includes built-in LLM evaluation and checklist context' : 'V6 includes built-in LLM evaluation',
         qualityBreakdown: rankingResult.metadata.qualityBreakdown,
       } : (fitEvaluation ? {
         overall_reason: fitEvaluation.overall_reason,
@@ -675,6 +819,72 @@ app.post('/api/rank', async (req, res) => {
 });
 
 /**
+ * GET /api/search-doctor
+ * Look up doctors by name (partial match, case-insensitive).
+ * Query param: q (or name) = search string. Optional: limit (default 50).
+ */
+app.get('/api/search-doctor', (req, res) => {
+  try {
+    const q = (req.query.q || req.query.name || '').trim();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+
+    if (!q) {
+      return res.status(400).json({ error: 'Query parameter "q" or "name" is required' });
+    }
+
+    if (!practitioners) {
+      return res.status(503).json({
+        error: 'Data loading',
+        message: 'Practitioner data is still loading. Call GET /api/status to check readiness, or retry in a moment.',
+      });
+    }
+
+    const term = q.toLowerCase();
+    const matches = practitioners.filter((p) => {
+      const name = (p.name || '').toLowerCase();
+      if (name.includes(term)) return true;
+      const alts = p._originalRecord?.name_alternatives;
+      if (Array.isArray(alts)) {
+        if (alts.some((alt) => String(alt).toLowerCase().includes(term))) return true;
+      }
+      return false;
+    });
+
+    const results = matches.slice(0, limit).map((p) => {
+      const orig = p._originalRecord || {};
+      const locs = orig.locations || [];
+      const locationSummary = locs.length > 0
+        ? locs.map((loc) => loc.hospital || loc.address || loc.postcode).filter(Boolean).slice(0, 3)
+        : [];
+      return {
+        id: p.id,
+        name: p.name,
+        title: p.title || null,
+        specialty: p.specialty || null,
+        email: orig.email || null,
+        profile_url: p.profile_url || null,
+        gmc_number: p.gmc_number || null,
+        locations: locationSummary,
+      };
+    });
+
+    res.json({
+      success: true,
+      q,
+      total: matches.length,
+      returned: results.length,
+      results,
+    });
+  } catch (error) {
+    console.error('[Server] Error in /api/search-doctor:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/search
  * Simple search endpoint (query parameter)
  */
@@ -689,7 +899,10 @@ app.get('/api/search', async (req, res) => {
     }
     
     if (!practitioners) {
-      return res.status(500).json({ error: 'Data not loaded' });
+      return res.status(503).json({
+        error: 'Data loading',
+        message: 'Practitioner data is still loading. Call GET /api/status to check readiness, or retry in a moment.',
+      });
     }
     
     // Use the same ranking logic as POST /api/rank
@@ -810,7 +1023,10 @@ const handleRankProduction = async (req, res) => {
     }
 
     if (!practitioners) {
-      return res.status(500).json({ error: 'Data not loaded' });
+      return res.status(503).json({
+        error: 'Data loading',
+        message: 'Practitioner data is still loading. Call GET /api/status to check readiness, or retry in a moment.',
+      });
     }
 
     // Filter by specialty if provided
@@ -942,6 +1158,7 @@ const handleRankProduction = async (req, res) => {
         research_interests: doc?.research_interests ?? null,
         phin_patient_feedback: doc?.phin_patient_feedback ?? orig?.phin_data?.patient_feedback ?? null,
         phin_patient_satisfaction: doc?.phin_patient_satisfaction ?? orig?.patient_satisfaction_phin ?? null,
+        phin_remote_consultation: doc?.phin_remote_consultation ?? orig?.phin_data?.remote_consultation ?? null,
         nhs_base: doc?.nhs_base ?? orig?.nhs_base ?? null,
         nhs_posts: doc?.nhs_posts ?? orig?.nhs_posts ?? null,
         procedure_count: (doc?.procedure_volumes_display?.length) ?? doc?.procedure_count ?? 0,

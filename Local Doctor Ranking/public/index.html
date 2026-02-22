@@ -372,6 +372,13 @@
             color: #888;
             font-style: italic;
         }
+        .remote-yes {
+            color: #0d7d4a;
+            font-weight: 600;
+        }
+        .remote-no {
+            color: #888;
+        }
         
         .loading {
             text-align: center;
@@ -414,6 +421,80 @@
         .stats-bar strong {
             margin-right: 20px;
         }
+        
+        .mode-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px;
+            border-radius: 10px;
+            width: fit-content;
+        }
+        .mode-tab {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .mode-tab:hover {
+            background: rgba(255,255,255,0.15);
+        }
+        .mode-tab.active {
+            background: white;
+            color: #667eea;
+        }
+        .doctor-search-panel {
+            display: none;
+        }
+        .doctor-search-panel.show {
+            display: block;
+        }
+        .rank-mode-panel {
+            display: block;
+        }
+        .rank-mode-panel.hide {
+            display: none;
+        }
+        .doctor-result-card {
+            padding: 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            background: #fafafa;
+        }
+        .doctor-result-card .doctor-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .doctor-result-card .doctor-meta {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 6px;
+        }
+        .doctor-result-card .doctor-email {
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+        .doctor-result-card .doctor-email a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .doctor-result-card .doctor-email a:hover {
+            text-decoration: underline;
+        }
+        .doctor-result-card .doctor-locations {
+            font-size: 0.85em;
+            color: #888;
+            margin-top: 6px;
+        }
     </style>
 </head>
 <body>
@@ -427,9 +508,33 @@
             Loading statistics...
         </div>
         
+        <div class="mode-tabs">
+            <button type="button" class="mode-tab active" id="modeTabRank" data-mode="rank">Rank by query</button>
+            <button type="button" class="mode-tab" id="modeTabDoctor" data-mode="doctor">Search doctor by name</button>
+        </div>
+        
         <div class="search-box">
+            <div id="rankModePanel" class="rank-mode-panel">
             <form class="search-form" id="searchForm">
                 <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <label for="sessionPhoneInput" style="color: #333; font-size: 14px; font-weight: 600;">Session phone number <span id="phoneRequiredStar" style="color: #c33;">*</span></label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #666;">
+                                <input type="checkbox" id="testModeCheckbox" checked style="cursor: pointer;">
+                                <span>Test mode (no phone needed; results not recorded)</span>
+                            </label>
+                        </div>
+                        <input
+                            type="text"
+                            class="search-input"
+                            id="sessionPhoneInput"
+                            placeholder="e.g. +44 7951 344688 (patient/WhatsApp contact for this session)"
+                            autocomplete="tel"
+                            style="max-width: 320px;"
+                        >
+                        <p style="font-size: 12px; color: #666;" id="sessionPhoneHint">Used to link this run to WhatsApp recommendations. Required so we can match and compare results.</p>
+                    </div>
                     <div style="display: flex; gap: 10px;">
                         <input 
                             type="text" 
@@ -452,6 +557,7 @@
                                 <option value="v5" selected>V5 (Ideal Profile - GPT-5.1)</option>
                                 <option value="v2">V2 (Parallel - GPT-4o-mini)</option>
                                 <option value="v6">V6 (Progressive Ranking - GPT-5.1)</option>
+                                <option value="v7">V7 (Checklist + Progressive - GPT-5.1)</option>
                                 <option value="production">Production BM25 (New Features)</option>
                             </select>
                         </div>
@@ -595,6 +701,22 @@
                 <span class="example-query" onclick="setQuery('Looking for a cardiologist for atrial fibrillation')">Cardiologist</span>
                 <span class="example-query" onclick="setQuery('I need a general surgeon for hernia repair')">Hernia repair</span>
             </div>
+            </div>
+            
+            <div id="doctorSearchModePanel" class="doctor-search-panel search-box">
+                <p style="color: #666; margin-bottom: 12px;">Look up a specific doctor by name (partial match).</p>
+                <form class="search-form" id="doctorSearchForm" style="margin-bottom: 0;">
+                    <input 
+                        type="text" 
+                        class="search-input" 
+                        id="doctorNameInput" 
+                        placeholder="e.g. Smith, or full name"
+                        autocomplete="off"
+                        style="flex: 1; max-width: 400px;"
+                    >
+                    <button type="submit" class="search-button" id="doctorSearchButton">Search doctor</button>
+                </form>
+            </div>
         </div>
         
         <div class="results-container" id="resultsContainer">
@@ -616,29 +738,92 @@
         // API base URL: use same origin when served from ranking server; otherwise point to localhost:3000
         const API_BASE = (function() {
             const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
-            if (window.location.hostname === 'localhost' && port === '3000') return ''; // same origin
-            if (window.location.protocol === 'file:') return 'http://localhost:3000'; // opened from file
-            if (window.location.hostname === 'localhost') return 'http://localhost:3000'; // other port, assume API on 3000
-            return ''; // same origin in production
+            const hostname = window.location.hostname;
+            const protocol = window.location.protocol;
+            let base = '';
+            if (hostname === 'localhost' && port === '3000') {
+                base = ''; // same origin
+            } else if (protocol === 'file:') {
+                base = 'http://localhost:3000'; // opened from file
+            } else if (hostname === 'localhost') {
+                base = 'http://localhost:3000'; // other port, assume API on 3000
+            } else {
+                base = ''; // same origin in production
+            }
+            console.log('[API_BASE] Detected:', { hostname, port, protocol, base });
+            return base;
         })();
 
-        // Load stats on page load; show warning if server unreachable
+        // Poll /api/status until data is ready, then show stats. Search button stays enabled so you can submit; 503 will show if data not ready.
         async function loadStats() {
-            try {
-                const response = await fetch(API_BASE + '/api/stats');
-                const data = await response.json();
-                if (data.success) {
-                    document.getElementById('statsBar').innerHTML = `
-                        <strong>Total Doctors: ${data.stats.total.toLocaleString()}</strong>
-                        <strong>Specialties: ${data.stats.uniqueSpecialties}</strong>
-                        <strong>With GMC: ${data.stats.withGMC.toLocaleString()}</strong>
-                    `;
-                } else {
-                    showServerWarning('Stats failed');
+            const statsBar = document.getElementById('statsBar');
+            if (!statsBar) {
+                console.error('Stats bar element not found');
+                return;
+            }
+            const pollMs = 2000;
+            let pollTimer = null;
+
+            function stopPolling() {
+                if (pollTimer) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
                 }
+            }
+
+            const checkStatus = async () => {
+                try {
+                    const url = API_BASE + '/api/status';
+                    const r = await fetch(url);
+                    if (!r.ok) {
+                        console.warn('[loadStats] /api/status returned', r.status);
+                        if (statsBar) statsBar.innerHTML = '<strong>Server error ' + r.status + '</strong> Check console for details.';
+                        return false;
+                    }
+                    const s = await r.json();
+                    if (s && s.dataReady) {
+                        stopPolling();
+                        try {
+                            const res = await fetch(API_BASE + '/api/stats');
+                            if (!res.ok) {
+                                if (statsBar) statsBar.innerHTML = '<strong>Data ready (stats unavailable)</strong>';
+                                return true;
+                            }
+                            const data = await res.json();
+                            if (data.success && statsBar) {
+                                statsBar.innerHTML = `
+                                    <strong>Total Doctors: ${data.stats.total.toLocaleString()}</strong>
+                                    <strong>Specialties: ${data.stats.uniqueSpecialties}</strong>
+                                    <strong>With GMC: ${data.stats.withGMC.toLocaleString()}</strong>
+                                    ${s.v7Ready ? '<strong>V7 data ready</strong>' : ''}
+                                `;
+                            } else if (statsBar) {
+                                statsBar.innerHTML = '<strong>Data ready</strong>';
+                            }
+                        } catch (statsErr) {
+                            console.error('[loadStats] Failed to load stats:', statsErr);
+                            if (statsBar) statsBar.innerHTML = '<strong>Data ready (stats load failed)</strong>';
+                        }
+                        return true;
+                    }
+                    if (statsBar) statsBar.innerHTML = '<strong>Loading practitioner data…</strong> You can search now; if data is not ready you’ll get a message to retry.';
+                    return false;
+                } catch (e) {
+                    console.error('[loadStats] Error checking status:', e);
+                    stopPolling();
+                    showServerWarning('Cannot reach server: ' + (e.message || 'Unknown error'));
+                    const searchButton = document.getElementById('searchButton');
+                    if (searchButton) searchButton.disabled = false;
+                    return true;
+                }
+            };
+
+            try {
+                const ready = await checkStatus();
+                if (!ready) pollTimer = setInterval(checkStatus, pollMs);
             } catch (error) {
-                console.error('Failed to load stats:', error);
-                showServerWarning('Cannot reach server');
+                console.error('[loadStats] Failed to initialize:', error);
+                showServerWarning('Failed to check server status');
             }
         }
         function showServerWarning(reason) {
@@ -652,6 +837,102 @@
             const productionOptions = document.getElementById('productionOptions');
             productionOptions.style.display = this.value === 'production' ? 'block' : 'none';
         });
+
+        document.getElementById('testModeCheckbox').addEventListener('change', function() {
+            const star = document.getElementById('phoneRequiredStar');
+            const hint = document.getElementById('sessionPhoneHint');
+            const input = document.getElementById('sessionPhoneInput');
+            if (this.checked) {
+                if (star) star.style.visibility = 'hidden';
+                if (hint) hint.textContent = 'Test mode: this run will not be recorded. Leave phone empty or fill for reference only.';
+                if (input) input.placeholder = 'Optional in test mode';
+            } else {
+                if (star) star.style.visibility = 'visible';
+                if (hint) hint.textContent = 'Used to link this run to WhatsApp recommendations. Required so we can match and compare results.';
+                if (input) input.placeholder = "e.g. +44 7951 344688 (patient/WhatsApp contact for this session)";
+            }
+        });
+
+        // Mode tabs: Rank by query vs Search doctor by name
+        const modeTabRank = document.getElementById('modeTabRank');
+        const modeTabDoctor = document.getElementById('modeTabDoctor');
+        const rankModePanel = document.getElementById('rankModePanel');
+        const doctorSearchModePanel = document.getElementById('doctorSearchModePanel');
+        function setMode(mode) {
+            const isDoctor = mode === 'doctor';
+            modeTabRank.classList.toggle('active', !isDoctor);
+            modeTabDoctor.classList.toggle('active', isDoctor);
+            rankModePanel.classList.toggle('hide', isDoctor);
+            doctorSearchModePanel.classList.toggle('show', isDoctor);
+        }
+        modeTabRank.addEventListener('click', () => setMode('rank'));
+        modeTabDoctor.addEventListener('click', () => setMode('doctor'));
+
+        document.getElementById('doctorSearchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const q = document.getElementById('doctorNameInput').value.trim();
+            if (!q) return;
+            await searchDoctorByName(q);
+        });
+
+        async function searchDoctorByName(q) {
+            const resultsContainer = document.getElementById('resultsContainer');
+            const loading = document.getElementById('loading');
+            const resultsContent = document.getElementById('resultsContent');
+            const queryInfo = document.getElementById('queryInfo');
+            const resultsList = document.getElementById('resultsList');
+            const errorDiv = document.getElementById('error');
+            const btn = document.getElementById('doctorSearchButton');
+            resultsContainer.classList.add('show');
+            loading.style.display = 'block';
+            resultsContent.style.display = 'none';
+            errorDiv.style.display = 'none';
+            btn.disabled = true;
+            try {
+                const url = API_BASE + '/api/search-doctor?q=' + encodeURIComponent(q) + '&limit=50';
+                const res = await fetch(url);
+                const data = await res.json();
+                btn.disabled = false;
+                loading.style.display = 'none';
+                resultsContent.style.display = 'block';
+                if (!data.success) {
+                    errorDiv.textContent = data.error || data.message || 'Search failed';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                const total = data.total || 0;
+                const results = data.results || [];
+                queryInfo.innerHTML = '<strong>Doctor search:</strong> "' + escapeHtml(q) + '" — ' + total + ' match' + (total !== 1 ? 'es' : '') + ', showing ' + results.length + '.';
+                if (results.length === 0) {
+                    resultsList.innerHTML = '<p style="color:#666; padding:20px;">No doctors found. Try a different name or partial name.</p>';
+                } else {
+                    resultsList.innerHTML = results.map((d) => {
+                        const email = d.email ? '<div class="doctor-email"><a href="mailto:' + escapeHtml(d.email) + '">' + escapeHtml(d.email) + '</a></div>' : '';
+                        const profile = d.profile_url ? '<div class="doctor-email"><a href="' + escapeHtml(d.profile_url) + '" target="_blank" rel="noopener">View profile</a></div>' : '';
+                        const locs = (d.locations && d.locations.length) ? '<div class="doctor-locations">' + escapeHtml(d.locations.join(' · ')) + '</div>' : '';
+                        return '<div class="doctor-result-card">' +
+                            '<div class="doctor-name">' + escapeHtml(d.name) + (d.title ? ' — ' + escapeHtml(d.title) : '') + '</div>' +
+                            '<div class="doctor-meta">' + (d.specialty ? escapeHtml(d.specialty) : '') + (d.gmc_number ? ' · GMC ' + escapeHtml(d.gmc_number) : '') + '</div>' +
+                            email + profile + locs +
+                            '</div>';
+                    }).join('');
+                }
+                errorDiv.style.display = 'none';
+            } catch (err) {
+                btn.disabled = false;
+                loading.style.display = 'none';
+                resultsContent.style.display = 'block';
+                errorDiv.textContent = err.message || 'Request failed. Is the server running?';
+                errorDiv.style.display = 'block';
+                resultsList.innerHTML = '';
+            }
+        }
+        function escapeHtml(s) {
+            if (s == null) return '';
+            const div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
         
         function setQuery(query) {
             document.getElementById('queryInput').value = query;
@@ -675,6 +956,19 @@
             const insuranceFilter = document.getElementById('insuranceFilter').value.trim();
             const evaluateFit = document.getElementById('evaluateFitCheckbox').checked;
             const nhsMode = document.getElementById('nhsModeCheckbox').checked;
+            const testMode = document.getElementById('testModeCheckbox') && document.getElementById('testModeCheckbox').checked;
+            const sessionPhoneNumber = (document.getElementById('sessionPhoneInput') && document.getElementById('sessionPhoneInput').value) ? document.getElementById('sessionPhoneInput').value.trim() : '';
+            
+            if (!testMode && !sessionPhoneNumber) {
+                resultsContainer.classList.add('show');
+                resultsContent.style.display = 'none';
+                loading.style.display = 'none';
+                errorDiv.textContent = 'Please enter the session phone number (patient/WhatsApp contact) so we can link this run to recommendations, or tick Test mode to run without recording.';
+                errorDiv.style.display = 'block';
+                searchButton.disabled = false;
+                if (document.getElementById('sessionPhoneInput')) document.getElementById('sessionPhoneInput').focus();
+                return;
+            }
             
             // Show loading state
             resultsContainer.classList.add('show');
@@ -688,8 +982,12 @@
                     query: query,
                     shortlistSize: 10,
                     evaluateFit: evaluateFit,
-                    variant: variantSelector
+                    variant: variantSelector,
+                    testMode: !!testMode
                 };
+                if (!testMode && sessionPhoneNumber) {
+                    requestBody.sessionPhoneNumber = sessionPhoneNumber;
+                }
                 
                 // Add filters if provided
                 if (specialtyFilter) {
@@ -728,8 +1026,8 @@
                     requestBody.nhsMode = true;
                 }
                 
-                // Add V6 specific options if V6 is selected
-                if (variantSelector === 'v6') {
+                // Add V6 / V7 specific options when selected
+                if (variantSelector === 'v6' || variantSelector === 'v7') {
                     requestBody.maxIterations = 5;
                     requestBody.maxProfilesReviewed = 30;
                     requestBody.batchSize = 12;
@@ -907,13 +1205,18 @@
                         }
                     }
                     
-                    // Add V6 specific metadata
+                    // Add V6 / V7 specific metadata
                     let v6MetadataText = '';
-                    if (variantSelector === 'v6' && data.queryInfo.iterations !== undefined) {
-                        v6MetadataText = `<br><strong>V6 Progressive Ranking:</strong> ${data.queryInfo.iterations} iteration(s), ${data.queryInfo.profilesEvaluated} profiles evaluated, ${data.queryInfo.profilesFetched} profiles fetched`;
+                    if ((variantSelector === 'v6' || variantSelector === 'v7') && data.queryInfo.iterations !== undefined) {
+                        const label = variantSelector === 'v7' ? 'V7 Progressive Ranking' : 'V6 Progressive Ranking';
+                        v6MetadataText = `<br><strong>${label}:</strong> ${data.queryInfo.iterations} iteration(s), ${data.queryInfo.profilesEvaluated} profiles evaluated, ${data.queryInfo.profilesFetched} profiles fetched`;
                         v6MetadataText += `<br><strong>Termination:</strong> ${data.queryInfo.terminationReason}`;
                         if (data.queryInfo.top3AllExcellent !== undefined) {
                             v6MetadataText += ` | <strong>Top 3 All Excellent:</strong> ${data.queryInfo.top3AllExcellent ? '✅ Yes' : '❌ No'}`;
+                        }
+                        if (variantSelector === 'v7' && data.queryInfo.checklist) {
+                            const cv = data.queryInfo.checklist.filter_values || [];
+                            v6MetadataText += `<br><strong>Checklist:</strong> ${cv.length} competency item(s)${data.queryInfo.checklist_boost_applied ? ' · boost applied' : ''}`;
                         }
                     }
                     
@@ -950,7 +1253,7 @@
                     const aiReasoning = (result.fit_reason || result.evaluation_reason) || null;
                     const locationsFormatted = formatLocations(result.locations);
                     const aboutText = (result.about || result.clinical_expertise_full || result.clinical_expertise || '').trim();
-                    const iterationInfo = (variantSelector === 'v6' && result.iteration_found != null) ? `
+                    const iterationInfo = ((variantSelector === 'v6' || variantSelector === 'v7') && result.iteration_found != null) ? `
                         <div class="iteration-info" style="font-size: 11px; color: #888; margin-top: 4px;">Found in iteration ${result.iteration_found}</div>
                     ` : '';
                     const scoreBreakdown = (variantSelector === 'production' && (result.bm25Score != null || result.qualityBoost != null || result.proximityBoost != null)) ? `
@@ -1005,6 +1308,14 @@
                             <div class="card-section-label">Pricing</div>
                             <div class="card-section-value ${result.pricing ? '' : 'pricing-na'}">${(result.pricing && String(result.pricing).trim()) ? result.pricing : 'Contact for pricing'}</div>
                         </div>
+                        <div class="card-section remote-consultation">
+                            <div class="card-section-label">Remote consultations</div>
+                            <div class="card-section-value">
+                                ${result.phin_remote_consultation === true
+                                    ? '<span class="remote-yes" title="Profile declares video/telephone or online consultations">✓ Yes</span>'
+                                    : '<span class="remote-no" title="No remote consultation declared">— No</span>'}
+                            </div>
+                        </div>
                         ${aiReasoning ? `
                         <div class="card-section">
                             <div class="card-section-label">AI reasoning</div>
@@ -1054,11 +1365,15 @@
                 }).join('');
                 
             } catch (error) {
-                loading.style.display = 'none';
-                errorDiv.style.display = 'block';
-                errorDiv.textContent = `Error: ${error.message}`;
+                console.error('[search] Error:', error);
+                if (loading) loading.style.display = 'none';
+                if (errorDiv) {
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = `Error: ${error.message || 'Unknown error occurred. Check browser console for details.'}`;
+                }
+                if (resultsContent) resultsContent.style.display = 'none';
             } finally {
-                searchButton.disabled = false;
+                if (searchButton) searchButton.disabled = false;
             }
         }
         
@@ -1076,13 +1391,34 @@
         });
         
         // Form submission
-        document.getElementById('searchForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const query = document.getElementById('queryInput').value.trim();
-            if (query) {
-                search(query);
-            }
-        });
+        const searchForm = document.getElementById('searchForm');
+        if (searchForm) {
+            searchForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (doctorSearchModePanel && doctorSearchModePanel.classList.contains('show')) return;
+                const queryInput = document.getElementById('queryInput');
+                const query = queryInput ? queryInput.value.trim() : '';
+                if (query) {
+                    search(query);
+                } else {
+                    const resultsContainer = document.getElementById('resultsContainer');
+                    const errorDiv = document.getElementById('error');
+                    const resultsContent = document.getElementById('resultsContent');
+                    const loading = document.getElementById('loading');
+                    if (resultsContainer) resultsContainer.classList.add('show');
+                    if (loading) loading.style.display = 'none';
+                    if (resultsContent) resultsContent.style.display = 'none';
+                    if (errorDiv) {
+                        errorDiv.textContent = 'Please enter a search query (e.g. "I need a knee replacement surgeon").';
+                        errorDiv.style.display = 'block';
+                    }
+                }
+                return false;
+            });
+        } else {
+            console.error('Search form not found');
+        }
         
         // Load stats on page load
         loadStats();

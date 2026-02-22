@@ -142,6 +142,9 @@ function transformMergedRecord(record) {
   const phinPatientFeedback = record.phin_data?.patient_feedback ?? record.patient_feedback ?? null;
   const phinPatientSatisfaction = record.patient_satisfaction_phin ?? record.phin_data?.patient_satisfaction_phin ?? null;
   
+  // PHIN-style: whether practitioner offers remote consultation (true/false)
+  const phinRemoteConsultation = deriveRemoteConsultation(record);
+  
   return {
     practitioner_id: record.id || `practitioner_${Math.random().toString(36).substr(2, 9)}`,
     id: record.id,
@@ -195,11 +198,37 @@ function transformMergedRecord(record) {
     research_interests: record.research_interests ?? null,
     phin_patient_feedback: phinPatientFeedback,
     phin_patient_satisfaction: phinPatientSatisfaction,
+    phin_remote_consultation: phinRemoteConsultation,
     procedure_volumes_display: procedureVolumesDisplay,
     
     // Store original record for reference
     _originalRecord: record
   };
+}
+
+/**
+ * Derive whether the practitioner offers remote consultation (video/telephone/online).
+ * Used for PHIN data section: phin_remote_consultation (true/false).
+ */
+function deriveRemoteConsultation(record) {
+  if (record == null) return false;
+  // Explicit PHIN/source field
+  if (typeof record.phin_data?.remote_consultation === 'boolean') return record.phin_data.remote_consultation;
+  if (typeof record.remote_consultations === 'boolean' && record.remote_consultations) return true;
+  if (record.remote_video_consultations === true || record.remote_audio_consultations === true) return true;
+  // BUPA-style consultation_types array
+  const types = record.consultation_types;
+  if (Array.isArray(types)) {
+    const lower = types.map(t => (t && String(t)).toLowerCase());
+    if (lower.some(t => t.includes('video') || t.includes('telephone') || t.includes('telehealth') || t.includes('online') || t.includes('remote'))) return true;
+  }
+  // Locations: "Telephone / video consultation" or "Online"
+  const locs = record.locations || [];
+  for (const loc of locs) {
+    const name = (loc.hospital || loc.name || '').toLowerCase();
+    if (name.includes('telephone') || name.includes('video consultation') || name.includes('online')) return true;
+  }
+  return false;
 }
 
 /**
@@ -268,6 +297,15 @@ async function rankDoctors(practitioners, userQuery, options = {}) {
     messages = [],
     location = null
   } = options;
+  
+  // 🚫 BLACKLIST FILTER - Apply FIRST (exclude blacklisted doctors)
+  // Never surface blacklisted practitioners
+  const beforeBlacklist = practitioners.length;
+  practitioners = practitioners.filter(p => !(p.blacklisted === true));
+  const blacklistedCount = beforeBlacklist - practitioners.length;
+  if (blacklistedCount > 0) {
+    console.log(`[Ranking] 🚫 Filtered out ${blacklistedCount} blacklisted practitioner(s)`);
+  }
   
   console.log(`\n[Ranking] Query: "${userQuery}"`);
   console.log(`[Ranking] Searching through ${practitioners.length} practitioners...`);
@@ -391,6 +429,9 @@ if (require.main === module) {
   main().catch(console.error);
 }
 
+// V7: load normalized + canonical merged practitioners (for variant 'v7')
+const { loadV7Data } = require('./v7-data-loader');
+
 // Export for use as module
 module.exports = {
   loadMergedData,
@@ -398,4 +439,5 @@ module.exports = {
   transformMergedRecord,
   rankDoctors,
   getCanonicalInsuranceName,
+  loadV7Data,
 };

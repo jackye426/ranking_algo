@@ -115,9 +115,16 @@ async function rankPractitioners(practitioners, userQuery, options = {}) {
     );
   }
 
-  // Step 2: Apply manual specialty filter BEFORE ranking (if provided)
-  let filteredPractitioners = practitioners;
-  const initialCount = practitioners.length;
+  // Step 2: Apply blacklist filter FIRST (exclude blacklisted doctors)
+  // Never surface blacklisted practitioners
+  let filteredPractitioners = practitioners.filter(p => !(p.blacklisted === true));
+  const blacklistedCount = practitioners.length - filteredPractitioners.length;
+  if (blacklistedCount > 0) {
+    console.log(`[Ranking V2] 🚫 Filtered out ${blacklistedCount} blacklisted practitioner(s)`);
+  }
+  
+  // Step 2b: Apply manual specialty filter BEFORE ranking (if provided)
+  const initialCount = filteredPractitioners.length;
   if (manualSpecialty && String(manualSpecialty).trim()) {
     const { filterBySpecialty } = require(path.join(parentDir, 'specialty-filter'));
     filteredPractitioners = filterBySpecialty(practitioners, { manualSpecialty: String(manualSpecialty).trim() });
@@ -234,9 +241,16 @@ function rankPractitionersSync(practitioners, sessionContext, options = {}) {
     }
   }
 
+  // Apply blacklist filter FIRST (exclude blacklisted doctors)
+  // Never surface blacklisted practitioners
+  let filteredPractitioners = practitioners.filter(p => !(p.blacklisted === true));
+  const blacklistedCount = practitioners.length - filteredPractitioners.length;
+  if (blacklistedCount > 0) {
+    console.log(`[Ranking V2 Sync] 🚫 Filtered out ${blacklistedCount} blacklisted practitioner(s)`);
+  }
+  
   // Apply manual specialty filter BEFORE ranking (if provided)
-  let filteredPractitioners = practitioners;
-  const initialCount = practitioners.length;
+  const initialCount = filteredPractitioners.length;
   if (manualSpecialty && String(manualSpecialty).trim()) {
     const { filterBySpecialty } = require(path.join(parentDir, 'specialty-filter'));
     filteredPractitioners = filterBySpecialty(practitioners, { manualSpecialty: String(manualSpecialty).trim() });
@@ -301,4 +315,7 @@ module.exports = {
   rankPractitioners,
   rankPractitionersSync,
   rankPractitionersProgressive: require('./progressive-ranking-v6').rankPractitionersProgressive,
+  rankPractitionersProgressiveV7: require('./progressive-ranking-v7').rankPractitionersProgressiveV7,
+  generateMedicalCompetencyChecklist: require('./generate-checklist-v7').generateMedicalCompetencyChecklist,
+  calculateChecklistBoost: require('./checklist-matcher-v7').calculateChecklistBoost,
 };
