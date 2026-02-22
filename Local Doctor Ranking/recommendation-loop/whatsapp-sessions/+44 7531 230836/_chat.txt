@@ -1,0 +1,97 @@
+[1/30/26, 14:25:37] ~Jess: ‎Messages and calls are end-to-end encrypted. Only people in this chat can read, listen to, or share them.
+[1/30/26, 14:25:37] ~Jess:
+[1/30/26, 14:22:30] ~Jess: Can you help me find the right specialist?
+[1/30/26, 14:22:32] DocMap: Hi, thanks so much for reaching out.
+
+We help connect you with trusted women’s health specialists, including doctors, dietitians, and therapists. Someone from our team will be in touch shortly (Usually within 10 mins).
+
+In the meantime, it would really help to know:
+* the type of specialist you’re looking for
+* your location
+* whether you have any insurance
+
+If this is a medical emergency, please contact 999 (or your local emergency services) straight away.
+
+Please note that we don’t provide medical diagnoses or medical advice.
+[1/30/26, 14:23:37] ~Jess: hi there, it’s jess here doing some beta testing! but i would love to find:
+- a specialist who works in nutrition for ibs, especially post infectious ibs triggered by antibiotics and food poisoning
+- ⁠surbiton, london 
+- ⁠no insurance 
+thank you!
+[1/30/26, 14:42:16] DocMap: Hi Jess! Thanks for testing it out and sharing the above. 
+
+Just checking, have you seen any specialists for this before? Are there particular symptoms that affect your day to day the most? And are you open to online appointments or do you prefer in-person if possible?
+[2/2/26, 11:53:14] DocMap: Hey Jess! Hope you had a great weekend. 
+
+Just wanted to follow up in case it slipped through, happy to continue whenever it suits you.
+[2/2/26, 15:19:42] ~Jess: Hey, thanks for following up :)
+
+I have seen a nutritionist in the past, this was around 1.5 years ago and I have been working alone since. I notice my symptoms are worse when I eat out of routine and drink alcohol. Online works for me! ‎<This message was edited>
+[2/2/26, 15:23:03] DocMap: Thanks for sharing. Let me look into it for you, be back with a few results shortly
+[2/2/26, 15:23:52] ~Jess: thanks!
+[2/2/26, 15:28:10] DocMap: Based on what you’ve shared, these are the three specialists we think are the best fit, taking into account your post-infectious IBS history, symptom flares when routine changes or alcohol is involved, your preference for online support, and the fact that you’ve already tried working with a nutritionist in the past.
+[2/2/26, 15:28:23] DocMap: 1) Sarah McKenna
+
+📍 London (London Bridge) | Online
+Advanced Gastroenterology Dietitian
+
+Why she’s suitable:
+Sarah is an advanced gastroenterology dietitian with strong NHS experience supporting people with complex and persistent gut symptoms. She regularly works with IBS alongside SIBO, IMO, bile acid malabsorption, and other functional gut disorders, and is fully trained in both hydrogen and methane breath testing. Her approach is thorough, evidence-based, and focused on understanding the underlying drivers of symptoms rather than relying on generic IBS advice.
+
+Best for:
+If your symptoms began after antibiotics or illness and you want a structured, investigative approach that goes deeper than standard dietary guidance.
+
+🔗 View profile: https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/sarah-mckenna
+[2/2/26, 15:28:35] DocMap: 2) Estelle Kearney
+
+📍 London (London Bridge) | Online
+Specialist Gut Health Dietitian
+
+Why she’s suitable:
+Estelle is a specialist gut health dietitian with extensive experience in complex gastroenterology and neurogastroenterology conditions. She has advanced FODMAP training from King’s College London and is trained in hydrogen breath testing for SIBO and food intolerances. She takes a holistic but firmly evidence-based approach, considering gut–brain interactions, lifestyle factors, and symptom patterns.
+
+Best for:
+If stress, gut sensitivity, and fluctuating symptoms are part of the picture and you want someone who looks at the gut–brain connection alongside diet.
+
+🔗 View profile: https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/estelle-kearney
+[2/2/26, 15:28:48] DocMap: 3) Bethany Willson
+
+📍 Online
+Specialist Gastroenterology Dietitian
+
+Why she’s suitable:
+Bethany works as a specialist gastroenterology dietitian in a leading London hospital and often supports people whose symptoms have been labelled as IBS but haven’t improved with standard advice. She has experience with IBS, SIBO, bile acid malabsorption, and complex gut presentations, and is FODMAP trained through King’s College London. She also offers a free initial consultation, which can be a helpful low-pressure starting point.
+
+Best for:
+If you want someone methodical and clinical who will take your symptoms seriously and work through them step by step.
+
+🔗 View profile: https://docmap.co.uk/dietitian/bethany-willson
+[2/2/26, 15:29:05] DocMap: Do these feel like they could be a good fit for you?
+[2/2/26, 15:39:05] ~Jess: These all look great, thank you for sending them through!
+[2/2/26, 15:42:41] DocMap: Thats great. Of course. And just to get your feedback, from a user pov you are happy with the compatibility of these dietitians? Like do you think these profiles  fits your need if you are looking for a dietitian?
+[2/2/26, 15:44:02] DocMap: Part of the trick is for us to be able to return the best results out of hundreds if not thousands of profiles, so we are still refining the ranking algo all the time
+[2/2/26, 15:54:45] ~Jess: From first glance, they look like they would all be a good fit. In the past I needed to set up intro calls to see if they were a personality match - it's often not their experience or knowledge that I'm unsure about, but whether they will be compatible on a social level! I think giving a clear ranking and explaining why they were most compatible would be handy. Also price is a big factor so I would find it really helpful if pricing was included, although I note 2/3 of them don't have pricing info aviaible online.
+[2/2/26, 16:01:34] DocMap: Yeah the social aspect is a very interesting point. Is it more helpful to indicate those that offer free initial consultations or try and find social matches?
+
+Pricing is def very true. We should include them whenever the data is there.
+[2/2/26, 16:02:17] DocMap: Do you think in general people will find this tool to be useful?
+[2/2/26, 16:03:13] DocMap: Like what would make it so that you feel “wow I would totally share this with my friends if they are looking for someone”
+[2/2/26, 16:04:52] ~Jess: Often they have their own website which might have more info on pricing/packages available so it could be worth trying to find the nutritionists own website or socials for more detailed info. I would find it helpful for sure - I might actually find it more useful to have 5-10 links with less detailed information so I could browse a slightly wider range of professionals.
+
+In terms of giving it the wow factor, if you were able to set up initial free consultation calls, or have a discount arranged for my first session, this is something that would set it apart and take some of the admin/financial burden away
+[2/2/26, 16:29:19] DocMap: We can definitely share more than just three options.
+
+I was curious: does the context we add on why each profile might be a good fit give you more confidence than researching on Google yourself?
+
+I completely agree on pricing transparency, especially for self-pay. I’ll take a closer look at how we display that.
+
+Really interesting point about initial intro calls. For doctors and dietitians in our network, that’s something we can set up quite easily. It’s great to hear that would remove some of the admin and add a bit of a “wow” factor.
+
+Aside from the financial side, do you think that would remove most of the friction, or are there other burdens in the process that tend to get overlooked?
+[2/2/26, 16:30:16] DocMap: Thank you so much for taking the time and giving these thoughtful suggestions btw, it’s super helpful!
+[2/2/26, 16:44:20] ~Jess: if i think back to before i knew much about ibs and the gut system, the overview wouldn’t add much context as the terms wouldn’t really have meant anything to me. 
+
+i can’t think of anything else off the top of my head at the moment but i think of anything i’ll send a message! 
+
+no problem, happy to help ☺️
+[2/2/26, 16:46:42] DocMap: Really good to know! Yes feel free to message us any time! Thanks again

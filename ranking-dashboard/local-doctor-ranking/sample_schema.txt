@@ -1,0 +1,100 @@
+﻿{
+  "total_records": 43004,
+  "merged_at": "2026-02-14T17:24:56.415358",
+  "statistics": {
+    "existing_merged_records": 42995,
+    "reddit_entries": 162,
+    "reddit_doctors_matched": 146,
+    "reddit_doctors_unmatched": 16,
+    "bupa_records": 10802,
+    "bupa_urls_added": 10808,
+    "practitioners_with_trust_affiliations": 1301,
+    "practitioners_with_reddit_data": 146,
+    "isrctn_practitioners_with_trials": 1241
+  },
+  "records": [
+    {
+      "id": "bupa_31834",
+      "sources": [
+        "BUPA"
+      ],
+      "merge_date": "2026-02-14T13:58:28.563433",
+      "requires_review": false,
+      "gmc_number": null,
+      "name": "Mrs Nikki Croce",
+      "title": "Mrs",
+      "first_name": "Nikki",
+      "last_name": "Croce",
+      "specialty": "Counselling",
+      "specialty_source": "BUPA",
+      "specialties": [
+        "Counselling",
+        "Eye Movement Desensitisation and Reprocessing (EMDR)",
+        "Solution Focused Brief Therapy"
+      ],
+      "clinical_interests": "working with child, adolescent and adults survivors of childhood abuse and domestic abuse which includes physical, emotional and sexual abuse; working with Eating disorders; supporting individuals who have experienced Infant loss.",
+      "areas_of_interest": [
+        "working with child, adolescent and adults survivors of childhood abuse and domestic abuse which includes physical, emotional and sexual abuse",
+        "working with Eating disorders",
+        "supporting individuals who have experienced Infant loss."
+      ],
+      "locations": [
+        {
+          "hospital": "Practice",
+          "address": "The Practice Old Torquay Road Paignton TQ3 2QY",
+          "postcode": "TQ32QY",
+          "phone": "07706 316903",
+          "email": "serenitytorbay@outlook.com",
+          "website": "",
+          "type": "Practice",
+          "nhs": false,
+          "nhsppu": false,
+          "source": "BUPA"
+        }
+      ],
+      "qualifications": [
+        "BACP Accreditation BACP 2024",
+        "Advanced Diploma Integrative Counselling Iron Mill College 2021",
+        "EMDR Part 1 EMDR Academy 2024",
+        "EMDR Part 4 EMDR Academy 2025",
+        "Rainbow Baby Training The Foundation for Infant Loss Training 2024",
+        "Post Qualifying Diploma in Eating Disorders Iron Mill College 2022"
+      ],
+      "languages": [],
+      "about": "My name is Nikki,  I am an experienced counsellor with a warm and friendly approach. I have experience of working with children, young people and also adults.  I have experience of working with children, adults and young people; I have experience of working with domestic abuse, sexual violence, eating disorders and addictive behaviours.  I have also trained in working with Eating disorders and also supporting individuals who have experienced Infant loss.  I will provide a safe space to explore what has happened in your life without judgement.",
+      "professional_memberships": [
+        "BACP Accredited since January 2024"
+      ],
+      "nhs_base": null,
+      "contact_phone": "07909 820734",
+      "email": "serenitytorbay@outlook.com",
+      "website": null,
+      "consultation_types": [
+        "Face-to-face consultations",
+        "Video and telephone consultations"
+      ],
+      "fee_assured": true,
+      "verified_account": true,
+      "procedures": [],
+      "procedures_completed": [],
+      "profile_urls": {
+        "bupa": null
+      },
+      "urls": [],
+      "research_interests": null,
+      "awards": [],
+      "publications": [],
+      "reddit_recommendation_level": "ðŸŸ¢ Green - Mentioned by patients in an endometriosis support community",
+      "reddit_recommendation_sources": [],
+      "reddit_patient_notes": "",
+      "reddit_patient_notes_raw": "",
+      "reddit_name_field": "http://www.nikkikroon.ie/",
+      "reddit_expertise_type": "surgical_specialist",
+      "reddit_urls": [
+        "http://www.nikkikroon.ie/"
+      ],
+      "reddit_match_confidence": 71.9090909090909,
+      "reddit_match_method": "name_fuzzy_medium",
+      "reddit_source_entry": {
+        "doctor_name": "Dr. Nikki Kroon",
+        "name_field": "http://www.nikkikroon.ie/",

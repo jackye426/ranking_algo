@@ -1,0 +1,96 @@
+[2/11/26, 12:43:58] ~Megan: ‎Messages and calls are end-to-end encrypted. Only people in this chat can read, listen to, or share them.
+[2/11/26, 12:43:58] ~Megan:
+[2/11/26, 12:43:46] ~Megan: Can you help me find the right specialist?
+[2/11/26, 12:43:47] DocMap: Hi, thanks so much for reaching out.
+
+We help connect people with trusted women’s health specialists, including doctors, dietitians, therapists, and physiotherapists. Someone from our team will be in touch shortly.
+
+In the meantime, it would really help if you could let us know:
+•the type of specialist you’re looking for
+•your location
+•whether you have any insurance
+
+If this is a medical emergency, please contact 999 (or your local emergency services) immediately.
+
+Please note that we don’t provide medical diagnoses or medical advice.
+[2/11/26, 12:44:03] ~Megan: Endometriosis, with Devon and no insurance
+[2/11/26, 12:44:30] DocMap: Thanks for sharing these information. 
+
+To help find the right specialist for you, can you tell us a bit more about your specific situation, such as the procedures you are looking for, your symptoms or anything else you’d like to look for in a specialist
+[2/11/26, 12:44:41] ~Megan: Endometriosis excision and management
+[2/11/26, 12:46:13] DocMap: Have you been diagnosed with deep or complex endometriosis (for example involving the bowel, bladder, or nerves), or is this your first surgical opinion?
+[2/11/26, 12:46:42] ~Megan: I have been diagnosed with deep infiltrating endometriosis
+[2/11/26, 12:47:58] DocMap: Thanks for confirming it’s deep infiltrating endometriosis — that’s really helpful.
+
+Just to make sure we match you with the right level of specialist, do you know whether it involves the bowel, bladder, ureters, diaphragm, or nerves?
+[2/11/26, 12:48:17] ~Megan: Ureters
+[2/11/26, 12:49:03] DocMap: Thanks — ureter involvement is really important to know.
+
+Because this usually requires a highly specialised surgeon (often working with urology), it can sometimes mean travelling to a tertiary centre.
+
+How far would you be willing to travel for the right specialist?
+[2/11/26, 12:49:41] ~Megan: Any amount
+[2/11/26, 12:50:02] DocMap: Understood. Bear with me as I fetch your results. ~15 mins
+[2/11/26, 12:59:38] DocMap: Based on your diagnosis of deep infiltrating endometriosis involving the ureter, we’ve shortlisted five highly experienced excision surgeons with tertiary-level expertise, and it’s worth noting that Mr Minas, Mr Griffiths, Mr Tsepov and Mr Raza are all frequently featured on online endometriosis community recommendation lists.
+[2/11/26, 12:59:50] DocMap: Mr Vasileios Minas
+
+📍 The Runnymede Hospital (Surrey) / The Lister Hospital (London)
+Consultant Obstetrician & Gynaecologist, Lead Surgeon & Director of a BSGE-accredited Endometriosis Centre
+
+Why he may be a good fit:
+High-volume surgeon for deeply infiltrating endometriosis and complex laparoscopic excision, leading a BSGE-accredited centre with an established multidisciplinary setup. Strong fit for ureter-involving DIE where a tertiary pathway and coordinated urology input are often needed.
+
+Best for:
+Women with complex DIE including ureter involvement who want a high-volume, centre-led excision pathway with MDT support.
+
+🔗 https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/mr-vasileios-minas
+[2/11/26, 13:00:04] DocMap: 2. Mr Denis Tsepov
+
+📍 London Bridge Hospital / Harley Street (London)
+Consultant Gynaecological Surgeon, BSGE-accredited Endometriosis Referral Centre (2022), Advanced Pelvic & Robotic Surgery
+
+Why he may be a good fit:
+Focused on severe / deep infiltrating endometriosis, with a centre model built around complex pelvic surgery and multidisciplinary collaboration. Particularly relevant for ureter/urinary-tract-associated disease where surgical planning and urology access matter.
+
+Best for:
+Women willing to travel to London for a specialist advanced pelvic surgery centre (including robotic options) for ureter-involving DIE.
+
+🔗 https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/mr-denis-tsepov
+[2/11/26, 13:00:13] DocMap: 3. Mr Haider Jan
+
+📍 Spire St Anthony’s Hospital / Parkside Hospital (London)
+Consultant Obstetrician & Gynaecologist, Lead Surgeon of a BSGE-accredited Endometriosis Centre
+
+Why he may be a good fit:
+BSGE-accredited endometriosis specialist with a high volume of minimally invasive procedures and explicit ureterolysis listed in scope—important for ureter-involving DIE, which often needs tertiary-level expertise and careful surgical technique.
+
+Best for:
+Women who want BSGE-centre-level excision expertise in/around London, particularly where ureter involvement is part of the surgical plan.
+
+🔗 https://www.spirehealthcare.com/spire-st-anthonys-hospital/consultants/mr-haider-jan-c6075583
+[2/11/26, 13:00:26] DocMap: 4. Mr Anthony Griffiths
+
+📍 Spire Cardiff Hospital & St Joseph’s Private Hospital (Wales)
+Consultant Obstetrician & Gynaecologist, BSGE-Accredited Endometriosis Surgeon
+
+Why he may be a good fit:
+BSGE-accredited surgeon with a stated focus on severe and rectovaginal disease, and procedures that explicitly include ureterolysis and ureteric stenting—a strong signal for ureter-involving deep disease. Also has clear tertiary leadership experience building endometriosis services.
+
+Best for:
+Women based in the South West who want a high-level excision surgeon that’s closer than London, without compromising on tertiary expertise for complex DIE.
+
+🔗 https://www.spirehealthcare.com/spire-cardiff-hospital/consultants/mr-anthony-griffiths-c4325064
+[2/11/26, 13:00:43] DocMap: 5. Mr Amer Raza
+
+📍 Cromwell Hospital (London)
+Consultant Gynaecologist, Advanced Laparoscopic & Robotic Endometriosis Surgery (MDT-led)
+
+Why he may be a good fit:
+Strong emphasis on complex deep endometriosis, with explicit robotic excision + ureterolysis and a multidisciplinary setup (including urology/colorectal support). This is the kind of structure that tends to suit ureter DIE cases where planning, imaging, and MDT access are essential.
+
+Best for:
+Women who want a top-tier private MDT pathway in London for severe DIE with ureter involvement.
+
+🔗 https://www.cromwellhospital.com/find-a-consultant/amer-raza-consultant-gynaecologist/
+[2/11/26, 13:01:00] DocMap: Let me know if any stand out to you, and I’d be happy to help you take the next step—whether that’s checking suitability, clarifying pathways, or reaching out on your behalf.
+[2/11/26, 13:02:53] ~Megan: That’s great thanks

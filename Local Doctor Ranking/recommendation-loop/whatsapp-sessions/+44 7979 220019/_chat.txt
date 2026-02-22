@@ -1,0 +1,107 @@
+[2/10/26, 23:31:38] ~Raph 🪲: ‎Messages and calls are end-to-end encrypted. Only people in this chat can read, listen to, or share them.
+[2/10/26, 23:31:38] ~Raph 🪲:
+[2/10/26, 23:27:29] ~Raph 🪲: Can you help me find the right specialist?
+[2/10/26, 23:27:31] DocMap: Hi, thanks so much for reaching out.
+
+We help connect people with trusted women’s health specialists, including doctors, dietitians, therapists, and physiotherapists. Someone from our team will be in touch shortly.
+
+In the meantime, it would really help if you could let us know:
+•the type of specialist you’re looking for
+•your location
+•whether you have any insurance
+
+If this is a medical emergency, please contact 999 (or your local emergency services) immediately.
+
+Please note that we don’t provide medical diagnoses or medical advice.
+[2/10/26, 23:28:06] ~Raph 🪲: Endometriosis, south west London, no insurance
+[2/11/26, 10:07:14] DocMap: Hi, it’s Jack from DocMap. I’ll be helping you with finding the right specialists today. 
+
+Thanks for sharing these information. 
+
+To help find the right specialist for you, can you tell us a bit more about your specific situation, such as the procedures you are looking for, your symptoms or anything else you’d like to look for in a specialist
+[2/11/26, 10:16:39] ~Raph 🪲: I’m looking for a endometriosis specialist excision surgeon, for a laparoscopic surgery, who takes on NHS patients
+[2/11/26, 10:22:49] DocMap: Ok, and just to check, are you hoping to see the surgeon through the NHS pathway, or are you open to a private consultation if the surgeon also holds an NHS post?
+[2/11/26, 10:23:54] ~Raph 🪲: Ideally would like to get an NHS referral to a private surgeon but open to a private consultation
+[2/11/26, 10:25:02] DocMap: Understood. Are there any limits to how far you’d be happy to travel, or consultation fee range you’d like me to keep in mind?
+[2/11/26, 10:26:06] ~Raph 🪲: I wouldn’t like to travel more than an hour by car from Kingston Upon Thames
+[2/11/26, 10:27:50] DocMap: Ok, bear with me while I go fetch the results. Should take ~15 mins
+[2/11/26, 10:27:59] ~Raph 🪲: Great thank you!
+[2/11/26, 10:46:06] DocMap: Based on what you’ve shared, we’ve shortlisted five highly specialised endometriosis excision surgeons who work within BSGE-accredited centres and regularly perform advanced laparoscopic excision surgery. We’ve also included one experienced specialist closer to Kingston in case travel is a concern.
+[2/11/26, 10:46:20] DocMap: 1) Mr Vasileios Minas
+
+📍 The Runnymede Hospital (Chertsey) / Nuffield Woking / The Lister Hospital Chelsea
+Consultant Gynaecologist (Lead Endometriosis Surgeon, BSGE-accredited centre)
+
+Why he may be a good fit:
+Director of a BSGE-accredited Endometriosis Centre and one of the highest-volume surgeons in the UK for complex laparoscopic excision, including deeply infiltrating disease. He leads a multidisciplinary team and performs advanced robotic and nerve-aware surgery. Strong NHS base at St Peter’s Hospital (CEMIG).
+
+Best for:
+Patients seeking high-volume, complex excision surgery within a recognised BSGE centre, with realistic NHS referral potential and strong MDT support.
+
+🔗 https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/mr-vasileios-minas
+[2/11/26, 10:46:31] DocMap: 2) Mr Michael Adamczyk
+
+📍 The Lister Hospital (Chelsea) / CEMIG Surrey (Ashford & St Peter’s)
+Consultant Gynaecologist & Endometriosis Surgeon (BSGE-accredited centre)
+
+Why he may be a good fit:
+A high-volume excision specialist whose practice is almost entirely focused on endometriosis and pelvic pain. Fellowship-trained in advanced excision surgery, with additional formal training in neuropelveology for complex nerve-related disease. Works within one of the UK’s busiest BSGE-accredited centres.
+
+Best for:
+Patients with advanced, recto-vaginal, or nerve-related endometriosis who want a specialist surgeon with deep excision focus and multidisciplinary access.
+
+🔗 https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/michael-adamczyk
+[2/11/26, 10:46:42] DocMap: 3) Mr Shaheen Khazali
+
+📍 The Lister Hospital (Chelsea) / The Runnymede Hospital (Chertsey)
+Consultant Gynaecologist & Endometriosis Specialist (Lead Surgeon, BSGE-accredited CEMIG)
+
+Why he may be a good fit:
+Lead surgeon at CEMIG, the UK’s busiest BSGE-accredited endometriosis centre. Internationally recognised expert in advanced laparoscopic and robotic excision, including recto-vaginal and bowel endometriosis. Strong academic and surgical leadership within the BSGE.
+
+Best for:
+Patients wanting care at a nationally recognised, high-volume endometriosis centre with extensive experience in complex and deeply infiltrating disease.
+
+🔗 https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/mr-shaheen-khazali-1
+[2/11/26, 10:47:20] DocMap: 4) Mr Amer Raza
+
+📍 Cromwell Hospital (London)
+Consultant Gynaecologist & Robotic Endometriosis Surgeon
+
+Why he may be a good fit:
+Leads one of the UK’s largest specialist endometriosis centres and performs advanced robotic excision of complex and recto-vaginal disease, including bowel and ureter involvement. Works within a large multidisciplinary team environment.
+
+Best for:
+Patients with severe or complex endometriosis seeking highly specialised robotic excision surgery in a comprehensive private MDT setting.
+
+🔗 https://www.cromwellhospital.com/find-a-consultant/amer-raza-consultant-gynaecologist/
+[2/11/26, 10:47:38] DocMap: 5) Mr Denis Tsepov
+
+📍 London Endometriosis & Advanced Pelvic Surgery (Harley Street / London Bridge Hospital)
+Consultant Gynaecologist & Robotic Endometriosis Surgeon (BSGE-accredited centre)
+
+Why he may be a good fit:
+Internationally recognised expert in severe and deep infiltrating endometriosis, including bowel, urinary tract, and diaphragmatic disease. Leads a BSGE-accredited referral centre and performs complex laparoscopic and robotic excision within a specialist MDT framework.
+
+Best for:
+Patients with advanced, multi-organ endometriosis who require coordinated complex excision surgery in a tertiary-level centre.
+
+🔗 https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/mr-denis-tsepov
+[2/11/26, 10:48:16] DocMap: 6) Miss Silvia Carta
+
+📍 Kingston Hospital NHS Trust / New Victoria Hospital (Kingston upon Thames)
+Consultant Gynaecologist (BSGE member)
+
+Why she may be a good fit:
+A consultant gynaecologist with a specialist interest in endometriosis and pelvic pain who performs laparoscopic excision of endometriosis (including ureterolysis where required). She is based locally in Kingston and also works within the NHS at Kingston Hospital, making an NHS referral pathway more straightforward.
+
+Best for:
+Patients who would prefer a highly experienced excision surgeon closer to home, particularly for moderate to complex endometriosis, with potential NHS referral access.
+
+https://www.newvictoria.co.uk/our-consultants/miss-silvia-carta
+[2/11/26, 10:48:49] DocMap: Have a look and let us know which one feels like the best fit for you. If you’d like, we can help you reach out to their secretary, or draft a message to confirm suitability for your specific case.
+[2/11/26, 11:02:39] DocMap: If that’s everything, let us know how we did via a quick 15 mins chat here: https://meetings-eu1.hubspot.com/jack-ye/clone?uuid=9d888ebf-ea23-4e82-9a9b-e9f50102b191
+[2/11/26, 17:14:06] ~Raph 🪲: That’s great thank you I’ll have a look through them 😊
+[2/13/26, 15:51:33] DocMap: If you found our service to be helpful, would you be interested in leaving a review for us on Trustpilot?
+
+https://uk.trustpilot.com/review/docmap.co.uk?utm_medium=trustbox&utm_source=TrustBoxReviewCollector
