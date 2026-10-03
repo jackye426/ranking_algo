@@ -4,14 +4,18 @@
   "description": "",
   "main": "apply-ranking.js",
   "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node demo/server.cjs",
+    "start:legacy": "node server.js",
+    "test": "node --test demo/*.test.cjs",
+    "verify:demo": "node demo/scripts/verify.cjs",
+    "verify:refinements": "node demo/scripts/verify-refinements.cjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@huggingface/transformers": "^4.3.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

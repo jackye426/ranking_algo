@@ -1,0 +1,13 @@
+# Set the service root to this directory, or upload an equivalent safe staging
+# folder with --path-as-root. Secrets belong in Railway service variables.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+# A fresh clinical-only vector index is built before this service becomes ready.
+# Keep the previous healthy deployment serving while the new index prepares.
+healthcheckTimeout = 900
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

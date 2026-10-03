@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+**/demo/.cache/
+**/.env.*.local
 npm-debug.log*
 
 # Environment variables

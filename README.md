@@ -1,5 +1,9 @@
 # WhatsApp Triage - Doctor Ranking Algorithm Optimization
 
+## DocMap conversational Spire demo
+
+The working demo lives in `Local Doctor Ranking/` and is [live on Railway](https://docmap-search-production.up.railway.app/). Run `npm ci` and `npm start` there, then open `http://localhost:3000`. A fresh checkout uses the labelled public-profile snapshot; the full connected dataset and OpenRouter explanations require private server-side configuration described in [the demo guide](Local%20Doctor%20Ranking/DEMO.md). That guide covers architecture, verified search results, data provenance and deployment. The original dashboard is preserved as `public/legacy.html` and its server remains available with `npm run start:legacy`.
+
 This repository contains the optimization and evaluation framework for a doctor ranking algorithm used in a WhatsApp-based medical triage system. The project focuses on improving search and ranking accuracy for matching patients with appropriate medical specialists.
 
 ## 📋 Project Overview

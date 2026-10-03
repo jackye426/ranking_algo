@@ -1,0 +1,18 @@
+const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function evidencePage(record, source) {
+  const r = record;
+  const sourceName = source === 'supabase' ? 'DocMap’s connected consultant dataset' : 'The verified public-profile demo collection';
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(r.name)} — profile sources | DocMap</title>
+  <style>body{margin:0;background:#f7f9f8;color:#173b3e;font:16px/1.65 system-ui,sans-serif}main{max-width:780px;margin:64px auto;padding:0 24px}a{color:#087a70}header{border-bottom:1px solid #dce5e2;padding-bottom:24px}h1{font-size:36px;line-height:1.2;letter-spacing:-1px}h2{font-size:20px;margin-top:32px}p{color:#4b6265}.eyebrow{font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#087a70}.facts{display:flex;gap:8px;flex-wrap:wrap;padding:0;list-style:none}.facts li{padding:7px 12px;border:1px solid #dce5e2;border-radius:10px;background:white}details{margin:32px 0;padding:20px;background:white;border:1px solid #dce5e2;border-radius:16px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:#4b6265}.source{font-size:14px}li{margin:6px 0}footer{margin:48px 0;color:#708184;font-size:13px}</style>
+  <main><a href="/">docmap</a><header><p class="eyebrow">Profile sources</p><h1>${escape(r.name)}</h1><p>${escape(r.specialty)}</p><a href="${escape(r.profileUrl)}" target="_blank" rel="noopener noreferrer">View the Spire consultant profile ↗</a></header>
+  <p class="source">${sourceName} contains the following profile information. External profiles may have changed since collection; the original links are provided below.</p>
+  <h2>Recorded clinical interests</h2><ul class="facts">${r.clinicalInterests.map(x=>`<li>${escape(x)}</li>`).join('')}</ul>
+  ${(r.procedures||[]).length?`<h2>Recorded procedures</h2><ul>${r.procedures.map(x=>`<li>${escape(x)}</li>`).join('')}</ul><p class="source">These are recorded procedure descriptions, not live availability or verified procedure volumes.</p>`:''}
+  ${r.description?`<h2>Profile information</h2><p>${escape(r.description)}</p>`:''}
+  <h2>Recorded Spire locations</h2><ul>${r.locations.map(l=>`<li><strong>${escape(l.name)}</strong><br>${escape([l.address,l.city,l.postcode].filter(Boolean).join(', '))}</li>`).join('')}</ul>
+  <h2>Insurance evidence</h2>${r.insuranceEvidence.length?`<ul>${r.insuranceEvidence.map(e=>`<li>${escape(e.text)} <a href="${escape(e.sourceUrl)}" target="_blank" rel="noopener noreferrer">Source ↗</a></li>`).join('')}</ul>`:'<p>No consultant-specific insurance evidence is verified in this demo. This does not mean the consultant declines insurance.</p>'}
+  <h2>External profile sources</h2><ul>${r.sourceUrls.map(url=>`<li><a href="${escape(url)}" target="_blank" rel="noopener noreferrer">${escape(new URL(url).hostname)} ↗</a></li>`).join('')}</ul>
+  <details><summary>Record provenance</summary><p>The reference below identifies the records and fields used for these statements. A missing original field URL means the statement is grounded in the stored DocMap record. Merge dates describe data processing, not a fresh check of the external profiles.</p><pre>${escape(JSON.stringify({recordIds:r.sourceRecordIds,sourceDate:r.retrievedAt,sourceMergeDates:r.sourceMergeDates,fields:r.fieldProvenance,locations:r.locations.map(l=>({name:l.name,provenance:l.provenance})),supplementalEvidence:r.supplementalEvidence},null,2))}</pre></details>
+  <footer>DocMap · A consultant-search demonstration for DoctorCall</footer></main></html>`;
+}
+module.exports = {evidencePage};
