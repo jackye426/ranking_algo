@@ -4,7 +4,19 @@
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.addEventListener('pageshow', () => { if (!document.body.classList.contains('chat-mode')) window.scrollTo(0, 0); });
   const $ = (id) => document.getElementById(id);
-  const state = { epoch: 0, sessionId: null, busy: false, criteria: {}, criteriaLabels: [], controller: null, turns: [], activeTurn: null, explanationControllers: new Set() };
+  const state = { epoch: 0, sessionId: null, busy: false, criteria: {}, criteriaLabels: [], controller: null, turns: [], activeTurn: null, explanationControllers: new Set(), lastMessage: '', failedRequest: null };
+  const navigation = { screen: 'home', restoring: false, resultsScroll: 0, profiles: new Map(), pendingTraversal: null };
+  function routeTo(screen, extra = {}, replace = false) {
+    // Back is asynchronous. If another action wins before its popstate event,
+    // retain that action and write its route only after traversal has settled.
+    if (navigation.pendingTraversal && !navigation.restoring) {
+      navigation.pendingTraversal.after = { screen, extra };
+      navigation.screen = screen; return;
+    }
+    if (!navigation.restoring) history[replace ? 'replaceState' : 'pushState']?.({ docmap: true, epoch: state.epoch, screen, ...extra }, '');
+    navigation.screen = screen;
+  }
+  routeTo('home', {}, true);
   let explanationNumber = 0;
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   let reducedMotion = motionPreference.matches;
@@ -72,73 +84,7 @@
     }
   ];
   // DEMO_SCENARIOS_END
-  const demoGuide = { opener: null, version: 0, copyRequest: 0 };
-
-  function closeDemoGuide({ restoreFocus = true } = {}) {
-    const dialog = $('demo-guide-dialog');
-    const opener = demoGuide.opener;
-    demoGuide.version += 1; demoGuide.opener = null;
-    document.body.classList.remove('demo-guide-open');
-    if (dialog.open) dialog.close();
-    if (restoreFocus && opener?.isConnected && !opener.hidden && !opener.closest('[hidden]')) opener.focus({ preventScroll: true });
-  }
-
-  function renderDemoGuide() {
-    const container = $('demo-guide-list'); container.replaceChildren();
-    demoScenarios.forEach((scenario, index) => {
-      const section = el('details', 'demo-scenario'); section.dataset.scenario = scenario.id;
-      section.setAttribute('name', 'demo-scenarios'); section.open = index === 0;
-      const summary = el('summary', 'demo-scenario-heading'); summary.append(el('span', '', scenario.title), icon('chevron'));
-      const steps = el('ol', 'demo-scenario-steps');
-      scenario.prompts.forEach((prompt, step) => {
-        const item = el('li', 'demo-scenario-step');
-        item.append(el('p', 'demo-scenario-prompt', prompt));
-        const button = el('button', `demo-step-action${step === 0 ? ' demo-start-action' : ''}`, step === 0 ? 'Use as new search' : 'Copy follow-up');
-        button.type = 'button'; button.dataset.step = String(step);
-        button.setAttribute('aria-label', `${step === 0 ? 'Use as new search' : 'Copy follow-up'}: ${prompt}`);
-        if (step === 0) button.addEventListener('click', () => {
-          closeDemoGuide({ restoreFocus: false }); reset();
-          const input = $('initial-query'); input.value = prompt; resizeInput(input); input.focus({ preventScroll: true });
-          announce('New search prepared. Review the opening prompt, then send it when you’re ready.');
-        });
-        else button.addEventListener('click', async () => {
-          const version = demoGuide.version; const request = ++demoGuide.copyRequest;
-          button.disabled = true; button.textContent = 'Copying…'; $('demo-guide-status').textContent = '';
-          try {
-            if (!window.navigator?.clipboard?.writeText) throw new Error('Clipboard is unavailable');
-            await window.navigator.clipboard.writeText(prompt);
-            if (version !== demoGuide.version || !$('demo-guide-dialog').open) return;
-            button.textContent = 'Copied';
-            if (request === demoGuide.copyRequest) $('demo-guide-status').textContent = 'Follow-up copied. Paste it into your search when you’re ready.';
-          } catch {
-            if (version !== demoGuide.version || !$('demo-guide-dialog').open) return;
-            button.textContent = 'Copy follow-up';
-            if (request === demoGuide.copyRequest) $('demo-guide-status').textContent = 'Couldn’t copy. Select the follow-up text and copy it manually.';
-          } finally {
-            if (version === demoGuide.version && $('demo-guide-dialog').open) button.disabled = false;
-          }
-        });
-        item.append(button); steps.append(item);
-      });
-      const notice = el('div', 'demo-scenario-notice'); notice.append(el('strong', '', 'What to notice'), el('p', '', scenario.notice));
-      section.append(summary, steps, notice); container.append(section);
-    });
-  }
-
-  function openDemoGuide(opener) {
-    closeMatchSheet({ immediate: true, restoreFocus: false });
-    const fromAbout = $('about-dialog').open;
-    ['about-dialog', 'history-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
-    demoGuide.opener = fromAbout ? $('about-open') : opener;
-    demoGuide.version += 1;
-    // Establish a visible native-dialog return target before showModal.
-    demoGuide.opener.focus({ preventScroll: true });
-    renderDemoGuide(); $('demo-guide-status').textContent = '';
-    document.body.classList.add('demo-guide-open');
-    $('demo-guide-dialog').showModal(); $('demo-guide-dialog').scrollTop = 0;
-    $('demo-guide-close').focus({ preventScroll: true });
-  }
-
+  window.DocMapScenarios = demoScenarios;
   function animateElement(node, frames, options) {
     if (reducedMotion || typeof node?.animate !== 'function') return;
     const animation = node.animate(frames, { easing: 'cubic-bezier(.2,.7,.2,1)', ...options });
@@ -221,12 +167,78 @@
   }
   const examplePrompt = createExamplePrompt();
 
-  function openConversation() {
+  function updateResume() {
+    $('resume-search').hidden = !state.turns.length && !state.busy && !state.failedRequest;
+    $('resume-search').textContent = state.busy ? 'Return to your search in progress ↗' : 'Resume your search ↗';
+  }
+
+  function showHome({ record = true } = {}) {
+    if (document.body.classList.contains('chat-mode')) navigation.resultsScroll = window.scrollY;
+    closeMatchSheet({ immediate: true, restoreFocus: false });
+    ['about-dialog', 'history-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
+    $('workspace').hidden = true; $('landing').hidden = false; $('search-actions').hidden = true;
+    document.body.classList.remove('chat-mode', 'search-entering', 'is-refining');
+    if (record) routeTo('home');
+    updateResume(); examplePrompt.reset();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    $('initial-query').focus({ preventScroll: true });
+    announce('Back to search. Your conversation and shortlist are saved in this tab.');
+  }
+
+  function resumeSearch({ record = true, focus = true } = {}) {
+    if (!state.turns.length && !state.busy && !state.failedRequest) return;
+    openConversation({ record });
+    window.scrollTo({ top: navigation.resultsScroll, behavior: 'instant' });
+    if (focus) $('followup-query').focus({ preventScroll: true });
+  }
+
+  function profileRouteOpened(entry, explain) {
+    const key = `${entry.context.searchId}:${entry.person.id}`;
+    navigation.profiles.set(key, entry);
+    navigation.profileReturn = { trigger: matchSheet.returnFocus, top: matchSheet.scrollY, left: matchSheet.scrollX };
+    routeTo('profile', { profileKey: key, explain: Boolean(explain) }, navigation.screen === 'profile');
+  }
+
+  function profileRouteClosed() {
+    if (navigation.restoring || navigation.screen !== 'profile') return;
+    navigation.screen = 'results';
+    if (history.back) { navigation.pendingTraversal = { after: null }; history.back(); }
+    else routeTo('results', {}, true);
+  }
+
+  window.addEventListener('popstate', (event) => {
+    const queued = navigation.pendingTraversal; navigation.pendingTraversal = null;
+    if (queued?.after) {
+      routeTo(queued.after.screen, queued.after.extra, queued.after.screen !== 'profile');
+      return;
+    }
+    const target = event.state;
+    if (!target?.docmap) return; // Ordinary in-page anchors are not app navigation.
+    navigation.restoring = true;
+    try {
+      if (!target?.docmap || target.epoch !== state.epoch || target.screen === 'home') {
+        navigation.screen = 'home'; showHome({ record: false });
+      } else {
+        const leavingProfile = Boolean(matchSheet.entry || queued || navigation.screen === 'profile');
+        const returnPosition = leavingProfile && navigation.profileReturn;
+        if (returnPosition) navigation.resultsScroll = returnPosition.top;
+        closeMatchSheet({ immediate: true, restoreFocus: false });
+        navigation.screen = 'results'; resumeSearch({ record: false, focus: !returnPosition });
+        const entry = target.screen === 'profile' && navigation.profiles.get(target.profileKey);
+        if (entry && entry.epoch === state.epoch) openMatchSheet(entry, { explain: false });
+        else if (returnPosition?.trigger?.isConnected) returnPosition.trigger.focus({ preventScroll: true });
+      }
+    } finally { navigation.restoring = false; }
+  });
+
+  function openConversation({ record = true } = {}) {
     if (document.body.classList.contains('chat-mode')) return;
     const source = $('landing-form').getBoundingClientRect(); const epoch = state.epoch;
     examplePrompt.pause();
     $('landing').hidden = true; $('workspace').hidden = false; $('search-actions').hidden = false;
+    if (record) routeTo('results');
     document.body.classList.add('chat-mode', 'search-entering');
+    window.scrollTo({ top: 0, behavior: 'instant' });
     window.requestAnimationFrame(() => {
       if (epoch !== state.epoch || reducedMotion) return;
       const form = $('followup-form'); const target = form.getBoundingClientRect();
@@ -236,14 +248,15 @@
   }
 
   function reset() {
-    closeDemoGuide({ restoreFocus: false });
     closeMatchSheet({ immediate: true, restoreFocus: false });
     state.epoch += 1;
     runningAnimations.forEach((animation) => animation.cancel()); runningAnimations.clear();
     state.controller?.abort();
     state.explanationControllers.forEach((controller) => controller.abort()); state.explanationControllers.clear();
-    Object.assign(state, { sessionId: null, busy: false, criteria: {}, criteriaLabels: [], controller: null, turns: [], activeTurn: null });
-    ['conversation', 'active-criteria', 'search-status', 'search-error', 'history-list'].forEach((id) => $(id).replaceChildren());
+    Object.assign(state, { sessionId: null, busy: false, criteria: {}, criteriaLabels: [], controller: null, turns: [], activeTurn: null, lastMessage: '', failedRequest: null });
+    navigation.profiles.clear(); navigation.resultsScroll = 0; routeTo('home', {}, true);
+    ['conversation', 'active-criteria', 'search-status', 'search-error', 'history-list', 'submitted-message'].forEach((id) => $(id).replaceChildren());
+    $('submitted-message').hidden = true;
     ['history-dialog', 'about-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
     $('workspace').hidden = true; $('landing').hidden = false; $('search-actions').hidden = true; $('history-preview').hidden = true;
     $('result-total').textContent = ''; $('search-title').textContent = 'Your shortlist';
@@ -261,11 +274,12 @@
     document.body.classList.toggle('is-refining', busy && state.turns.length > 0);
     const preview = state.activeTurn && state.activeTurn !== state.turns.at(-1);
     document.querySelectorAll('.send-button, .suggestion-button, button.criterion-chip, .example-queries button').forEach((button) => { button.disabled = busy || Boolean(preview); });
-    document.querySelectorAll('.explanation-toggle').forEach((button) => { button.disabled = busy; });
-    $('followup-query').disabled = busy || Boolean(preview);
+    document.querySelectorAll('.explanation-toggle, .view-consultant').forEach((button) => { button.disabled = busy; });
+    $('followup-query').disabled = Boolean(preview);
     $('followup-query').placeholder = preview ? 'Return to your current search to refine' : 'Tell us more, or refine your search…';
     $('history-open').disabled = busy || !state.turns.length;
     $('conversation').setAttribute('aria-busy', String(busy));
+    updateResume();
   }
 
   function labelsFor(data) {
@@ -317,10 +331,13 @@
   function loading() {
     $('search-status').replaceChildren(el('span', 'status-pulse'), el('span', '', state.turns.length ? 'Updating your shortlist…' : 'Finding your specialists…'));
     if (state.turns.length) return null;
-    const skeleton = el('div', 'skeleton-card'); skeleton.setAttribute('aria-hidden', 'true');
-    skeleton.append(el('div', 'skeleton-avatar')); const lines = el('div', 'skeleton-lines');
-    for (let i = 0; i < 3; i++) lines.append(el('div', 'skeleton-line'));
-    skeleton.append(lines); $('conversation').append(skeleton); return skeleton;
+    const skeleton = el('div', 'skeleton-list'); skeleton.setAttribute('aria-hidden', 'true');
+    for (let cardIndex = 0; cardIndex < 2; cardIndex++) {
+      const card = el('div', 'skeleton-card'); card.append(el('div', 'skeleton-avatar')); const lines = el('div', 'skeleton-lines');
+      for (let i = 0; i < 4; i++) lines.append(el('div', 'skeleton-line'));
+      card.append(lines); skeleton.append(card);
+    }
+    $('conversation').append(skeleton); return skeleton;
   }
 
   function formatLocation(location) {
@@ -358,6 +375,7 @@
 
   function closeMatchSheet({ immediate = false, restoreFocus = true } = {}) {
     if (!matchSheet.entry && !matchSheet.dialog.open) return;
+    if (restoreFocus) profileRouteClosed();
     const entry = matchSheet.entry; const version = ++matchSheet.version;
     cancelExplanation(entry);
     entry?.button.setAttribute('aria-expanded', 'false');
@@ -399,7 +417,7 @@
       const key = `${item.text.trim()}\n${safeUrl(item.sourceUrl)}`;
       if (seen.has(key)) return false; seen.add(key); return true;
     });
-    const summary = el('summary', 'sheet-sources-toggle'); summary.append(el('span', '', 'Sources & profile details'), icon('chevron')); details.append(summary);
+    const summary = el('summary', 'sheet-sources-toggle'); summary.append(el('span', '', 'Sources & evidence'), icon('chevron')); details.append(summary);
     const body = el('div', 'sheet-source-content');
     const reasons = list(data?.reasons).filter((item) => item && typeof item.text === 'string' && item.text.trim());
     const citationMap = new Map(validCitations(data?.citations).map((item) => [String(item.id), item]));
@@ -429,22 +447,17 @@
     const caveats = fullCaveats(entry, data);
     if (caveats.length) { body.append(el('h3', '', 'Important details')); const items = el('ul'); caveats.forEach((text) => items.append(el('li', '', text))); body.append(items); }
     const person = entry.person;
-    if (person.description) body.append(el('h3', '', 'From the consultant record'), el('p', 'sheet-record-description', person.description));
-    const interests = list(person.clinicalInterests).map(textValue).filter(Boolean);
-    if (interests.length) { body.append(el('h3', '', 'Clinical interests listed')); const items = el('ul'); interests.forEach((text) => items.append(el('li', '', text))); body.append(items); }
-    const locations = list(person.locations).filter(Boolean);
-    if (locations.length) {
-      body.append(el('h3', '', 'Practice locations')); const items = el('ul');
-      locations.forEach((location) => items.append(el('li', '', typeof location === 'string' ? location : [...new Set([location.name, location.address, location.postcode].filter(Boolean))].join(', ')))); body.append(items);
+    if (person.description) body.append(el('h3', '', 'Original profile description'), el('p', 'sheet-record-description', person.description));
+    const originalInterests = list(person.clinicalInterests).map(textValue).filter(Boolean);
+    if (originalInterests.length) {
+      body.append(el('h3', '', 'Clinical interests as recorded'));
+      const original = el('ul'); originalInterests.forEach(text => original.append(el('li', '', text))); body.append(original);
     }
-    const insurers = list(person.insurers).map(textValue).filter(Boolean);
-    if (insurers.length) body.append(el('h3', '', 'Insurance listed'), el('p', '', insurers.join(' · ')));
     const insurance = list(person.insuranceEvidence).filter(Boolean);
     if (insurance.length) {
       body.append(el('h3', '', 'Insurance details from source'));
       insurance.forEach((item) => { const paragraph = el('p', '', typeof item === 'string' ? item : item.text || item.note || item.description || ''); const source = link('Source', item.sourceUrl || item.url, 'source-link'); if (source) paragraph.append(document.createTextNode(' '), source); body.append(paragraph); });
     }
-    if (person.gmc) body.append(el('p', '', `GMC registration: ${person.gmc}`));
     const urls = [...new Set([person.evidenceUrl, person.profileUrl, ...list(person.sourceUrls).map((item) => typeof item === 'string' ? item : item?.url)].map(safeUrl).filter(Boolean))];
     if (urls.length) { body.append(el('h3', '', 'Profile links')); const links = el('div', 'sheet-source-links'); urls.forEach((url) => { const source = link(sourceLabel(url), url, 'source-link'); if (source) { source.append(icon('external')); links.append(source); } }); body.append(links); }
     details.append(body); $('sheet-provenance').replaceChildren(details);
@@ -473,21 +486,179 @@
     $('sheet-caveats').hidden = !caveats.length;
   }
 
+  function displayProfileText(value) {
+    // Repair missing sentence spacing for reading only. The exact source text
+    // remains available in the evidence disclosure.
+    return String(value || '').trim().replace(/([a-z0-9])\.([A-Z][a-z])/g, '$1. $2');
+  }
+
+  function readableProfileExcerpt(value, maximum = 160) {
+    const text = String(value || '').trim();
+    if (text.length < 5 || text.length > maximum || /\+\/-|±|\b[A-Z]\d{4}\b|[.…]{2,}$|…$|[-/:;,]$/.test(text)) return false;
+    // Characteristic mis-decoded UTF-8 and the observed r-split source remnant
+    // are withheld from presentation, not repaired into an invented specialty.
+    if (/\uFFFD|Ã[\u0080-\u00bf]|Â[\u0080-\u00bf]|â(?:€|[\u0080-\u00bf])|\byGene\b/u.test(text)) return false;
+    const brackets = []; const pairs = { ')': '(', ']': '[' };
+    for (const char of text) {
+      if (char === '(' || char === '[') brackets.push(char);
+      else if (char === ')' || char === ']') { if (brackets.pop() !== pairs[char]) return false; }
+    }
+    if (brackets.length || /[a-z]:[A-Z]|\)[A-Za-z]|[a-z]{3,}[A-Z][a-z]{2,}/.test(text)) return false;
+    // Observed ingestion fragments, not a clinical vocabulary allow-list. Short
+    // valid terms such as hip, ear, eye, OA, GI and MS must remain available.
+    if (/\b(?:su|Su|Expe|expe)(?=$|[.,;])/.test(text) || /^(?:tise:|ea of\b)/.test(text) || /\b(?:and|or|with|of|for|in|the|to)\.?$/i.test(text)) return false;
+    return true;
+  }
+
+  function informativeProfilePhrase(value) {
+    const text = String(value || '').replace(/^The profile (?:includes|lists)\s*:?[ ]*/i, '').replace(/[.!?]+$/, '').trim().toLowerCase();
+    const anatomy = new Set(['knee', 'knees', 'hip', 'hips', 'shoulder', 'shoulders', 'foot', 'feet', 'ankle', 'ankles', 'elbow', 'elbows', 'hand', 'hands', 'wrist', 'wrists', 'spine', 'back', 'neck', 'skin', 'ear', 'ears', 'nose', 'throat', 'joint', 'joints']);
+    return Boolean(text) && !text.split(/\s*(?:,|\band\b|&|\/)\s*/).every(part => anatomy.has(part));
+  }
+
+  function profileSentences(value) {
+    const text = displayProfileText(value);
+    const sentences = typeof Intl?.Segmenter === 'function' ? [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)].map(item => item.segment.trim()) : [text];
+    return sentences.filter(sentence => /[.!?][”"']?$/.test(sentence) && readableProfileExcerpt(sentence, 240));
+  }
+
+  function conciseProfileRelevance(person, context = {}) {
+    if (!baselineCitations(person).length) return '';
+    const summary = displayProfileText(person.personalizedMatch?.summary);
+    // The existing grounded summary has a known identity introduction. Keep its
+    // complete clinical sentence, without repeating identity or boilerplate.
+    const marker = summary.match(/\b(?:whose profile includes|has a profile that includes)\s+/);
+    if (marker) {
+      const phrase = profileSentences(summary.slice(marker.index + marker[0].length))[0];
+      if (phrase && phrase.length <= 200 && informativeProfilePhrase(phrase)) return `The profile includes ${phrase}`;
+    }
+    const sentence = profileSentences(summary).find(text => informativeProfilePhrase(text) && !/^(?:That connects|The nearest|Check the|Insurer|Confirm|Procedure evidence)/i.test(text) && (!person.name || !text.startsWith(person.name)));
+    if (sentence) return sentence;
+    const fact = profileHighlights(person, context, 1)[0]?.text;
+    if (!fact) {
+      const biography = profileSentences(person.description);
+      return biography.find(text => /\b(?:practice|treat(?:s|ment)?|specialist interest|subspecialty|clinical interests?)\b/i.test(text) && !/\b(?:training|fellowship|research|publication)\b/i.test(text)) || biography[0] || '';
+    }
+    if (/[.!?]$/.test(fact)) return fact;
+    return `The profile lists ${fact}.`;
+  }
+
+  function profileHighlights(person, context = {}, maximum = 3) {
+    // These are excerpts, not new clinical claims. Query overlap only chooses
+    // which documented details to show first; it never changes search ranking.
+    const criteria = context.criteria || {};
+    const query = [criteria.topic, ...list(criteria.procedures), ...list(criteria.clinicalContext)].map(textValue).join(' ').toLowerCase();
+    const words = [...new Set(query.match(/[a-z]{3,}/g) || [])].filter(word => !/^(?:the|and|with|have|want|need|that|this|for|from|has|had|not|been|only|specialist|consultant|doctor)$/.test(word));
+    const clinicalFact = fact => fact.kind !== 'terminology' && !/location|specialty|consultant identity|language|gender|insurance|plain.english|terminology/i.test(fact.criterion || '') && !/\b(?:miles|fee assured|open referral|Bupa|AXA|insurance)\b/i.test(fact.text);
+    const candidates = [
+      ...baselineCitations(person).filter(clinicalFact).map(fact => ({ text: fact.text.replace(/^(?:Profile lists|Record lists|Specialty):\s*/i, '').trim(), sourceUrl: fact.sourceUrl })),
+      ...list(person.clinicalInterests).map(textValue).filter(Boolean).map(text => ({ text: text.trim(), sourceUrl: person.evidenceUrl || person.profileUrl })),
+    ];
+    const seen = new Set();
+    return candidates.filter(item => {
+      const key = item.text.toLowerCase().replace(/[.]+$/, '').replace(/\s+/g, ' ');
+      if (seen.has(key) || !readableProfileExcerpt(item.text) || !informativeProfilePhrase(item.text)) return false;
+      if (/\b(?:I am|I have|my|we|our|qualified|graduated|trained|training|fellowship|career|appointed)\b|\byears? (?:of )?experience\b/i.test(item.text)) return false;
+      seen.add(key); return true;
+    }).map((item, index) => ({ ...item, index, overlap: words.filter(word => item.text.toLowerCase().includes(word)).length }))
+      .sort((a, b) => b.overlap - a.overlap || a.index - b.index).slice(0, maximum);
+  }
+
+  function profileText(text, className = '') {
+    const clean = displayProfileText(text);
+    const block = el('div', `profile-text ${className}`.trim()); const paragraph = el('p', 'profile-description', clean); block.append(paragraph);
+    if (clean.length > 340) {
+      block.classList.add('is-collapsed');
+      const toggle = el('button', 'profile-read-more', 'Read more'); toggle.type = 'button'; toggle.setAttribute('aria-expanded', 'false');
+      toggle.addEventListener('click', () => { const collapsed = block.classList.toggle('is-collapsed'); toggle.setAttribute('aria-expanded', String(!collapsed)); toggle.textContent = collapsed ? 'Read more' : 'Show less'; });
+      block.append(toggle);
+    }
+    return block;
+  }
+
+  function renderConsultantProfile(entry) {
+    const person = entry.person; const profile = el('div', 'consultant-profile');
+    const summary = typeof person.personalizedMatch?.summary === 'string' && baselineCitations(person).length ? person.personalizedMatch.summary.trim() : '';
+    if (person.description && person.description.trim() !== summary) {
+      const about = el('section', 'profile-section profile-about'); about.append(el('h3', 'profile-section-title', 'About'), profileText(person.description)); profile.append(about);
+    }
+    if (summary) {
+      const preview = el('section', 'profile-section sheet-preview');
+      const concise = conciseProfileRelevance(person, entry.context);
+      preview.append(el('h3', 'profile-section-title', 'Relevant to your search'));
+      if (concise) preview.append(profileText(concise, 'profile-baseline'));
+      if (summary !== concise) {
+        const full = el('details', 'profile-more profile-full-summary'); const toggle = el('summary'); toggle.append(el('span', '', 'Full profile summary'), icon('chevron'));
+        full.append(toggle, el('p', 'profile-description', displayProfileText(summary))); preview.append(full);
+      }
+      profile.append(preview);
+    }
+    const interests = [...new Set(list(person.clinicalInterests).map(textValue).map(text => text.trim()).filter(text => readableProfileExcerpt(text, 500)))];
+    const highlights = profileHighlights(person, entry.context, 3);
+    if (interests.length || highlights.length) {
+      const focus = el('section', 'profile-section profile-clinical'); focus.append(el('h3', 'profile-section-title', 'Clinical focus'));
+      const items = el('ul', 'profile-focus-list');
+      const shown = highlights.length ? highlights.map(item => item.text) : interests.slice(0, 3);
+      shown.forEach(text => items.append(el('li', '', text))); focus.append(items);
+      const shownKeys = new Set(shown.map(text => text.toLowerCase().replace(/[.]+$/, '')));
+      const remaining = interests.filter(text => !shownKeys.has(text.toLowerCase().replace(/[.]+$/, '')));
+      if (remaining.length) {
+        const more = el('details', 'profile-more'); const toggle = el('summary'); toggle.append(el('span', '', `More clinical interests (${remaining.length})`), icon('chevron')); more.append(toggle);
+        const rest = el('ul', 'profile-focus-list'); remaining.forEach(text => rest.append(el('li', '', text))); more.append(rest); focus.append(more);
+      }
+      profile.append(focus);
+    }
+    const locations = list(person.locations).filter(Boolean);
+    if (locations.length) {
+      const section = el('section', 'profile-section profile-locations'); section.append(el('h3', 'profile-section-title', locations.length === 1 ? 'Practice location' : 'Practice locations'));
+      locations.forEach((location, index) => {
+        const place = el('div', 'profile-location'); const name = typeof location === 'string' ? location : location.name || location.address || location.postcode;
+        const heading = el('p', 'profile-location-name'); heading.append(icon('pin'), el('span', '', name || 'Recorded practice')); place.append(heading);
+        if (typeof location === 'object') {
+          const address = [...new Set([location.address, location.city, location.postcode].filter(Boolean))].join(', ');
+          if (address && address !== name) place.append(el('p', 'profile-location-address', address));
+        }
+        if (index === 0 && (person.distanceLabel || Number.isFinite(person.distanceMiles))) place.append(el('p', 'profile-location-distance', `${person.distanceLabel || `${person.distanceMiles.toFixed(1)} miles away`} · approximate straight-line distance`));
+        section.append(place);
+      });
+      profile.append(section);
+    }
+    const languages = [...new Set(list(person.languages).map(textValue).filter(Boolean))];
+    const insurers = list(person.insurers).map(textValue).filter(Boolean);
+    if (languages.length || insurers.length || person.gmc) {
+      const details = el('section', 'profile-section profile-practical'); details.append(el('h3', 'profile-section-title', 'Useful details'));
+      const facts = el('dl', 'profile-facts');
+      const fact = (label, value) => { const row = el('div'); row.append(el('dt', '', label), el('dd', '', value)); facts.append(row); };
+      if (languages.length) fact('Languages listed', languages.join(' · '));
+      if (insurers.length) fact('Insurer recognition listed', insurers.join(' · '));
+      if (person.gmc) fact('GMC registration', person.gmc);
+      details.append(facts); profile.append(details);
+    }
+    const external = link('View full Spire profile', person.profileUrl, 'profile-external-link');
+    if (external) { external.append(icon('external')); profile.append(external); }
+    return profile;
+  }
+
   function renderSheet(entry) {
     if (matchSheet.entry !== entry || entry.epoch !== state.epoch) return;
     const content = $('sheet-content'); const fragment = document.createDocumentFragment();
+    // Keep the profile mounted while only the AI panel changes. Open disclosures,
+    // selected text and a patient's reading position survive generation/retries.
+    if (!content.querySelector('.consultant-profile')) content.append(renderConsultantProfile(entry));
+    let panel = content.querySelector('.profile-match-panel');
+    if (!panel) { panel = el('section', 'profile-match-panel'); panel.setAttribute('aria-label', 'Why this could be a match'); content.append(panel); }
     const busy = Boolean(entry.pending); const data = entry.cached;
     matchSheet.dialog.classList.toggle('is-loading', busy); matchSheet.dialog.classList.toggle('is-ready', Boolean(data));
-    content.setAttribute('aria-busy', String(busy));
+    content.setAttribute('aria-busy', 'false'); panel.setAttribute('aria-busy', String(busy));
+    const heading = el('h3', 'profile-match-heading'); heading.append(icon('spark'), el('span', '', 'Why this could be a match')); fragment.append(heading);
     if (busy) {
-      const profileSummary = typeof entry.person.personalizedMatch?.summary === 'string' && baselineCitations(entry.person).length ? entry.person.personalizedMatch.summary.trim() : '';
-      const progress = el('div', `sheet-progress${!data && profileSummary ? ' has-summary' : ''}`); const label = el('p', 'sheet-progress-text'); label.append(el('span', 'explanation-pulse'), document.createTextNode(data ? 'Checking your explanation…' : 'Personalising your explanation…')); progress.append(label);
-      if (!data && !profileSummary) { const skeleton = el('div', 'sheet-skeleton'); skeleton.setAttribute('aria-hidden', 'true'); for (let index = 0; index < 3; index++) skeleton.append(el('span')); progress.append(skeleton); }
+      const hasSummary = Boolean(content.querySelector('.sheet-preview'));
+      const progress = el('div', `sheet-progress${hasSummary ? ' has-summary' : ''}`); const label = el('p', 'sheet-progress-text'); label.append(el('span', 'explanation-pulse'), document.createTextNode(data ? 'Checking your explanation…' : 'Personalising your explanation…')); progress.append(label);
+      if (!data && !hasSummary) { const skeleton = el('div', 'sheet-skeleton'); skeleton.setAttribute('aria-hidden', 'true'); for (let index = 0; index < 3; index++) skeleton.append(el('span')); progress.append(skeleton); }
       fragment.append(progress);
-      if (!data && profileSummary) {
-        const preview = el('section', 'sheet-explanation sheet-preview');
-        preview.append(el('p', 'sheet-provider', 'Profile summary'), el('p', 'sheet-summary', profileSummary)); fragment.append(preview);
-      }
+    } else if (!data && !entry.error) {
+      fragment.append(el('p', 'profile-match-intro', 'Connect your search with the details in this consultant’s profile.'));
+      const start = el('button', 'explanation-start', 'Personalise my match'); start.type = 'button'; start.addEventListener('click', () => loadMatchExplanation(entry)); fragment.append(start);
     }
     if (data) {
       const ai = ['openrouter', 'openai'].includes(data.provider);
@@ -502,7 +673,8 @@
       failure.append(el('p', '', expired ? 'This search has expired. Start a new search to request an explanation; this clears the conversation and its preferences.' : entry.error.message || 'We couldn’t load the explanation. Your results are still available.'));
       const retry = el('button', 'explanation-retry', expired ? 'Start a new search' : 'Try again'); retry.type = 'button'; retry.disabled = busy; retry.addEventListener('click', expired ? reset : () => loadMatchExplanation(entry, true)); failure.append(retry); fragment.append(failure);
     }
-    content.replaceChildren(fragment); renderSheetCaveats(entry); renderSheetSources(entry);
+    if (panel.contains(document.activeElement)) { panel.setAttribute('tabindex', '-1'); panel.focus({ preventScroll: true }); }
+    panel.replaceChildren(fragment); renderSheetCaveats(entry); renderSheetSources(entry);
   }
 
   function checkedExplanation(data) {
@@ -552,23 +724,32 @@
     return pending.promise;
   }
 
-  function openMatchSheet(entry) {
+  function openMatchSheet(entry, { explain = true, trigger = entry.button } = {}) {
     if (state.busy) return;
-    if (matchSheet.entry === entry && matchSheet.dialog.open && !matchSheet.dialog.classList.contains('is-closing')) return;
+    if (matchSheet.entry === entry && matchSheet.dialog.open && !matchSheet.dialog.classList.contains('is-closing')) {
+      if (explain && !entry.cached && !entry.error) loadMatchExplanation(entry);
+      profileRouteOpened(entry, explain);
+      return;
+    }
     closeMatchSheet({ immediate: true, restoreFocus: false });
-    matchSheet.entry = entry; matchSheet.version += 1; matchSheet.returnFocus = entry.button;
+    entry.button = trigger;
+    matchSheet.entry = entry; matchSheet.version += 1; matchSheet.returnFocus = trigger;
     matchSheet.scrollX = window.scrollX; matchSheet.scrollY = window.scrollY;
     entry.button.setAttribute('aria-expanded', 'true');
     const identity = el('div', 'sheet-person'); const title = el('div', 'sheet-person-copy');
     title.append(el('h2', 'sheet-name', entry.person.name || 'Consultant profile')); title.firstElementChild.id = 'sheet-consultant-name';
     const specialty = list(entry.person.specialty).map(textValue).filter(Boolean).join(' · '); if (specialty) title.append(el('p', 'sheet-specialty', specialty));
+    const locations = list(entry.person.locations).filter(Boolean);
+    if (locations.length) { const first = locations[0]; const name = typeof first === 'string' ? first : first.name || first.city || first.postcode; if (name) title.append(el('p', 'sheet-practice', name + (locations.length > 1 ? ` · +${locations.length - 1} listed practice${locations.length > 2 ? 's' : ''}` : ''))); }
     identity.append(portrait(entry.person, 'sheet-avatar'), title); $('sheet-identity').replaceChildren(identity);
     $('sheet-provenance').replaceChildren(); $('sheet-content').replaceChildren(); $('sheet-status').textContent = '';
     matchSheet.dialog.classList.remove('is-closing'); matchSheet.dialog.classList.add('is-opening'); document.body.classList.add('sheet-open');
     renderSheet(entry); matchSheet.dialog.showModal(); $('sheet-scroll').scrollTop = 0; $('sheet-close').focus({ preventScroll: true });
     const version = matchSheet.version;
     window.setTimeout(() => { if (version === matchSheet.version) matchSheet.dialog.classList.remove('is-opening'); }, reducedMotion ? 0 : 360);
-    if (!entry.cached && !entry.error) loadMatchExplanation(entry);
+    if (explain && !entry.cached && !entry.error) loadMatchExplanation(entry);
+    if (explain) $('sheet-content').querySelector('.profile-match-panel')?.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'instant' : 'smooth' });
+    profileRouteOpened(entry, explain);
   }
 
   $('sheet-close').addEventListener('click', () => closeMatchSheet());
@@ -596,15 +777,7 @@
   window.addEventListener('pointerup', finishSheetDrag); window.addEventListener('pointercancel', finishSheetDrag);
 
   function differentiator(person, context) {
-    const insurance = String(context.criteria?.insurance || '').toLowerCase();
-    const facts = baselineCitations(person).filter((fact) => fact.kind !== 'terminology' && !/location|specialty|consultant identity|language|gender|plain.english|terminology/i.test(fact.criterion || '') && (!insurance || String(fact.criterion).toLowerCase() !== insurance));
-    for (const fact of facts) {
-      const text = fact.text.replace(/^(?:Profile lists|Record lists|Specialty):\s*/i, '').trim().replace(/[.]$/, '');
-      if (text.length < 8 || text.length > 125 || /\+\/-|±|\b[A-Z]\d{4}\b|\b(?:miles|fee assured|open referral|Bupa|AXA|insurance)\b/i.test(text)) continue;
-      if (/\b(?:I am|I have|my|we|our|qualified|graduated|trained|training|fellowship|career|appointed)\b|\byears? (?:of )?experience\b/i.test(text)) continue;
-      return text;
-    }
-    return null;
+    return profileHighlights(person, context, 3);
   }
 
   function consultantCard(person, index, searchContext) {
@@ -621,12 +794,13 @@
         distance.title = 'Approximate straight-line distance to a recorded Spire practice, not travel time.'; row.append(distance);
       }
       practical.append(row);
+      if (locations.length > 1) practical.append(el('span', 'card-other-locations', `+${locations.length - 1} listed practice${locations.length > 2 ? 's' : ''}`));
     }
     const insurers = list(person.insurers).map(textValue).filter(Boolean); const requested = String(searchContext.criteria?.insurance || '').toLowerCase();
     const shownInsurers = requested ? insurers.filter((insurer) => insurer.toLowerCase().includes(requested)) : insurers.slice(0, 1);
     if (shownInsurers.length) {
       const row = el('div', 'insurance-row');
-      shownInsurers.forEach((insurer) => { const label = el('span', 'insurance-pill'); label.append(icon('check'), document.createTextNode(insurer)); row.append(label); });
+      shownInsurers.forEach((insurer) => { const label = el('span', 'insurance-pill'); label.append(icon('check'), document.createTextNode(`${insurer} listed`)); row.append(label); });
       const shownNames = new Set(shownInsurers.map((insurer) => insurer.toLowerCase()));
       const evidence = list(person.insuranceEvidence).filter(Boolean).filter((item) => !item.insurer || shownNames.has(String(item.insurer).toLowerCase())).map((item) => typeof item === 'string' ? item : item.text || item.note || '').join(' ');
       if (/not fee assured/i.test(evidence)) row.append(el('span', 'insurance-exception', 'Not fee assured'));
@@ -635,20 +809,23 @@
     }
     if (practical.childElementCount) article.append(practical);
     const focus = differentiator(person, searchContext);
-    if (focus) { const note = el('div', 'card-differentiator'); note.append(el('span', 'card-focus-label', 'Profile includes'), el('p', 'card-focus-text', focus)); article.append(note); }
+    if (focus.length) {
+      const note = el('div', 'card-differentiator'); note.append(el('span', 'card-focus-label', 'Profile includes'));
+      const details = el('ul', 'card-focus-list'); focus.forEach(item => details.append(el('li', 'card-focus-text', item.text))); note.append(details); article.append(note);
+    }
+    const relevance = conciseProfileRelevance(person, searchContext) || (!focus.length ? profileSentences(person.description)[0] : '');
+    if (relevance) article.append(el('p', 'card-match-summary', relevance));
     const actions = el('div', 'card-actions');
+    const view = el('button', 'view-consultant', 'View consultant'); view.type = 'button'; view.setAttribute('aria-haspopup', 'dialog'); view.setAttribute('aria-controls', 'match-dialog'); view.setAttribute('aria-expanded', 'false'); view.setAttribute('aria-label', `View ${person.name || 'this consultant'}’s profile`); view.append(icon('chevron'));
     const why = el('button', 'explanation-toggle'); why.type = 'button'; why.id = `explanation-toggle-${++explanationNumber}`;
     why.setAttribute('aria-haspopup', 'dialog'); why.setAttribute('aria-controls', 'match-dialog'); why.setAttribute('aria-expanded', 'false');
     why.setAttribute('aria-label', `Why ${person.name || 'this consultant'} matches your search`);
-    why.title = 'Uses your search preferences and profile evidence'; why.append(icon('spark'), el('span', 'explanation-toggle-label', 'Why this match'), icon('chevron'));
+    why.title = 'Uses your search preferences and profile evidence'; why.append(icon('spark'), el('span', 'explanation-toggle-label', 'Why this could be a match'));
     const disclosure = el('span', 'sr-only', 'Uses your search preferences and profile evidence to prepare an explanation.'); disclosure.id = `${why.id}-disclosure`; why.setAttribute('aria-describedby', disclosure.id);
     const entry = { person, context: searchContext, epoch: state.epoch, button: why, cached: null, pending: null, error: null,
       request: Object.freeze({ sessionId: searchContext.sessionId, searchId: searchContext.searchId, consultantId: person.id }) };
-    why.addEventListener('click', () => openMatchSheet(entry)); actions.append(why, disclosure);
-    const sourceUrls = list(person.sourceUrls).map((item) => typeof item === 'string' ? item : item?.url).map(safeUrl).filter(Boolean);
-    const evidenceUrl = safeUrl(person.evidenceUrl); const profileUrl = safeUrl(person.profileUrl) || sourceUrls.find((url) => url !== evidenceUrl);
-    const profile = link(profileUrl ? 'View profile' : 'View record', profileUrl || evidenceUrl, 'profile-link');
-    if (profile) { profile.setAttribute('aria-label', `View source ${profileUrl ? 'profile' : 'record'} for ${person.name || 'this consultant'}`); profile.append(icon('external')); actions.append(profile); }
+    view.addEventListener('click', () => openMatchSheet(entry, { explain: false, trigger: view }));
+    why.addEventListener('click', () => openMatchSheet(entry, { explain: true, trigger: why })); actions.append(view, why, disclosure);
     article.append(actions); return article;
   }
 
@@ -679,6 +856,7 @@
     if (!turn) return;
     closeMatchSheet({ immediate: true, restoreFocus: false });
     state.activeTurn = turn;
+    if (!state.busy) renderSubmittedMessage(turn.message);
     const preview = turn !== state.turns.at(-1);
     state.turns.forEach((entry) => { entry.node.hidden = entry !== turn; });
     $('history-preview').hidden = !preview;
@@ -724,21 +902,38 @@
     errorBox.append(el('h2', '', expired ? 'This search has expired' : error.clarification ? 'One detail to clarify' : 'We couldn’t update your search'),
       el('p', '', expired ? 'Your results are still here. Start a new search to continue with fresh preferences.' : error.message || 'Please try again. Your current shortlist and preferences are unchanged.'));
     const retry = el('button', 'retry-button', expired ? 'Start a new search' : error.clarification ? 'Edit your request' : 'Try again'); retry.type = 'button';
-    retry.addEventListener('click', expired ? reset : error.clarification ? () => $('followup-query').focus() : () => send(request, displayMessage));
-    errorBox.append(retry); $('search-error').hidden = false; $('search-error').replaceChildren(errorBox);
+    const edit = () => {
+      // An existing draft is never silently replaced by the failed message.
+      if (!$('followup-query').value.trim()) { $('followup-query').value = request.message || displayMessage; resizeInput($('followup-query')); }
+      $('followup-query').focus({ preventScroll: true });
+    };
+    retry.addEventListener('click', expired ? reset : error.clarification ? edit : () => send(request, displayMessage, { preserveDraft: true }));
+    errorBox.append(retry);
+    if (!expired && !error.clarification) { const editButton = el('button', 'text-button edit-request', 'Edit request'); editButton.type = 'button'; editButton.addEventListener('click', edit); errorBox.append(editButton); }
+    $('search-error').hidden = false; $('search-error').replaceChildren(errorBox);
     announce(expired ? 'Search expired. Your earlier results are still available.' : 'Search could not be updated. Your previous shortlist and preferences remain.');
   }
 
-  async function send(request, displayMessage) {
+  function renderSubmittedMessage(message, pending = false) {
+    const container = $('submitted-message'); container.replaceChildren(); container.hidden = !message;
+    if (message) container.append(el('span', 'message-eyebrow', pending ? 'Your request · sent' : 'Your latest request'), el('p', 'message-text', message));
+  }
+
+  async function send(request, displayMessage, { preserveDraft = false } = {}) {
     if (state.busy || (state.activeTurn && state.activeTurn !== state.turns.at(-1))) return;
     const payload = { ...request };
     if ('message' in payload) { payload.message = payload.message.trim(); if (!payload.message) return; }
     const message = displayMessage || payload.message || 'Updated search preferences';
     const epoch = state.epoch;
     closeMatchSheet({ immediate: true, restoreFocus: false });
+    if (navigation.screen === 'profile') routeTo('results', {}, true);
     openConversation(); $('search-error').replaceChildren();
+    state.lastMessage = message; state.failedRequest = null;
+    renderSubmittedMessage(message, true);
+    if (payload.message && !preserveDraft) {
+      ['initial-query', 'followup-query'].forEach((id) => { $(id).value = ''; resizeInput($(id)); });
+    }
     const skeleton = loading(); setBusy(true);
-    if (payload.message) { $('followup-query').value = payload.message; resizeInput($('followup-query')); }
     const controller = new AbortController(); state.controller = controller;
     const timeout = window.setTimeout(() => controller.abort('timeout'), 90000);
     announce(state.turns.length ? 'Updating your shortlist. Your current results remain available.' : 'Searching Spire consultant records.');
@@ -759,19 +954,19 @@
       state.turns.push(turn); $('conversation').append(turn.node);
       skeleton?.remove(); $('search-status').replaceChildren();
       showTurn(turn, false); animateShortlist(turn, previous);
-      if (payload.message) { $('initial-query').value = ''; $('followup-query').value = ''; resizeInput($('followup-query')); }
+      renderSubmittedMessage(message);
       announce((data.message || 'Your shortlist is ready.') + ' ' + data.results.length + ' profiles displayed.');
     } catch (error) {
       if (epoch !== state.epoch || state.controller !== controller) return;
       skeleton?.remove(); $('search-status').replaceChildren();
       if (controller.signal.aborted) error = new Error('This is taking longer than expected. Please try again. Your current shortlist is unchanged.');
+      state.failedRequest = { request: payload, message };
       renderError(error, payload, message);
     } finally {
       window.clearTimeout(timeout);
       if (epoch === state.epoch && state.controller === controller) {
         state.controller = null; setBusy(false);
-        if (!reducedMotion && !state.turns.length) window.scrollTo({ top: 0, behavior: 'smooth' });
-        $('followup-query').focus({ preventScroll: true });
+        if (!$('workspace').hidden && !matchSheet.dialog.open && document.activeElement !== $('initial-query')) $('followup-query').focus({ preventScroll: true });
       }
     }
   }
@@ -780,25 +975,28 @@
     const input = $(id); input.addEventListener('input', () => resizeInput(input));
     input.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); input.form.requestSubmit(); } });
   });
-  $('landing-form').addEventListener('submit', (event) => { event.preventDefault(); send({ message: $('initial-query').value }, $('initial-query').value); });
+  window.addEventListener('resize', () => {
+    window.requestAnimationFrame(() => ['initial-query', 'followup-query'].forEach((id) => resizeInput($(id))));
+  });
+  function startSearch(message) {
+    if (!message.trim()) return;
+    if (state.sessionId || state.turns.length || state.busy || state.failedRequest) reset();
+    send({ message }, message);
+  }
+  $('landing-form').addEventListener('submit', (event) => { event.preventDefault(); startSearch($('initial-query').value); });
   $('followup-form').addEventListener('submit', (event) => { event.preventDefault(); send({ message: $('followup-query').value }, $('followup-query').value); });
-  document.querySelectorAll('[data-query]').forEach((button) => button.addEventListener('click', () => send({ message: button.dataset.query }, button.dataset.query)));
-  ['brand-home', 'new-search'].forEach((id) => $(id).addEventListener('click', reset));
+  document.querySelectorAll('[data-query]').forEach((button) => button.addEventListener('click', () => startSearch(button.dataset.query)));
+  $('new-search').addEventListener('click', reset);
+  $('brand-home').addEventListener('click', () => showHome());
+  $('back-search').addEventListener('click', () => { if (history.back && navigation.screen === 'results') history.back(); else showHome(); });
+  $('resume-search').addEventListener('click', () => resumeSearch());
+  $('see-how').addEventListener('click', (event) => { event.preventDefault(); $('homepage-story').scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' }); });
   $('return-current').addEventListener('click', () => { showTurn(state.turns.at(-1), true); $('followup-query').focus({ preventScroll: true }); announce('Back to your current search.'); });
   $('history-open').addEventListener('click', () => { renderHistory(); $('history-dialog').showModal(); });
   $('history-close').addEventListener('click', () => $('history-dialog').close());
   $('about-open').addEventListener('click', () => $('about-dialog').showModal());
   ['about-close', 'about-done'].forEach((id) => $(id).addEventListener('click', () => $('about-dialog').close()));
-  ['demo-guide-open', 'demo-guide-about'].forEach((id) => $(id).addEventListener('click', () => openDemoGuide($(id))));
-  $('demo-guide-close').addEventListener('click', () => closeDemoGuide());
-  $('demo-guide-dialog').addEventListener('cancel', (event) => { event.preventDefault(); closeDemoGuide(); });
-  $('demo-guide-dialog').addEventListener('close', () => {
-    if (!$('demo-guide-dialog').open) { demoGuide.version += 1; document.body.classList.remove('demo-guide-open'); }
-  });
-  const outsideDemoGuide = (event) => { const rect = $('demo-guide-dialog').getBoundingClientRect(); return event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom; };
-  let demoBackdropStart = false;
-  $('demo-guide-dialog').addEventListener('pointerdown', (event) => { demoBackdropStart = event.target === $('demo-guide-dialog') && outsideDemoGuide(event); });
-  $('demo-guide-dialog').addEventListener('click', (event) => { if (demoBackdropStart && event.target === $('demo-guide-dialog') && outsideDemoGuide(event)) closeDemoGuide(); demoBackdropStart = false; });
+  $('demo-guide-about').addEventListener('click', () => { $('about-dialog').close(); showHome(); $('homepage-story').scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' }); });
   ['about-dialog', 'history-dialog'].forEach((id) => {
     $(id).addEventListener('click', (event) => {
       if (event.target !== $(id)) return;

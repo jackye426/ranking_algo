@@ -39,11 +39,11 @@ test('frontend preserves search state and owns explanation requests across sheet
  assert.equal(visible()[0].querySelectorAll('.profile-details').length,0);assert.match(visible()[0].textContent,/Profile includes.*Knee replacement/);
  let why=visible()[0].querySelector('.explanation-toggle');why.click();let pending=requests.at(-1);
  assert.equal($('match-dialog').open,true);assert.equal(pending.url,'/api/match-explanation');assert.equal(pending.body.searchId,'s1');assert.equal($('sheet-close'),document.activeElement);
- why.click();assert.equal(requests.at(-1),pending);assert.match($('sheet-content').textContent,/Personalising your explanation/);assert.match($('sheet-caveats').textContent,/Not fee assured/);assert.match($('sheet-content').textContent,/Profile summary.*A source-based summary/);assert.doesNotMatch($('sheet-content').textContent,/AI-generated explanation/);assert.equal($('sheet-content').querySelectorAll('.sheet-skeleton').length,0);
+ why.click();assert.equal(requests.at(-1),pending);assert.match($('sheet-content').textContent,/Personalising your explanation/);assert.match($('sheet-caveats').textContent,/Not fee assured/);assert.match($('sheet-content').textContent,/Relevant to your search.*A source-based summary/);assert.doesNotMatch($('sheet-content').textContent,/AI-generated explanation/);assert.equal($('sheet-content').querySelectorAll('.sheet-skeleton').length,0);
  $('match-dialog').emit('cancel');assert.equal($('match-dialog').open,false);assert.equal(pending.options.signal.aborted,true);assert.equal(document.activeElement,why);
  const explanation={summary:'Your knee search matches the recorded practice.',reasons:[{title:'Knee',text:'Knee replacement is listed.',evidenceIds:['e1']}],citations:[{id:'e1',text:'Knee replacement',sourceUrl:'/sources/tim'}],caveats:['Not fee assured. Some fees can exceed cover.'],provider:'openrouter',retryable:false};
  pending.resolve({...explanation,summary:'STALE CLOSED RESPONSE'});await flush();assert.doesNotMatch($('sheet-content').textContent,/STALE/);
- why.click();assert.notEqual(requests.at(-1),pending);const openSources=$('sheet-provenance').querySelector('details');openSources.open=true;openSources.querySelector('summary').focus();requests.at(-1).resolve(explanation);await flush();assert.match($('sheet-content').textContent,/AI-generated explanation/);assert.doesNotMatch($('sheet-content').textContent,/A source-based summary/);assert.match($('sheet-provenance').textContent,/Source evidence|Insurance details/);assert.equal($('sheet-content').querySelectorAll('a').length,0);assert.equal(document.activeElement,$('sheet-provenance').querySelector('summary'));assert.equal($('sheet-provenance').querySelector('details').open,true);
+ why.click();assert.notEqual(requests.at(-1),pending);const openSources=$('sheet-provenance').querySelector('details');openSources.open=true;openSources.querySelector('summary').focus();requests.at(-1).resolve(explanation);await flush();assert.match($('sheet-content').textContent,/AI-generated explanation/);assert.match($('sheet-content').textContent,/A source-based summary/);assert.match($('sheet-provenance').textContent,/Source evidence|Insurance details/);assert.ok($('sheet-content').querySelectorAll('a').some(a=>/Spire profile/.test(a.textContent)));assert.equal(document.activeElement,$('sheet-provenance').querySelector('summary'));assert.equal($('sheet-provenance').querySelector('details').open,true);
  $('sheet-close').click();const requestCount=requests.length;why.click();assert.equal(requests.length,requestCount);assert.match($('sheet-content').textContent,/matches the recorded practice/);$('sheet-close').click();
  submit('Only Bupa');pending=requests.at(-1);assert.equal(visible().length,1);assert.doesNotMatch($('active-criteria').textContent,/Bupa/);pending.reject(new Error('Temporary connection failure'));await flush();assert.match($('result-total').textContent,/104/);assert.doesNotMatch($('active-criteria').textContent,/Bupa/);
  $('search-error').querySelector('.retry-button').click();requests.at(-1).resolve(data('s2','Bupa',4));await flush();assert.match($('active-criteria').textContent,/Bupa/);
@@ -73,43 +73,4 @@ test('frontend preserves search state and owns explanation requests across sheet
  $('new-search').click();
 });
 
-test('demo guide prepares a fresh search without sending, copies only on success and preserves modal ownership',async()=>{
- $('new-search').click();await flush();
- const before=requests.length;
- $('demo-guide-open').click();
- assert.equal($('demo-guide-dialog').open,true);assert.equal(document.activeElement,$('demo-guide-close'));
- const scenarios=$('demo-guide-list').querySelectorAll('.demo-scenario');
- assert.equal(scenarios.length,4);assert.equal(scenarios[0].open,true);
- assert.equal(requests.length,before);
- let written;
- window.navigator={clipboard:{writeText:async text=>{written=text}}};
- scenarios[0].querySelectorAll('.demo-step-action')[1].click();await flush();
- assert.equal(written,'Physiotherapy hasn’t helped');assert.match($('demo-guide-status').textContent,/Follow-up copied/);
- assert.equal(requests.length,before);assert.equal($('initial-query').value,'');
- window.navigator.clipboard.writeText=async()=>{throw Error('Denied')};
- scenarios[0].querySelectorAll('.demo-step-action')[1].click();await flush();
- assert.match($('demo-guide-status').textContent,/Couldn’t copy/);
- assert.equal(scenarios[0].querySelectorAll('.demo-step-action')[1].textContent,'Copy follow-up');
- let resolveCopy;
- window.navigator.clipboard.writeText=()=>new Promise(resolve=>{resolveCopy=resolve});
- scenarios[0].querySelectorAll('.demo-step-action')[1].click();
- $('demo-guide-close').click();$('demo-guide-open').click();resolveCopy();await flush();
- assert.equal($('demo-guide-status').textContent,'','an old clipboard promise cannot update a reopened guide');
- $('demo-guide-dialog').emit('cancel');await flush();
- assert.equal($('demo-guide-dialog').open,false);assert.equal(document.activeElement,$('demo-guide-open'));
- $('initial-query').value='Existing knee search';$('landing-form').requestSubmit();requests.at(-1).resolve(data('before-guide'));await flush();
- const afterSearch=requests.length;
- $('about-open').click();$('demo-guide-about').click();await flush();
- assert.equal($('about-dialog').open,false);assert.equal($('demo-guide-dialog').open,true);
- $('demo-guide-close').click();await flush();assert.equal(document.activeElement,$('about-open'));
- $('about-open').click();$('demo-guide-about').click();await flush();
- $('demo-guide-list').querySelectorAll('.demo-start-action')[1].click();await flush();
- assert.equal(requests.length,afterSearch,'choosing a scenario only prepares the input');
- assert.equal($('demo-guide-dialog').open,false);assert.equal($('workspace').hidden,true);
- assert.equal($('conversation').childElementCount,0);assert.equal(document.activeElement,$('initial-query'));
- assert.equal($('initial-query').value,'My periods are very painful and I haven’t been diagnosed with endometriosis');
- assert.equal(document.body.classList.contains('demo-guide-open'),false);
- $('landing-form').requestSubmit();const freshRequest=requests.at(-1);
- freshRequest.resolve(data('after-guide'));await flush();$('new-search').click();
- assert.equal(freshRequest.body.sessionId,undefined,'explicit submission starts without the earlier session');
-});
+// The replaced homepage guide is exercised in walkthrough.test.cjs.

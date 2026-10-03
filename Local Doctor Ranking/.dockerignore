@@ -34,6 +34,12 @@ public/**
 !public/index.html
 !public/styles.css
 !public/app.js
+!public/profiles.css
+!public/walkthrough.css
+!public/walkthrough.js
+!public/brand/
+public/brand/**
+!public/brand/docmap-logo.jpg
 !public/fonts/
 public/fonts/**
 !public/fonts/inter-variable.ttf

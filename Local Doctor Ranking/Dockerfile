@@ -31,7 +31,8 @@ COPY demo/server.cjs demo/search.cjs demo/models.cjs demo/geo.cjs \
     demo/criteria.cjs demo/query-interpreter.cjs demo/clinical-filters.cjs demo/personalized-match.cjs \
     demo/match-explanation.cjs demo/evidence-page.cjs ./demo/
 COPY demo/data/public-spire-records.cjs ./demo/data/public-spire-records.cjs
-COPY public/index.html public/styles.css public/app.js ./public/
+COPY public/index.html public/styles.css public/app.js public/profiles.css public/walkthrough.css public/walkthrough.js ./public/
+COPY public/brand/docmap-logo.jpg ./public/brand/docmap-logo.jpg
 COPY public/fonts/inter-variable.ttf public/fonts/OFL-Inter.txt ./public/fonts/
 # Live records and their fingerprint-checked embedding index are generated at
 # runtime. Only the cache is writable; application files remain root-owned.

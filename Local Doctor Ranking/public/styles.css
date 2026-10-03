@@ -1,5 +1,5 @@
 @font-face{font-family:Inter;src:url('/fonts/inter-variable.ttf') format('truetype');font-weight:100 900;font-style:normal;font-display:swap}
-:root{color-scheme:light;--paper:#f7f9fc;--white:#fff;--ink:#1d2b43;--muted:#5f6f85;--accent:#285eb7;--accent-soft:#eaf2ff;--line:#e3eaf3;--caution:#80613b;--glass:rgba(255,255,255,.76);--ease:cubic-bezier(.22,1,.36,1);font-family:-apple-system,BlinkMacSystemFont,Inter,"Segoe UI",sans-serif;font-synthesis:none;font-optical-sizing:auto}
+:root{color-scheme:light;--paper:#f8f9ff;--white:#fff;--ink:#23243f;--muted:#64677e;--accent:#3231e4;--accent-soft:#eeefff;--line:#e4e5f1;--caution:#80613b;--glass:rgba(255,255,255,.76);--ease:cubic-bezier(.22,1,.36,1);font-family:-apple-system,BlinkMacSystemFont,Inter,"Segoe UI",sans-serif;font-synthesis:none;font-optical-sizing:auto}
 *{box-sizing:border-box}
 html{scroll-padding-bottom:140px;scrollbar-gutter:stable}
 body{margin:0;background:var(--paper);color:var(--ink);font-size:16px;-webkit-font-smoothing:antialiased}
@@ -36,7 +36,8 @@ svg.icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.65;
 .chat-mode .site-header{height:84px}.chat-mode .scope-badge{margin-right:8px}
 
 /* Glass is concentrated around search and transient controls. */
-.landing{min-height:calc(100svh - 100px);width:min(1000px,100%);margin:0 auto;padding:clamp(105px,18vh,190px) 28px 120px;text-align:center}
+.landing{width:min(1180px,100%);margin:0 auto;padding:0 36px 100px;text-align:center}
+.search-hero{min-height:calc(87svh - 100px);max-width:960px;margin:0 auto;padding:clamp(95px,15vh,160px) 0 30px}
 .landing h1{font-size:clamp(46px,5.8vw,76px);letter-spacing:-.05em;line-height:1.12;font-weight:500;margin:0 0 20px}
 .landing-helper{max-width:620px;margin:0 auto 36px;color:var(--muted);font-size:16px;line-height:1.6;letter-spacing:-.01em}
 .search-form{background:var(--glass);border:1px solid #ffffff;border-radius:28px;box-shadow:0 12px 40px -20px #4f78aa40,0 2px 7px #597bab08,inset 0 1px 0 #ffffff;backdrop-filter:blur(24px) saturate(145%);-webkit-backdrop-filter:blur(24px) saturate(145%);transition:box-shadow .18s,border-color .18s}
@@ -48,7 +49,7 @@ svg.icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.65;
 .search-form textarea::placeholder{color:#64778f;opacity:1}
 .search-example{position:absolute;left:69px;right:98px;top:50%;transform:translateY(-50%);display:block;min-width:0;pointer-events:none;text-align:left;color:#64778f;font-size:20px;line-height:1.5;letter-spacing:-.015em}
 .search-example-text{white-space:normal;overflow-wrap:normal}.search-example-cursor{display:inline-block;width:1px;height:1.05em;margin-left:3px;vertical-align:-.12em;background:#6c94c8;opacity:.65}
-.send-button{display:grid;place-items:center;flex-shrink:0;width:50px;height:50px;border-radius:50%;border:1px solid #4b80c5;background:linear-gradient(145deg,#5b8dd4,#396fb6);color:white;align-self:flex-end;box-shadow:0 3px 8px #42699c20,inset 0 1px 0 #ffffff36;transition:filter .16s,transform .14s var(--ease)}
+.send-button{display:grid;place-items:center;flex-shrink:0;width:50px;height:50px;border-radius:50%;border:1px solid #4543e5;background:linear-gradient(145deg,#5551ec,#3231e4);color:white;align-self:flex-end;box-shadow:0 3px 8px #3835b52a,inset 0 1px 0 #ffffff36;transition:filter .16s,transform .14s var(--ease)}
 .send-button:hover:not(:disabled){filter:brightness(.95)}.send-button .icon{width:21px;height:21px}
 .example-queries{margin:32px auto 0;max-width:840px;display:flex;justify-content:center;flex-wrap:wrap;column-gap:28px;row-gap:4px}
 .example-queries button{border:0;background:none;color:var(--muted);font-size:13px;padding:14px 0;min-height:46px;max-width:100%;display:inline-flex;align-items:center;gap:8px;text-align:left;line-height:1.6}
@@ -228,4 +229,41 @@ dialog{padding:24px;border-radius:26px}.dialog-heading h2{font-size:24px}
 @media(prefers-reduced-transparency:reduce){.search-form,.followup-form,.match-sheet{background:#fbfdff;backdrop-filter:none;-webkit-backdrop-filter:none}dialog::backdrop{backdrop-filter:none;-webkit-backdrop-filter:none;background:#1a31576b}}
 @media(prefers-contrast:more){:root{--muted:#394b65;--line:#a6b8d0}.consultant-card,.search-form,.match-sheet,.criterion-chip{border-color:#7891b2}.profile-link,.card-location,.distance,.card-focus-text,.sheet-provider{color:#304969}.sheet-caveats{color:#634c2c}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.search-example-cursor{display:none}button:active:not(:disabled):not(.brand){transform:none}}
+
+/* DocMap identity: display the supplied artwork without redrawing the mark. */
+.brand{color:var(--ink);gap:11px;font-weight:680;letter-spacing:-1.3px}
+.brand-mark{position:relative;display:block;width:27px;height:39px;overflow:hidden;flex-shrink:0;mix-blend-mode:multiply}
+.brand-mark img{position:absolute;width:88px;height:88px;max-width:none;left:-30.3px;top:-24.8px}
+.atmosphere{background:radial-gradient(ellipse 48% 40% at 20% 36%,#e4e8ffa8,transparent),radial-gradient(ellipse 44% 42% at 81% 26%,#e8e5ff99,transparent),radial-gradient(ellipse 52% 30% at 52% 72%,#edf3ff70,transparent)}
+.search-form:focus-within{border-color:#b6b6f2;box-shadow:0 12px 40px -20px #5c57b640,0 0 0 3px #dadafb65}
+.scope-badge .status-dot{background:#7773df}
+.status-pulse,.explanation-pulse{background:#716de5}
+.criterion-chip{background:#eeeefb;border-color:#e0dff4;color:#55528c}
+button.criterion-chip:hover{background:#e5e5fa;border-color:#cccaef}
+.resume-search{display:block;margin:18px auto 0}
+.see-how{display:flex;align-items:center;justify-content:center;gap:9px;width:fit-content;min-height:44px;margin:36px auto 0;color:var(--muted);font-size:12px;text-decoration:none}
+.see-how:hover{color:var(--accent)}.see-how .icon{width:13px;height:13px}
+.back-search{color:var(--accent)}
+.submitted-message{margin:0 0 22px;padding:18px 22px;border-radius:20px;background:#eeeef988;border:1px solid #e5e4f3;max-width:100%;animation:content-in .22s var(--ease)}
+.message-eyebrow{font-size:10px;letter-spacing:.025em;color:#74748b;font-weight:550}
+.message-text{font-size:15px;line-height:1.65;letter-spacing:-.01em;overflow-wrap:anywhere;margin:6px 0 0}
+.edit-request{margin-left:18px}
+.search-form textarea{scrollbar-width:thin;scrollbar-color:#c9c8e7 transparent}
+.search-form textarea::-webkit-scrollbar{width:3px}.search-form textarea::-webkit-scrollbar-thumb{background:#c9c8e7;border-radius:3px}
+.composer-wrap{background:linear-gradient(to bottom,#f8f9ff00,#f8f9ffba 35%,#f8f9fff0)}
+.skeleton-list{display:grid;gap:18px}.skeleton-card{min-height:290px;background:#ffffffc9}
+.skeleton-line{background:linear-gradient(100deg,#eeeef7 20%,#f9f9ff 50%,#eeeef7 80%);background-size:200% 100%;animation:skeleton-sweep 2.2s ease-in-out infinite}
+.skeleton-line:nth-child(3){margin-top:45px}.skeleton-line:nth-child(4){width:65%;margin-top:20px}
+@keyframes skeleton-sweep{from{background-position:180% 0}to{background-position:-80% 0}}
+@media(max-width:900px){.site-header{padding:0 24px}.header-actions{gap:8px}.scope-badge{font-size:11px}.landing{padding:0 28px 80px}}
+@media(max-width:640px){
+ .landing{padding:0 20px 60px}.search-hero{padding:65px 0 20px;min-height:calc(92svh - 80px)}
+ .brand,.chat-mode .brand{font-size:24px}.brand-mark{transform:scale(.86);transform-origin:left center;margin-right:-3px}
+ .site-header,.chat-mode .site-header{height:78px;padding:0 20px;gap:12px}.header-actions{gap:3px}.search-actions{gap:2px}
+ .chat-mode .brand{font-size:0;gap:0}.chat-mode .brand-mark{margin-right:0}
+ .header-button{font-size:12px;padding:8px}.back-search{gap:0}.back-search .icon{width:17px}
+ .chat-mode .about-button{display:none}.see-how{margin-top:26px}
+ .submitted-message{padding:16px 18px;margin-bottom:20px}.message-text{font-size:14px}
+}
+@media(prefers-reduced-transparency:reduce){.search-form,.followup-form,.submitted-message{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}}
 @media(forced-colors:active){.consultant-card,.search-form,.match-sheet,.criterion-chip,.explanation-toggle{border:1px solid CanvasText}.send-button{background:ButtonFace;color:ButtonText}.atmosphere{display:none}}

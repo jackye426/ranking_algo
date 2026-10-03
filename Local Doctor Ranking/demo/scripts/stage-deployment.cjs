@@ -11,7 +11,8 @@ if(fs.existsSync(destination) && fs.readdirSync(destination).length) throw new E
 const files=['Dockerfile','.dockerignore','railway.toml','package.json','package-lock.json','bm25Service.cjs','location-filter.js',
   ...['server','search','models','geo','data-source','supabase-reader','supabase-mapper','criteria','query-interpreter','clinical-filters','personalized-match','match-explanation','evidence-page'].map(name=>`demo/${name}.cjs`),
   'demo/data/public-spire-records.cjs','demo/scripts/prewarm-models.cjs','public/index.html','public/styles.css','public/app.js',
-  'public/fonts/inter-variable.ttf','public/fonts/OFL-Inter.txt'];
+  'public/fonts/inter-variable.ttf','public/fonts/OFL-Inter.txt',
+  'public/profiles.css','public/walkthrough.css','public/walkthrough.js','public/brand/docmap-logo.jpg'];
 for(const file of files) if(!fs.statSync(path.join(source,file)).isFile()) throw new Error(`Missing deployment file: ${file}`);
 fs.mkdirSync(destination,{recursive:true});
 const manifest=[];

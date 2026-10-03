@@ -3,11 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f8fc">
+  <meta name="theme-color" content="#f8f9ff">
   <meta name="description" content="Find a Spire consultant with DocMap. Search naturally, then refine your shortlist.">
   <title>DocMap — Find your specialist</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/profiles.css">
+  <link rel="stylesheet" href="/walkthrough.css">
   <script src="/app.js" defer></script>
+  <script src="/walkthrough.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to search</a>
@@ -24,12 +27,14 @@
     <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
     <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
     <symbol id="icon-history" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2.7 7M3 4v7h7m2-4v5l3 2"/></symbol>
+    <symbol id="icon-back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol>
   </defs></svg>
   <header class="site-header">
-    <button class="brand" id="brand-home" aria-label="DocMap, start a new search"><span class="brand-symbol" aria-hidden="true"><span></span><span></span><span></span><span></span></span><span>docmap<span class="brand-dot">.</span></span></button>
+    <button class="brand" id="brand-home" aria-label="DocMap home"><span class="brand-mark" aria-hidden="true"><img src="/brand/docmap-logo.jpg" alt="" width="987" height="987"></span><span>docmap</span></button>
     <div class="header-actions">
       <span class="scope-badge"><span class="status-dot" aria-hidden="true"></span>Spire consultants</span>
       <nav class="search-actions" aria-label="Search actions" hidden id="search-actions">
+        <button class="header-button back-search" id="back-search"><svg class="icon"><use href="#icon-back"/></svg><span>Search</span></button>
         <button class="header-button" id="history-open" aria-haspopup="dialog"><svg class="icon"><use href="#icon-history"/></svg><span>History</span></button>
         <button class="header-button" id="new-search"><svg class="icon"><use href="#icon-plus"/></svg><span>New search</span></button>
       </nav>
@@ -38,6 +43,7 @@
   </header>
   <main id="main">
     <section class="landing" id="landing" aria-labelledby="hero-title">
+      <div class="search-hero">
       <h1 id="hero-title">Find your specialist.</h1>
       <p class="landing-helper" id="search-guidance">Tell us what you’re experiencing and what matters to you.</p>
       <form class="search-form landing-form" id="landing-form">
@@ -50,7 +56,10 @@
         <button data-query="I have stage 3 endometriosis and want to discuss excision surgery" aria-label="Try: I have stage 3 endometriosis and want to discuss excision surgery"><span class="example-query-text">Discussing endometriosis surgery</span><span aria-hidden="true">↗</span></button>
         <button data-query="My periods are very painful and I haven’t been diagnosed" aria-label="Try: My periods are very painful and I haven’t been diagnosed"><span class="example-query-text">Painful periods without a diagnosis</span><span aria-hidden="true">↗</span></button>
       </div>
-      <button class="demo-guide-link" id="demo-guide-open" type="button" aria-haspopup="dialog" aria-controls="demo-guide-dialog">Explore demo scenarios <svg class="icon" aria-hidden="true"><use href="#icon-chevron"/></svg></button>
+      <button class="resume-search text-button" id="resume-search" type="button" hidden>Resume your search ↗</button>
+      <a class="see-how" id="see-how" href="#homepage-story">See what a conversation can do <svg class="icon" aria-hidden="true"><use href="#icon-chevron"/></svg></a>
+      </div>
+      <div id="homepage-story"></div>
     </section>
     <section class="workspace" id="workspace" hidden aria-label="Your consultant shortlist">
       <div class="search-overview">
@@ -58,6 +67,7 @@
         <div class="active-criteria" id="active-criteria" aria-label="Active search criteria"></div>
         <div class="history-preview" id="history-preview" hidden><span>Viewing an earlier search</span><button id="return-current" class="text-button">Back to current search <span aria-hidden="true">↗</span></button></div>
       </div>
+      <div id="submitted-message" class="submitted-message" hidden></div>
       <div id="search-status" class="search-status" aria-live="polite"></div>
       <div id="search-error"></div>
       <div id="conversation" class="shortlist" aria-label="Consultant results"></div>
@@ -68,8 +78,8 @@
   <dialog id="match-dialog" class="match-sheet" aria-labelledby="sheet-title sheet-consultant-name">
     <div class="sheet-handle" aria-hidden="true"></div>
     <div class="sheet-header">
-      <div class="sheet-heading"><p id="sheet-title" class="sheet-eyebrow">Why this match</p><div id="sheet-identity" class="sheet-identity"></div></div>
-      <button class="icon-button sheet-close" id="sheet-close" aria-label="Close consultant explanation" autofocus><svg class="icon"><use href="#icon-close"/></svg></button>
+      <div class="sheet-heading"><p id="sheet-title" class="sheet-eyebrow">Consultant profile</p><div id="sheet-identity" class="sheet-identity"></div></div>
+      <button class="icon-button sheet-close" id="sheet-close" aria-label="Close consultant profile" autofocus><svg class="icon"><use href="#icon-close"/></svg></button>
     </div>
     <div id="sheet-scroll" class="sheet-scroll">
       <div id="sheet-content" class="sheet-content" aria-busy="false"></div>
@@ -87,14 +97,8 @@
     <p>AI helps interpret your search and explain relevant experience from Spire consultant profiles.</p>
     <div class="about-data"><strong id="data-source-label">Built around real consultant records</strong><p id="data-description">Searches records with evidence of Spire affiliation. Every profile links to its sources.</p></div>
     <p class="about-small">Search results are not a clinical assessment. Confirm procedure availability, location and insurance coverage before booking.</p>
-    <button class="demo-guide-link about-guide-link" id="demo-guide-about" type="button" aria-haspopup="dialog" aria-controls="demo-guide-dialog">Explore demo scenarios <span aria-hidden="true">↗</span></button>
+    <button class="demo-guide-link about-guide-link" id="demo-guide-about" type="button">See how DocMap works <span aria-hidden="true">↗</span></button>
     <button class="dialog-done" id="about-done">Back to search <span aria-hidden="true">↗</span></button>
-  </dialog>
-  <dialog id="demo-guide-dialog" class="demo-guide-dialog" aria-labelledby="demo-guide-title" aria-describedby="demo-guide-intro">
-    <div class="dialog-heading"><h2 id="demo-guide-title">Try a conversation</h2><button class="icon-button" id="demo-guide-close" type="button" aria-label="Close demo scenarios" autofocus><svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg></button></div>
-    <p class="demo-guide-intro" id="demo-guide-intro">Try an opening search, then add the follow-ups. Starting a scenario clears your current search and prepares the prompt for you to send.</p>
-    <div class="demo-scenarios" id="demo-guide-list"></div>
-    <p class="demo-guide-status" id="demo-guide-status" role="status" aria-live="polite" aria-atomic="true"></p>
   </dialog>
 </body>
 </html>
