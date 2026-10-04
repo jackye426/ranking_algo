@@ -53,6 +53,7 @@ const draft={differences:context.consultants.map(person=>({consultantId:person.i
 test('comparison validation rejects cross-consultant citations and superiority',()=>{
   assert.equal(validateComparison(draft,context),true);
   const wrong=structuredClone(draft);wrong.differences[0].evidenceIds=[context.consultants[1].evidence[0].id];assert.equal(validateComparison(wrong,context),false);
+  const inferred=structuredClone(draft);inferred.differences[0].text='The consultant has a non-surgical practice.';assert.equal(validateComparison(inferred,context),false);
   const superiority=structuredClone(draft);superiority.differences[0].text='The best doctor for you.';assert.equal(validateComparison(superiority,context),false);
 });
 test('comparison generation requires an independent support check and falls back on rejection',async()=>{
