@@ -122,5 +122,5 @@ test('Try your own search focuses the existing input without replacing or submit
   const h = setup(); h.mount.querySelectorAll('.wt-try')[0].emit('click');
   assert.equal(h.input.value, 'My unfinished search'); assert.equal(h.document.activeElement, h.input); assert.equal(h.calls.requests, 0);
   assert.equal(h.mount.querySelectorAll('.wt-healthcare-link')[0].href, '/for-healthcare-teams');
-  assert.match(h.mount.textContent, /The details change who you consider/); assert.doesNotMatch(h.mount.textContent, /Stage 3|excision|Remember what matters/);
+  assert.match(h.mount.textContent, /Go from a list of names to reasons to choose/); assert.doesNotMatch(h.mount.textContent, /Stage 3|excision|Remember what matters/);
 });

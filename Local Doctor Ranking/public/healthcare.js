@@ -32,28 +32,29 @@
   const header = node('header', 'hc-header');
   header.append(node('p', 'hc-eyebrow', 'DocMap for healthcare teams'));
   const heading = node('h1', 'hc-title'); heading.id = 'healthcare-title'; heading.tabIndex = -1;
-  heading.append(node('span', '', 'Your consultants have different expertise. '), node('span', 'hc-title-accent', 'Your patients have different needs.'));
-  header.append(heading, node('p', 'hc-intro', 'Spire already has the expertise. Help patients understand which consultants’ recorded interests relate to their situation—and why they are worth considering.'));
+  heading.append(node('span', '', 'Help patients choose '), node('span', 'hc-title-accent', 'who to contact.'));
+  header.append(heading, node('p', 'hc-intro', 'A list of knee specialists still leaves a patient deciding who is relevant to them. DocMap uses their goals and previous care to prioritise profiles and explain the recorded interests behind each option.'));
 
   const story = node('section', 'hc-story');
   story.setAttribute('aria-label', 'A verified knee search with a running goal and treatment history');
-  story.append(node('p', 'hc-context', 'Searching by name, condition or procedure is useful when patients know what to ask for. Their goals and treatment history add another dimension to choosing whom to explore.'));
+  story.append(node('p', 'hc-context', 'Name, condition and procedure searches help patients find a starting list. DocMap adds the context those terms leave out: what the patient wants to get back to and what they have already tried.'));
   const comparisonMount = node('div', 'hc-comparison'); comparisonMount.id = 'healthcare-comparison';
   comparisonMount.setAttribute('aria-busy', 'true');
   comparisonMount.append(node('p', 'hc-comparison-loading', 'Loading the prepared example…'));
   story.append(comparisonMount);
 
   const nextStep = node('section', 'hc-next-step'); nextStep.setAttribute('aria-labelledby', 'healthcare-next-step-title');
-  const nextHeading = node('h2', 'hc-next-step-title', 'Give patients a reason to take the next step.'); nextHeading.id = 'healthcare-next-step-title';
+  const nextHeading = node('h2', 'hc-next-step-title', 'Turn Spire’s expertise into a reason to enquire.'); nextHeading.id = 'healthcare-next-step-title';
+  const nextCopy = node('p', 'hc-next-step-copy', 'The opportunity for Spire is to help more patients move from “I found several doctors” to “I understand why I would contact this one”. A pilot would test whether that leads to more informed enquiries and fewer abandoned searches.');
   const values = node('div', 'hc-value-grid');
   [
-    ['Make expertise visible.', 'Bring specific clinical interests into view, beyond a broad specialty.'],
-    ['Make the choice understandable.', 'Show how recorded interests relate to the patient’s goals and treatment history.'],
-    ['Support the next step.', 'Give patients a clearer basis for exploring a profile or making an enquiry.']
+    ['Surface the expertise already there.', 'Bring relevant clinical interests out of individual consultant profiles and into the patient’s shortlist.'],
+    ['Explain why this consultant.', 'Connect the patient’s goal to specific profile evidence, so they can compare options with a reason.'],
+    ['Give the enquiry a starting point.', 'Help patients approach Spire with a consultant to explore and a clearer explanation of what they are looking for.']
   ].forEach(([title, description]) => {
     const item = node('div', 'hc-value'); item.append(node('h3', '', title), node('p', '', description)); values.append(item);
   });
-  nextStep.append(nextHeading, values);
+  nextStep.append(nextHeading, nextCopy, values);
 
   const pilot = node('details', 'hc-pilot'); pilot.id = 'healthcare-pilot';
   const pilotSummary = node('summary', 'hc-pilot-summary');

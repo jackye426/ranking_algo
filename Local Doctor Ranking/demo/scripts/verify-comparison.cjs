@@ -54,10 +54,10 @@ const editorial = {
   '7015944': {excerpts: ['knee pain, over 18 years, joint replacement'], reason: 'Knee pain is listed in his recorded clinical interests.'},
   '6078138': {specialtyOnly: true, excerpts: ['Consultant Orthopaedic Surgeon'], reason: 'His recorded specialty is orthopaedic surgery. The fit for this symptom needs confirmation.'},
   '3575473': {excerpts: ['knee pain'], reason: 'Knee pain is listed in his recorded clinical interests.'},
-  '4749002': {excerpts: ["Runner's knee", 'Knee pain'], reason: 'His recorded interests include runner’s knee and knee pain.'},
-  '6058091': {excerpts: ['Running injuries', 'Anterior knee pain'], reason: 'Running injuries and anterior knee pain are listed in his record.'},
-  '3351259': {excerpts: ['Investigation of painful knee'], reason: 'His record lists investigation of a painful knee. This excerpt does not confirm running-specific expertise.'},
-  '3116968': {excerpts: ['Running injuries', 'Knee pain'], reason: 'His recorded interests include running injuries and knee pain.'},
+  '4749002': {excerpts: ["Runner's knee", 'Knee pain'], reason: 'You want to get back to running. His record lists runner’s knee and knee pain, giving you a specific reason to explore his profile.'},
+  '6058091': {excerpts: ['Running injuries', 'Anterior knee pain'], reason: 'His record lists running injuries alongside anterior knee pain. Those interests connect with your knee concern and your goal of returning to running.'},
+  '3351259': {excerpts: ['Investigation of painful knee'], reason: 'Investigation of a painful knee relates to your knee concern. A running-specific connection would need confirming.'},
+  '3116968': {excerpts: ['Running injuries', 'Knee pain'], reason: 'You want to return to running. His recorded interests include running injuries and knee pain, giving you a reason to explore his sports medicine practice.'},
 };
 
 function publicResult(record) {

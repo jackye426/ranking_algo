@@ -71,26 +71,31 @@
     let selected = 'goal';
 
     const root = element('div', 'cmp-comparison');
-    const label = element('p', 'cmp-prepared', 'Prepared DocMap results');
+    const proof = element('div', 'cmp-proof');
+    proof.append(element('p', 'cmp-proof-title', `Same ${data.eligibleCount} consultants. Different top three.`),
+      element('p', 'cmp-proof-copy', 'Only the patient’s context changes. The search reprioritises the same pool of consultants.'));
+    const label = element('p', 'cmp-prepared', 'A prepared comparison using real DocMap search results');
     const grid = element('div', 'cmp-grid');
 
     const baseline = element('section', 'cmp-baseline');
     baseline.setAttribute('aria-labelledby', `${prefix}-baseline-title`);
-    const baselineHeading = element('h3', 'cmp-section-heading', 'A broad starting point');
+    const baselineHeading = element('h3', 'cmp-section-heading', 'Who appears for “knee pain”?');
     baselineHeading.id = `${prefix}-baseline-title`;
     const baselinePrompt = element('blockquote', 'cmp-baseline-prompt', data.baseline.prompt);
-    baseline.append(element('p', 'cmp-eyebrow', 'The concern'), baselineHeading, baselinePrompt);
+    baseline.append(element('p', 'cmp-eyebrow', 'Search by condition'), baselineHeading,
+      element('p', 'cmp-column-copy', 'Finds a starting list. The patient still has to work out whose interests relate to their own situation.'), baselinePrompt);
     const baselineResults = element('div', 'cmp-baseline-results');
     data.baseline.results.slice(0, 3).forEach(record => baselineResults.append(resultCard(record, true)));
-    baseline.append(baselineResults);
+    baseline.append(baselineResults, element('p', 'cmp-baseline-takeaway', '“Knee pain” tells us the concern. It doesn’t tell us that this patient wants to run again.'));
 
     const contextual = element('section', 'cmp-contextual');
     contextual.setAttribute('aria-labelledby', `${prefix}-context-title`);
-    const contextHeading = element('h3', 'cmp-section-heading', 'Now add the person');
+    const contextHeading = element('h3', 'cmp-section-heading', 'Who should I consider first?');
     contextHeading.id = `${prefix}-context-title`;
     const top = element('div', 'cmp-context-top');
     const topCopy = element('div', 'cmp-context-top-copy');
-    topCopy.append(element('p', 'cmp-eyebrow', 'The context'), contextHeading);
+    topCopy.append(element('p', 'cmp-eyebrow', 'Search with your context'), contextHeading,
+      element('p', 'cmp-column-copy', 'Prioritises profiles using your goal and previous care, then connects the relevant recorded interests to what you’ve shared.'));
     top.append(topCopy);
     const tablist = element('div', 'cmp-tabs');
     tablist.setAttribute('role', 'tablist'); tablist.setAttribute('aria-label', 'Add patient context to the prepared results');
@@ -122,7 +127,7 @@
     followup.append(followupLabel, followupText);
     const understanding = element('p', 'cmp-understanding');
     const results = element('div', 'cmp-context-results');
-    patient.append(prompt, followup, understanding);
+    patient.append(prompt, followup, element('p', 'cmp-change-label', 'What changes in the shortlist'), understanding);
     panel.append(patient, results);
     const stage = element('div', 'cmp-context-stage');
     const sizing = element('div', 'cmp-context-sizing');
@@ -140,7 +145,7 @@
         sampleFollowup.append(element('span', 'cmp-followup-label', 'Then you add'), element('p', 'cmp-followup-text', state.followup));
         samplePatient.append(sampleFollowup);
       }
-      samplePatient.append(element('p', 'cmp-understanding', contextExplanation(id)));
+      samplePatient.append(element('p', 'cmp-change-label', 'What changes in the shortlist'), element('p', 'cmp-understanding', contextExplanation(id)));
       const sampleResults = element('div', 'cmp-size-results');
       state.results.slice(0, 3).forEach(record => sampleResults.append(resultCard(record, false, true)));
       variant.append(samplePatient, sampleResults); sizing.append(variant);
@@ -148,15 +153,15 @@
     stage.append(panel, sizing);
     contextual.append(top, tablist, stage);
     grid.append(baseline, contextual);
-    const notice = element('p', 'cmp-notice', 'Prepared DocMap searches of the same consultant records. Live results may differ. First recorded hospital shown.');
+    const notice = element('p', 'cmp-notice', 'Both lists are prepared DocMap searches, not a reproduction of Spire’s current search results. Live results may differ. First recorded hospital shown.');
     const status = element('p', 'sr-only');
     status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.setAttribute('aria-atomic', 'true');
-    root.append(label, grid, notice, status); container.replaceChildren(root);
+    root.append(proof, label, grid, notice, status); container.replaceChildren(root);
 
     function contextExplanation(id) {
       return id === 'history'
-        ? 'Your running goal stays. Previous physiotherapy adds context without assuming the next treatment.'
-        : 'Your aim to get back to running adds context to the knee concern.';
+        ? 'Your running goal stays. Adding previous physiotherapy brings Mark Ridgewell first; his record lists knee pain and running injuries. This does not imply that surgery is needed.'
+        : 'Adding the running goal brings Ashutosh Acharya first. His record lists runner’s knee and knee pain—a specific connection to what this patient wants to get back to.';
     }
 
     function pause() {

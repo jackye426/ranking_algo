@@ -20,9 +20,9 @@
   const section = element('section', 'wt-showcase');
   section.setAttribute('aria-labelledby', 'wt-title');
   const intro = element('header', 'wt-introduction');
-  const title = element('h2', 'wt-title', 'The details change who you consider.');
+  const title = element('h2', 'wt-title', 'Go from a list of names to reasons to choose.');
   title.id = 'wt-title';
-  intro.append(element('p', 'wt-eyebrow', 'A search with more of you in it.'), title, element('p', 'wt-intro-copy', 'Share what matters to you. See which recorded interests connect with your situation.'));
+  intro.append(element('p', 'wt-eyebrow', 'Why your situation matters'), title, element('p', 'wt-intro-copy', 'A search for “knee pain” gives you a starting list. Your goal of getting back to running helps DocMap prioritise which profiles to explore—and explain why.'));
   const comparisonMount = element('div', 'wt-comparison'); comparisonMount.id = 'homepage-comparison';
   const actions = element('div', 'wt-actions');
   const trySearch = element('button', 'wt-try'); trySearch.type = 'button';

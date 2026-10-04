@@ -1,5 +1,11 @@
 /* A prepared comparison shared by the patient and healthcare-team surfaces. */
 .cmp-comparison{width:100%;text-align:left;color:var(--ink);min-width:0}
+.cmp-proof{padding:0 0 29px;margin:0 0 26px;border-bottom:1px solid #dfe2f0}
+.cmp-proof-title{font-size:clamp(23px,2.7vw,32px);font-weight:500;line-height:1.25;letter-spacing:-.035em;margin:0 0 11px;text-wrap:balance}
+.cmp-proof-copy{font-size:15px;line-height:1.75;color:#5c6680;margin:0;max-width:660px}
+.cmp-column-copy{font-size:14px;line-height:1.75;color:#657087;margin:13px 0 0;max-width:520px}
+.cmp-baseline-takeaway{font-size:16px;line-height:1.75;color:#4d5871;margin:29px 0 0;max-width:330px}
+.cmp-change-label{font-size:12px;font-weight:550;line-height:1.5;color:var(--accent);margin:25px 0 0}
 .cmp-prepared{font-size:11px;font-weight:500;line-height:1.6;letter-spacing:.015em;margin:0 0 21px;color:#797f94}
 .cmp-grid{display:grid;grid-template-columns:minmax(235px,.72fr) minmax(0,1.28fr);gap:clamp(48px,6.5vw,88px);align-items:start}
 .cmp-baseline{min-width:0;padding:29px 0 0}
@@ -24,7 +30,7 @@
 .cmp-followup{border-left:2px solid #b9b8ec;margin:16px 0 0;padding:1px 0 2px 13px}
 .cmp-followup-label{display:block;font-size:12px;line-height:1.5;color:#777c95;margin-bottom:4px}
 .cmp-followup-text{font-size:15px;font-weight:450;line-height:1.6;letter-spacing:-.013em;margin:0;color:#414a66}
-.cmp-understanding{font-size:13px;line-height:1.75;color:#71798e;margin:14px 0 0;max-width:510px}
+.cmp-understanding{font-size:14px;line-height:1.75;color:#515d77;margin:8px 0 0;max-width:510px}
 .cmp-context-results,.cmp-size-results{display:grid;gap:14px}
 .cmp-result,.cmp-size-card{min-width:0;padding:22px 23px 13px;border:1px solid #fff;border-radius:21px;background:#fffffff5;box-shadow:0 5px 20px -14px #34406d1c}
 .cmp-name{font-size:17px;font-weight:560;line-height:1.4;letter-spacing:-.022em;margin:0 0 5px;overflow-wrap:anywhere}
@@ -64,7 +70,7 @@
  .cmp-tab{flex:1;padding:9px 9px;font-size:11px;min-height:40px}.cmp-patient-prompt{font-size:17px}
  .cmp-result,.cmp-size-card{padding:19px 17px 10px;border-radius:18px}.cmp-result-compact{padding:15px 0;border-radius:0}
  .cmp-name{font-size:16px}.cmp-reason{font-size:14px;line-height:1.75}.cmp-specialty{font-size:12px}.cmp-location{font-size:12px}
- .cmp-understanding{font-size:13px}.cmp-followup-text{font-size:14px}.cmp-sources{gap:0 13px}.cmp-source{font-size:12px}
+ .cmp-understanding{font-size:14px}.cmp-followup-text{font-size:14px}.cmp-sources{gap:0 13px}.cmp-source{font-size:12px}
  .cmp-patient{margin-bottom:21px}.cmp-result-compact .cmp-name{font-size:14px}.cmp-result-compact .cmp-specialty{font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){.cmp-tab{transition:none}}
