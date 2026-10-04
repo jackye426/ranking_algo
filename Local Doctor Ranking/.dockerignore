@@ -21,6 +21,7 @@ demo/**
 !demo/query-interpreter.cjs
 !demo/clinical-filters.cjs
 !demo/personalized-match.cjs
+!demo/comparison-explanation.cjs
 !demo/match-explanation.cjs
 !demo/evidence-page.cjs
 !demo/data/
@@ -34,6 +35,7 @@ public/**
 !public/index.html
 !public/styles.css
 !public/app.js
+!public/decision.css
 !public/profiles.css
 !public/comparison-data.js
 !public/comparison.js

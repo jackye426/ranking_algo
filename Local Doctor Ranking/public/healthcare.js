@@ -35,6 +35,12 @@
   heading.append(node('span', '', 'Help patients choose '), node('span', 'hc-title-accent', 'who to contact.'));
   header.append(heading, node('p', 'hc-intro', 'A list of knee specialists still leaves a patient deciding who is relevant to them. DocMap uses their goals and previous care to prioritise profiles and explain the recorded interests behind each option.'));
 
+  const demoOptions = node('nav', 'healthcare-demo-options'); demoOptions.setAttribute('aria-label', 'Try the two demo experiences');
+  for (const [mode, title] of [['directory', 'Explore the directory'], ['guided', 'Explore top options']]) {
+    const entry = node('a', '', title + ' ↗'); entry.href = '/' + mode; entry.dataset.demoExperience = mode; demoOptions.append(entry);
+  }
+  header.append(demoOptions);
+
   const story = node('section', 'hc-story');
   story.setAttribute('aria-label', 'A verified knee search with a running goal and treatment history');
   story.append(node('p', 'hc-context', 'Name, condition and procedure searches help patients find a starting list. DocMap adds the context those terms leave out: what the patient wants to get back to and what they have already tried.'));

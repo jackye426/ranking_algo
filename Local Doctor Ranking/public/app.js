@@ -5,6 +5,9 @@
   window.addEventListener('pageshow', () => { if (!document.body.classList.contains('chat-mode')) window.scrollTo(0, 0); });
   const $ = (id) => document.getElementById(id);
   const state = { epoch: 0, sessionId: null, busy: false, criteria: {}, criteriaLabels: [], controller: null, turns: [], activeTurn: null, explanationControllers: new Set(), lastMessage: '', failedRequest: null };
+  state.experience = window.location.pathname === '/guided' ? 'guided' : 'directory';
+  state.decisions = new Map(); state.profileEntries = new Map();
+  let comparisonView = null;
   const navigation = { screen: 'home', restoring: false, resultsScroll: 0, profiles: new Map(), pendingTraversal: null };
   function routeTo(screen, extra = {}, replace = false) {
     // Back is asynchronous. If another action wins before its popstate event,
@@ -13,7 +16,7 @@
       navigation.pendingTraversal.after = { screen, extra };
       navigation.screen = screen; return;
     }
-    if (!navigation.restoring) history[replace ? 'replaceState' : 'pushState']?.({ docmap: true, epoch: state.epoch, screen, ...extra }, '', screen === 'healthcare' ? '/for-healthcare-teams' : '/');
+    if (!navigation.restoring) history[replace ? 'replaceState' : 'pushState']?.({ docmap: true, epoch: state.epoch, screen, experience: state.experience, ...extra }, '', screen === 'healthcare' ? '/for-healthcare-teams' : state.experience === 'guided' ? '/guided' : '/directory');
     navigation.screen = screen;
   }
   const initialScreen = window.location.pathname === '/for-healthcare-teams' ? 'healthcare' : 'home';
@@ -102,7 +105,7 @@
   function showHealthcare({ record = true, focus = true } = {}) {
     if (document.body.classList.contains('chat-mode')) navigation.resultsPosition = captureResultsPosition();
     closeMatchSheet({ immediate: true, restoreFocus: false });
-    ['about-dialog', 'history-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
+    ['about-dialog', 'history-dialog', 'compare-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
     examplePrompt.pause(); $('landing').hidden = true; $('workspace').hidden = true; $('search-actions').hidden = true;
     document.body.classList.remove('chat-mode', 'search-entering'); setHealthcareVisible(true);
     if (record) routeTo('healthcare');
@@ -225,7 +228,7 @@
   function showHome({ record = true } = {}) {
     if (document.body.classList.contains('chat-mode')) navigation.resultsPosition = captureResultsPosition();
     closeMatchSheet({ immediate: true, restoreFocus: false });
-    ['about-dialog', 'history-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
+    ['about-dialog', 'history-dialog', 'compare-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
     setHealthcareVisible(false); $('workspace').hidden = true; $('landing').hidden = false; $('search-actions').hidden = true;
     document.body.classList.remove('chat-mode', 'search-entering', 'is-refining');
     if (record) routeTo('home');
@@ -266,6 +269,7 @@
     if (!target?.docmap) return; // Ordinary in-page anchors are not app navigation.
     navigation.restoring = true;
     try {
+      if (target.experience) setExperience(target.experience, { record: false });
       if (target.screen === 'healthcare') {
         navigation.screen = 'healthcare'; showHealthcare({ record: false });
       } else if (!target?.docmap || target.epoch !== state.epoch || target.screen === 'home') {
@@ -276,6 +280,10 @@
         if (returnPosition) navigation.resultsPosition = returnPosition.position;
         closeMatchSheet({ immediate: true, restoreFocus: false });
         navigation.screen = 'results'; resumeSearch({ record: false, focus: !returnPosition });
+        if (target.screen === 'comparison') {
+          const comparisonTurn = state.turns.find(t => t.data.searchId === target.comparisonSearchId);
+          if (comparisonTurn) { decisionState(comparisonTurn.data).selected = new Set(target.comparisonIds); syncComparison(); openComparison(comparisonTurn.data, { record: false }); navigation.screen = 'comparison'; }
+        } else { $('compare-dialog').close(); comparisonView = null; }
         const entry = target.screen === 'profile' && navigation.profiles.get(target.profileKey);
         if (entry && entry.epoch === state.epoch) openMatchSheet(entry, { explain: false });
         else if (returnPosition?.trigger?.isConnected) returnPosition.trigger.focus({ preventScroll: true });
@@ -306,6 +314,7 @@
     state.controller?.abort();
     state.explanationControllers.forEach((controller) => controller.abort()); state.explanationControllers.clear();
     Object.assign(state, { sessionId: null, busy: false, criteria: {}, criteriaLabels: [], controller: null, turns: [], activeTurn: null, lastMessage: '', failedRequest: null });
+    state.decisions.clear(); state.profileEntries.clear(); $('compare-dialog').close(); comparisonView = null; $('compare-tray').hidden = true;
     navigation.profiles.clear(); navigation.resultsPosition = { top: 0 }; routeTo('home', {}, true);
     ['conversation', 'active-criteria', 'search-status', 'search-error', 'history-list', 'submitted-message'].forEach((id) => $(id).replaceChildren());
     $('submitted-message').hidden = true;
@@ -332,6 +341,7 @@
     $('followup-query').placeholder = preview ? 'Return to your current search to refine' : 'Tell us more, or refine your search…';
     $('history-open').disabled = busy || !state.turns.length;
     $('conversation').setAttribute('aria-busy', String(busy));
+    document.querySelectorAll('.compare-select, .compare-top, .load-more').forEach(button => { button.disabled = busy || button.dataset.loading === 'true'; });
     updateResume();
   }
 
@@ -365,6 +375,7 @@
         chip.append(icon('close'));
         chip.addEventListener('click', () => send({ removeCriterion: key }, `Remove “${label}” from my search`));
       }
+      if (key === 'clinicalContext') chip.classList.add('patient-context-chip');
       container.append(chip);
     });
   }
@@ -834,7 +845,178 @@
   window.addEventListener('pointerup', finishSheetDrag); window.addEventListener('pointercancel', finishSheetDrag);
 
   function differentiator(person, context) {
-    return profileHighlights(person, context, 3);
+    const highlights = profileHighlights(person, context, 16).filter(item => !/[a-z)]\.[A-Z]/.test(item.text));
+    const criteria = context.criteria || {};
+    const anchors = (String(criteria.topic || '').toLowerCase().match(/[a-z]{3,}/g) || []).filter(w => !/^(pain|painful|chronic|persistent|severe)$/.test(w));
+    const running = /\brunn(?:er|ing)\b/i.test(criteria.clinicalContext || '');
+    const activity = item => running && /\brunn(?:er|ing)/i.test(item.text);
+    const matched = highlights.filter(item => item.overlap > 0 && (!anchors.length || anchors.some(w => item.text.toLowerCase().includes(w)) || activity(item)));
+    matched.sort((a,b) => Number(activity(b)) - Number(activity(a)) || b.overlap - a.overlap);
+    const seen = new Set();
+    const distinct = matched.filter(item => { const key = item.text.toLowerCase().replace(/\binjures\b/g, 'injuries'); if(seen.has(key)) return false; seen.add(key); return true; });
+    return distinct.length ? distinct.slice(0, 3) : highlights.slice(0, 1);
+  }
+
+  function contextualReason(person, context) {
+    const facts = differentiator(person, context).slice(0, 2);
+    const criteria = context.criteria || {};
+    const detail = facts.map(f => f.text.replace(/[.]+$/, '')).join('; ');
+    if (!detail) return 'The available profile does not provide a specific reason for this search. Explore its recorded details.';
+    if (/\brunn(?:er|ing)\b/i.test(criteria.clinicalContext || '') && /\brunn(?:er|ing)/i.test(detail)) return `You mentioned running. This profile records an interest in ${facts.find(f => /runn(?:er|ing)/i.test(f.text)).text.replace(/[.]+$/, '')}.`;
+    if (criteria.procedures?.length) return 'You’re exploring a particular procedure. Compare these recorded details with what you want to discuss; current availability needs confirming.';
+    return criteria.topic ? `For your ${criteria.topic} search, these are the relevant details recorded in the profile.` : 'These recorded interests relate to the specialty you’re exploring.';
+  }
+
+  function decisionState(data) {
+    state.decisions ||= new Map(); const key = data.searchId || data;
+    if (!state.decisions.has(key)) state.decisions.set(key, { selected: new Set(), positions: {}, answers: new Map(), pending: new Map(), pagePending: false });
+    return state.decisions.get(key);
+  }
+  function syncExperienceButtons() {
+    $('directory-view').setAttribute('aria-pressed', String(state.experience !== 'guided'));
+    $('guided-view').setAttribute('aria-pressed', String(state.experience === 'guided'));
+    document.body.classList.toggle('guided-mode', state.experience === 'guided');
+  }
+  function applyExperience(node, data) {
+    const guided = state.experience === 'guided';
+    [...node.querySelectorAll('.consultant-card')].forEach((card, i) => { card.hidden = guided && i >= 3; });
+    const intro = node.querySelector('.guided-intro'); if (intro) intro.hidden = !guided || !data.results.length;
+    const more = node.querySelector('.load-more'); if (more) more.hidden = guided || !data.nextCursor;
+    const browse = node.querySelector('.browse-directory'); if (browse) browse.hidden = !guided;
+    const compare = node.querySelector('.compare-top'); if (compare) compare.hidden = !guided || data.results.length < 2;
+    if (state.activeTurn?.data === data) {
+      const total = Number.isFinite(data.total) ? data.total : data.results.length;
+      const shown = guided ? Math.min(3, data.results.length) : data.results.length;
+      $('result-total').textContent = data.needsClarification ? '' : `${total.toLocaleString()} consultants · ${shown} shown`;
+    }
+  }
+  function setExperience(value, { record = true } = {}) {
+    if (!['directory', 'guided'].includes(value)) return;
+    const turn = state.activeTurn; const previous = state.experience;
+    if (turn && previous !== value) decisionState(turn.data).positions[previous] = captureResultsPosition();
+    state.experience = value; syncExperienceButtons();
+    for (const item of state.turns) applyExperience(item.node, item.data);
+    if (turn) {
+      $('search-title').textContent = turn !== state.turns.at(-1) ? 'Earlier search' : value === 'guided' ? 'Your top options' : 'Consultants matching your search';
+      if (previous !== value) {
+        const position = decisionState(turn.data).positions[value] || { top: 0 };
+        if ($('workspace').hidden) navigation.resultsPosition = position; else restoreResultsPosition(position);
+      }
+    }
+    if (record && previous !== value) routeTo(navigation.screen, navigation.screen === 'profile' && matchSheet.entry ? { profileKey: `${matchSheet.entry.context.searchId}:${matchSheet.entry.person.id}` } : {});
+    syncComparison();
+  }
+  async function loadMore(data, node, button) {
+    const decision = decisionState(data); if (decision.pagePending || !data.nextCursor || state.busy) return;
+    decision.pagePending = true; node.querySelector('.page-error')?.remove(); button.disabled = true; button.dataset.loading = 'true'; button.textContent = 'Loading more profiles…';
+    const epoch = state.epoch;
+    try {
+      const response = await fetch('/api/search-results', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: data.sessionId, searchId: data.searchId, cursor: data.nextCursor }) });
+      const page = await response.json(); if (!response.ok) { const error = new Error(page.error || 'Could not load more profiles.'); error.status = response.status; throw error; }
+      if (epoch !== state.epoch) return;
+      const position = captureResultsPosition(); const ids = new Set(data.results.map(p => p.id));
+      const context = Object.freeze({ sessionId: data.sessionId, searchId: data.searchId, criteria: { ...data.criteria } });
+      for (const person of page.results) if (!ids.has(person.id)) { ids.add(person.id); data.results.push(person); node.querySelector('.consultant-list').append(consultantCard(person, data.results.length - 1, context)); }
+      data.nextCursor = page.nextCursor; applyExperience(node, data); syncComparison();
+      if (state.activeTurn?.data === data && !$('workspace').hidden) restoreResultsPosition(position);
+      button.textContent = 'Load more consultants'; announce('More profiles loaded. Your search and ranking are unchanged.');
+    } catch (error) {
+      const message = el('p', 'page-error', error.message); message.setAttribute('role', 'status'); node.querySelector('.result-controls').append(message);
+      if (error.status === 410) { data.nextCursor = null; button.hidden = true; const restart = el('button', 'text-button', 'Start a new search'); restart.type = 'button'; restart.addEventListener('click', reset); message.append(restart); }
+      else button.textContent = 'Try loading more again';
+      announce(error.message);
+    }
+    finally { decision.pagePending = false; button.dataset.loading = 'false'; button.disabled = state.busy; }
+  }
+  function toggleComparison(searchId, id) {
+    const data = state.turns.find(t => t.data.searchId === searchId)?.data; if (!data || state.busy) return;
+    const selection = decisionState(data).selected;
+    if (selection.has(id)) selection.delete(id);
+    else if (selection.size < 3) selection.add(id);
+    else { announce('You can compare up to three consultants. Remove one to add another.'); return; }
+    syncComparison();
+  }
+  function syncComparison() {
+    for (const turn of state.turns || []) {
+      const selection = decisionState(turn.data).selected;
+      turn.node.querySelectorAll('.compare-select').forEach(button => { const selected = selection.has(button.dataset.consultantId); button.setAttribute('aria-pressed', String(selected)); button.textContent = selected ? 'Selected' : 'Compare'; });
+    }
+    const count = state.activeTurn ? decisionState(state.activeTurn.data).selected.size : 0;
+    $('compare-tray').hidden = count === 0; $('compare-count').textContent = `${count} selected`;
+    $('compare-open').disabled = count < 2;
+  }
+  function comparisonRows(person, criteria) {
+    const source = person.evidenceUrl || person.profileUrl;
+    const interests = differentiator(person, { criteria });
+    const provenance = (field, value) => person.fieldProvenance?.[field]?.find(e => e.values?.includes(value))?.sourceUrl || source;
+    const rows = [
+      ['Relevant recorded interests', interests],
+      ['Specialty', [{ text: list(person.specialty).map(textValue).join(' · '), sourceUrl: source }]],
+      ['Selected recorded procedures', list(person.comparisonProcedures).slice(0, 4).map(value => ({ text: value.label, sourceUrl: value.sourceUrl }))],
+      ['Practice locations', list(person.locations).map(p => ({ text: typeof p === 'string' ? p : [p.name, p.city || p.postcode].filter(Boolean).join(' · '), sourceUrl: p.sourceUrl && !/[;\s]/.test(p.sourceUrl) ? p.sourceUrl : source }))]
+    ];
+    if (criteria.insurance) rows.push(['Insurance evidence', list(person.insuranceEvidence).filter(e => e.insurer?.toLowerCase() === criteria.insurance.toLowerCase()).map(e => ({ text: e.text, sourceUrl: e.sourceUrl || source }))]);
+    return rows;
+  }
+  function openComparison(data, { record = true } = {}) {
+    if (!data) return;
+    const decision = decisionState(data), ids = data.results.filter(p => decision.selected.has(p.id)).map(p => p.id); if (ids.length < 2) return;
+    const people = ids.map(id => data.results.find(p => p.id === id)); if (people.some(p => !p)) return;
+    comparisonView = { data, ids, key: JSON.stringify([...ids].sort()), epoch: state.epoch };
+    const host = $('compare-evidence'); host.replaceChildren();
+    $('compare-context').textContent = data.criteria.clinicalContext || [data.criteria.topic, ...list(data.criteria.procedures), data.criteria.specialty].filter(Boolean).join(' · ');
+    const headings = el('div', 'comparison-names'); headings.style.setProperty('--people', people.length);
+    people.forEach(person => { const cell = el('div', 'comparison-name'); cell.append(el('h3', '', person.name)); const profile = link('Spire profile ↗', person.profileUrl, 'comparison-source'); if (profile) cell.append(profile); headings.append(cell); }); host.append(headings);
+    const rows = people.map(person => comparisonRows(person, data.criteria));
+    rows[0].forEach(([title], index) => {
+      const row = el('section', 'comparison-row'); row.append(el('h3', 'comparison-row-title', title));
+      const cells = el('div', 'comparison-cells'); cells.style.setProperty('--people', people.length);
+      people.forEach((person, personIndex) => {
+        const cell = el('div', 'comparison-cell'); cell.append(el('p', 'comparison-mobile-name', person.name));
+        const facts = rows[personIndex][index][1].filter(f => f.text);
+        if (!facts.length) cell.append(el('p', 'comparison-unknown', 'Not confirmed in the available evidence'));
+        facts.forEach(fact => { const item = el('p', 'comparison-fact', fact.text); const evidence = link('Source ↗', fact.sourceUrl, 'comparison-source'); if (evidence) item.append(document.createTextNode(' '), evidence); cell.append(item); });
+        cells.append(cell);
+      }); row.append(cells); host.append(row);
+    });
+    const caveats = [...new Set(people.flatMap(p => fullCaveats({ person: p, context: { criteria: data.criteria } })))];
+    host.append(el('p', 'comparison-note', 'These are differences in recorded profiles, not ratings of clinical quality. Missing information does not mean a consultant lacks that experience. Procedure lists are not exhaustive; confirm current availability.'));
+    caveats.forEach(text => host.append(el('p', 'comparison-note', text)));
+    paintComparisonAnswer(); if (!$('compare-dialog').open) $('compare-dialog').showModal();
+    if (record) routeTo('comparison', { comparisonSearchId: data.searchId, comparisonIds: ids }, navigation.screen === 'comparison');
+  }
+  function paintComparisonAnswer() {
+    const view = comparisonView; if (!view || view.epoch !== state.epoch) return;
+    const decision = decisionState(view.data), answer = decision.answers.get(view.key), pending = decision.pending.has(view.key);
+    const host = $('compare-ai-content'); host.replaceChildren();
+    const button = $('compare-personalise'); button.disabled = pending;
+    button.hidden = Boolean(answer && !answer.retryable && answer.provider !== 'evidence');
+    button.textContent = pending ? 'Checking the differences against the sources…' : answer?.retryable ? 'Try the AI comparison again' : 'Explain these differences for me';
+    if (answer?.notice) host.append(el('p', 'comparison-note', answer.notice));
+    if (answer?.provider === 'evidence' && answer.retryable === false) button.hidden = true;
+    for (const difference of answer?.differences || []) {
+      const index = Number(difference.consultantId.slice(1)) - 1;
+      const personId = answer.consultantIds?.[index]; const person = view.data.results.find(p => p.id === personId); if (!person) continue;
+      const section = el('section', 'comparison-explanation'); section.append(el('h3', '', person.name), el('p', '', difference.text));
+      difference.evidenceIds.forEach(id => { const fact = answer.citations?.find(c => c.id === id); if (fact) { const citation = link('Supporting record ↗', fact.sourceUrl, 'comparison-source'); if (citation) { citation.title = fact.text; section.append(citation); } } }); host.append(section);
+    }
+  }
+  async function personaliseComparison() {
+    const view = comparisonView; if (!view) return;
+    const decision = decisionState(view.data); if (decision.pending.has(view.key)) return;
+    const controller = new AbortController(); state.explanationControllers.add(controller);
+    const timeout = window.setTimeout(() => controller.abort(), 45000); decision.pending.set(view.key, controller); paintComparisonAnswer();
+    try {
+      const response = await fetch('/api/comparison-explanation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: view.data.sessionId, searchId: view.data.searchId, consultantIds: view.ids }), signal: controller.signal });
+      const answer = await response.json(); if (!response.ok) throw new Error(answer.error || 'The comparison could not be prepared.');
+      if (!Array.isArray(answer.differences) || !Array.isArray(answer.citations)) throw new Error('The comparison response was incomplete.');
+      if (view.epoch === state.epoch) decision.answers.set(view.key, answer);
+    } catch (error) {
+      if (view.epoch === state.epoch) decision.answers.set(view.key, { provider: 'evidence', differences: [], retryable: true, notice: controller.signal.aborted ? 'This took longer than expected. Your sourced comparison is still available.' : error.message });
+    } finally {
+      window.clearTimeout(timeout); state.explanationControllers.delete(controller); decision.pending.delete(view.key);
+      if (comparisonView?.data === view.data && comparisonView.key === view.key) paintComparisonAnswer();
+    }
   }
 
   function consultantCard(person, index, searchContext) {
@@ -867,17 +1049,23 @@
     if (practical.childElementCount) article.append(practical);
     const focus = differentiator(person, searchContext);
     if (focus.length) {
-      const note = el('div', 'card-differentiator'); note.append(el('span', 'card-focus-label', 'Profile includes'));
+      const note = el('div', 'card-differentiator'); note.append(el('span', 'card-focus-label', 'Why consider this consultant?'));
+      note.append(el('p', 'card-context-reason', contextualReason(person, searchContext)));
       const details = el('ul', 'card-focus-list'); focus.forEach(item => details.append(el('li', 'card-focus-text', item.text))); note.append(details); article.append(note);
     }
     const relevance = conciseProfileRelevance(person, searchContext) || (!focus.length ? profileSentences(person.description)[0] : '');
-    if (relevance) article.append(el('p', 'card-match-summary', relevance));
+    if (!focus.length && relevance) article.append(el('p', 'card-match-summary', relevance));
     const actions = el('div', 'card-actions');
     const view = el('button', 'view-consultant explanation-toggle', 'View consultant'); view.type = 'button'; view.id = `explanation-toggle-${++explanationNumber}`; view.setAttribute('aria-haspopup', 'dialog'); view.setAttribute('aria-controls', 'match-dialog'); view.setAttribute('aria-expanded', 'false'); view.setAttribute('aria-label', `View ${person.name || 'this consultant'}’s profile and match explanation`); view.append(icon('chevron'));
     const disclosure = el('span', 'sr-only', 'Opens the profile and prepares an explanation using your search and linked profile evidence.'); disclosure.id = `${view.id}-disclosure`; view.setAttribute('aria-describedby', disclosure.id);
-    const entry = { person, context: searchContext, epoch: state.epoch, button: view, cached: null, pending: null, error: null,
+    const registry = state.profileEntries ||= new Map(); const entryKey = `${searchContext.searchId}:${person.id}`;
+    const entry = registry.get(entryKey) || { person, context: searchContext, epoch: state.epoch, button: view, cached: null, pending: null, error: null,
       request: Object.freeze({ sessionId: searchContext.sessionId, searchId: searchContext.searchId, consultantId: person.id }) };
+    registry.set(entryKey, entry); entry.button = view;
+    const compare = el('button', 'compare-select', 'Compare'); compare.type = 'button'; compare.dataset.consultantId = person.id; compare.setAttribute('aria-pressed', 'false'); compare.setAttribute('aria-label', `Compare ${person.name}`);
+    compare.addEventListener('click', () => toggleComparison(searchContext.searchId, person.id)); actions.append(compare);
     view.addEventListener('click', () => openMatchSheet(entry, { explain: true, trigger: view })); actions.append(view, disclosure);
+    const evidenceLink = link('Source ↗', person.evidenceUrl || person.profileUrl, 'card-source-link'); if (evidenceLink) actions.append(evidenceLink);
     article.addEventListener('click', event => {
       if (event.defaultPrevented || (event.button !== undefined && event.button !== 0) || state.busy || view.disabled) return;
       if (event.target.closest('button, a, input, textarea, select, summary, details, [contenteditable="true"]')) return;
@@ -893,34 +1081,44 @@
     const notice = (text) => { const node = el('div', 'notice'); node.append(icon('info'), el('span', '', text)); return node; };
     clarifications.forEach((text) => turn.append(notice(text)));
     const results = data.results;
+    const intro = el('div', 'guided-intro'); intro.append(el('p', 'guided-eyebrow', 'A closer look at your top options'), el('p', '', 'The first profiles in your search, with recorded interests to help you compare.')); intro.hidden = state.experience !== 'guided' || !results.length; turn.append(intro);
     if (results.length) {
       const cards = el('div', 'consultant-list');
       const context = Object.freeze({ sessionId: data.sessionId, searchId: data.searchId, criteria: { ...(data.criteria || {}) } });
       results.forEach((person, index) => cards.append(consultantCard(person, index, context)));
       turn.append(cards);
+      const controls = el('div', 'result-controls');
+      const more = el('button', 'load-more', 'Load more consultants'); more.type = 'button'; more.addEventListener('click', () => loadMore(data, turn, more)); controls.append(more);
+      const browse = el('button', 'browse-directory', 'Explore all matching consultants'); browse.type = 'button'; browse.addEventListener('click', () => setExperience('directory')); controls.append(browse);
+      const compareTop = el('button', 'compare-top', 'Compare these profiles'); compareTop.type = 'button'; compareTop.addEventListener('click', () => { decisionState(data).selected = new Set(data.results.slice(0, 3).map(p => p.id)); syncComparison(); openComparison(data); }); controls.prepend(compareTop);
+      turn.append(controls);
     } else {
       const empty = el('div', 'empty-state');
-      empty.append(icon('search'), el('h2', '', 'A little more room to search?'), el('p', '', 'No matches for these preferences. Try a wider area or remove a filter.'));
-      empty.append(suggestionActions(data.suggestions)); turn.append(empty);
+      empty.append(icon('search'), el('h2', '', data.needsClarification ? 'What would you like help with?' : 'A little more room to search?'), el('p', '', data.needsClarification ? 'Describe a symptom, a diagnosis, a treatment you’re considering, or something you’d like to get back to.' : 'No matches for these preferences. Try a wider area or remove a filter.'));
+      if (!data.needsClarification) empty.append(suggestionActions(data.suggestions)); turn.append(empty);
     }
     const notices = list(data.notices).map((item) => typeof item === 'string' ? item : item.message || item.text).filter(Boolean);
     const notes = el('div', 'search-notes');
     [...new Set(notices)].filter((text) => !clarifications.includes(text)).forEach((text) => notes.append(notice(text)));
     if (notes.childElementCount) turn.append(notes);
+    applyExperience(turn, data);
     return turn;
   }
 
   function showTurn(turn, scroll = false) {
     if (!turn) return;
     closeMatchSheet({ immediate: true, restoreFocus: false });
+    if (!$('compare-dialog').open || navigation.screen !== 'comparison') { $('compare-dialog').close(); comparisonView = null; }
     state.activeTurn = turn;
     const preview = turn !== state.turns.at(-1);
     state.turns.forEach((entry) => { entry.node.hidden = entry !== turn; });
     $('history-preview').hidden = !preview;
     $('search-error').hidden = preview;
-    $('search-title').textContent = preview ? 'Earlier shortlist' : 'Your shortlist';
+    $('search-title').textContent = preview ? 'Earlier search' : state.experience === 'guided' ? 'Your top options' : 'Consultants matching your search';
     const total = Number.isFinite(turn.data.total) ? turn.data.total : Number.isFinite(turn.data.totalMatches) ? turn.data.totalMatches : turn.data.results.length;
     $('result-total').textContent = total.toLocaleString() + (total === 1 ? ' consultant' : ' consultants') + (total > turn.data.results.length ? ' · ' + turn.data.results.length + ' shown' : '');
+    applyExperience(turn.node, turn.data);
+    syncComparison();
     renderCriteria(turn.labels, preview);
     setBusy(state.busy);
     if (scroll) {
@@ -1020,7 +1218,7 @@
       else navigation.resultsPosition = position;
       $('view-updated-matches').hidden = state.turns.length < 2;
       renderSubmittedMessage(message);
-      announce((data.message || 'Your shortlist is ready.') + ' ' + data.results.length + ' profiles displayed.');
+      announce((data.message || 'Your shortlist is ready.') + ' ' + (state.experience === 'guided' ? Math.min(3, data.results.length) : data.results.length) + ' profiles displayed.');
     } catch (error) {
       if (epoch !== state.epoch || state.controller !== controller) return;
       skeleton?.remove(); $('search-status').replaceChildren();
@@ -1062,12 +1260,26 @@
   $('landing-form').addEventListener('submit', (event) => { event.preventDefault(); startSearch($('initial-query').value); });
   $('followup-form').addEventListener('submit', (event) => { event.preventDefault(); send({ message: $('followup-query').value }, $('followup-query').value); });
   document.querySelectorAll('[data-query]').forEach((button) => button.addEventListener('click', () => startSearch(button.dataset.query)));
+  $('directory-view').addEventListener('click', () => setExperience('directory'));
+  $('guided-view').addEventListener('click', () => setExperience('guided'));
+  $('compare-open').addEventListener('click', () => openComparison(state.activeTurn?.data));
+  $('compare-clear').addEventListener('click', () => { if(state.activeTurn) decisionState(state.activeTurn.data).selected.clear(); syncComparison(); });
+  $('compare-close').addEventListener('click', () => $('compare-dialog').close());
+  $('compare-dialog').addEventListener('close', () => {
+    if (navigation.restoring || navigation.screen !== 'comparison') return;
+    navigation.screen = 'results';
+    if (history.back) { navigation.pendingTraversal = { after: null }; history.back(); } else routeTo('results', {}, true);
+  });
+  $('compare-personalise').addEventListener('click', () => personaliseComparison());
+  syncExperienceButtons();
   $('new-search').addEventListener('click', reset);
   $('brand-home').addEventListener('click', () => showHome());
   $('back-search').addEventListener('click', () => { if (history.back && navigation.screen === 'results') history.back(); else showHome(); });
   $('resume-search').addEventListener('click', () => resumeSearch());
   $('view-updated-matches').addEventListener('click', showUpdatedMatches);
   document.addEventListener('click', (event) => {
+    const demoEntry = event.target.closest?.('[data-demo-experience]');
+    if (demoEntry && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button <= 0) { event.preventDefault(); setExperience(demoEntry.dataset.demoExperience, { record: false }); if (state.turns.length) resumeSearch(); else showHome(); return; }
     const anchor = event.target.closest?.('#healthcare-open, #healthcare-return');
     if (!anchor || event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();

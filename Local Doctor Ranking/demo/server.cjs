@@ -6,6 +6,7 @@ const {performance}=require('node:perf_hooks');
 const {SearchEngine}=require('./search.cjs');
 const {criteriaLabels}=require('./criteria.cjs');
 const {explanationSnapshot,createMatchExplainer}=require('./match-explanation.cjs');
+const {comparisonSnapshot,createComparisonExplainer}=require('./comparison-explanation.cjs');
 const {createQueryInterpreter}=require('./query-interpreter.cjs');
 // Only static metric names and finite durations/counts enter this diagnostic
 // header. Search text, identifiers and provider responses are never included.
@@ -17,7 +18,7 @@ async function timed(res,name,operation) {
   try {return await operation();}
   finally {serverTiming(res,name,performance.now()-started);}
 }
-function createApp(engine,{explainMatch=createMatchExplainer(),interpretQuery=createQueryInterpreter(),publicOrigin=process.env.PUBLIC_ORIGIN,publicOrigins=process.env.PUBLIC_ORIGINS,trustProxy=process.env.TRUST_PROXY==='1',limits={},clock=Date.now}={}) {
+function createApp(engine,{explainMatch=createMatchExplainer(),explainComparison=createComparisonExplainer(),interpretQuery=createQueryInterpreter(),publicOrigin=process.env.PUBLIC_ORIGIN,publicOrigins=process.env.PUBLIC_ORIGINS,trustProxy=process.env.TRUST_PROXY==='1',limits={},clock=Date.now}={}) {
   const app=express(); const sessions=new Map(); const requests=new Map();
   const budget={concurrent:2,concurrentSearches:2,sessionGenerations:24,ipGenerationsPerHour:60,globalGenerationsPerHour:200,cardAttempts:3,sessionInterpretations:40,ipInterpretationsPerHour:120,globalInterpretationsPerHour:400,...limits};
   let activeGenerations=0; let activeSearches=0; let globalWindow={start:clock(),count:0,interpretations:0};
@@ -74,43 +75,84 @@ function createApp(engine,{explainMatch=createMatchExplainer(),interpretQuery=cr
     try {
       const parsed=await timed(res,'interpretation',()=>interpretQuery(interpretationInput));
       if(parsed.mode==='clarification') return res.status(422).json({error:parsed.notices.join(' ') || 'Please name the condition or procedure you want to search for. Your existing preferences are unchanged.',clarifications:parsed.notices});
+      const anchored=Boolean(parsed.criteria.topic?.trim() || parsed.criteria.specialty || parsed.criteria.procedures?.length);
+      if(!anchored) {
+        session.criteria=parsed.criteria;
+        session.updated=now;
+        return res.json({sessionId:id,searchId:randomUUID(),criteria:removeCriterion?parsed.criteria:session.criteria,
+          criteriaLabels:criteriaLabels(removeCriterion?parsed.criteria:session.criteria),results:[],total:0,needsClarification:true,
+          message:'What would you like help with? You can describe a symptom, diagnosis, treatment you are considering, or something you would like to get back to.',notices:[],clarifications:[]});
+      }
       const response=await timed(res,'search',()=>engine.search(parsed.criteria));
       session.criteria=parsed.criteria; session.updated=now;
       const searchId=randomUUID();
-      const snapshot={results:new Map(response.results.slice(0,6).map(result=>[result.id,explanationSnapshot(parsed.criteria,result)])),cache:new Map(),pending:new Map(),attempts:new Map()};
+      const snapshot={searchSnapshot:response.searchSnapshot,criteria:structuredClone(parsed.criteria),total:response.total,cursors:new Map(),pages:new Map(),pagePending:new Map(),results:new Map(response.results.slice(0,6).map(result=>[result.id,explanationSnapshot(parsed.criteria,result)])),cache:new Map(),pending:new Map(),attempts:new Map()};
       session.snapshots.set(searchId,snapshot);
       while(session.snapshots.size>10) session.snapshots.delete(session.snapshots.keys().next().value);
-      const {diagnostics,...publicResponse}=response;
+      let nextCursor=null;
+      if(response.searchSnapshot && response.total>6) {nextCursor=randomUUID();snapshot.cursors.set(nextCursor,6);}
+      const {diagnostics,searchSnapshot,...publicResponse}=response;
       const labels=criteriaLabels(parsed.criteria);
       if(parsed.criteria.clinicalContext) labels.push({key:'clinicalContext',label:`You shared: ${parsed.criteria.clinicalContext}`});
-      res.set('Cache-Control','no-store').json({sessionId:id,searchId,criteria:parsed.criteria,criteriaLabels:labels,...publicResponse,queryInterpretation:{mode:parsed.mode||'deterministic'},
+      res.set('Cache-Control','no-store').json({sessionId:id,searchId,criteria:parsed.criteria,criteriaLabels:labels,...publicResponse,nextCursor,queryInterpretation:{mode:parsed.mode||'deterministic'},
         clarifications:parsed.notices,notices:[...parsed.notices,...response.notices],sourceLabel:engine.sourceLabel});
     } catch(e) { console.error('[DocMap] Search failed:',e.name); res.status(500).json({error:'Search couldn’t complete. Please try again; your previous criteria are preserved.'}); }
     finally {session.busy=false;activeSearches--;}
   });
-  app.post('/api/match-explanation',async(req,res)=>{
+  app.post('/api/search-results',async(req,res)=>{
+    const state=prepare(req,res,'chat'); if(!state) return;
+    const body=req.body;
+    if(!body || Object.keys(body).sort().join(',')!=='cursor,searchId,sessionId' || Object.values(body).some(v=>typeof v!=='string'||!v||v.length>200)) return res.status(400).json({error:'Provide the search and continuation cursor.'});
+    const session=sessions.get(body.sessionId),snapshot=session?.snapshots.get(body.searchId);
+    if(!snapshot || !snapshot.searchSnapshot || snapshot.searchSnapshot.records!==engine.records) return res.status(410).json({error:'This search has expired. Start a new search to continue.'});
+    const offset=snapshot.cursors.get(body.cursor);
+    if(offset===undefined) return res.status(400).json({error:'This continuation cursor does not belong to that search.'});
+    session.updated=state.now;
+    if(snapshot.pages.has(body.cursor)) return res.json(snapshot.pages.get(body.cursor));
+    try {
+      if(!snapshot.pagePending.has(body.cursor)) {
+        if(activeSearches>=budget.concurrentSearches) return res.status(429).json({error:'Other searches are loading. Please retry.'});
+        activeSearches++;
+        const pending=Promise.resolve().then(()=>engine.resultsPage(snapshot.searchSnapshot,offset)).then(page=>{
+          for(const result of page.results) snapshot.results.set(result.id,explanationSnapshot(snapshot.criteria,result));
+          let nextCursor=null;
+          if(offset+page.results.length<snapshot.total) {nextCursor=randomUUID();snapshot.cursors.set(nextCursor,offset+page.results.length);}
+          const answer={results:page.results,total:snapshot.total,nextCursor};snapshot.pages.set(body.cursor,answer);return answer;
+        }).finally(()=>{snapshot.pagePending.delete(body.cursor);activeSearches--;});
+        snapshot.pagePending.set(body.cursor,pending);
+      }
+      res.json(await snapshot.pagePending.get(body.cursor));
+    } catch {res.status(503).json({error:'More profiles could not be loaded. Please retry.'});}
+  });
+  app.post(['/api/match-explanation','/api/comparison-explanation'],async(req,res)=>{
     const state=prepare(req,res,'explanation'); if(!state) return;
     const body=req.body;
-    if(!body || typeof body!=='object' || Array.isArray(body) || Object.keys(body).sort().join(',')!=='consultantId,searchId,sessionId' || [body.sessionId,body.searchId,body.consultantId].some(value=>typeof value!=='string' || !value || value.length>200)) return res.status(400).json({error:'Provide the conversation, search and consultant identifiers from a search result.'});
-    const session=sessions.get(body.sessionId);
-    const snapshot=session?.snapshots.get(body.searchId);
+    const comparison=req.path==='/api/comparison-explanation';
+    const expected=comparison?'consultantIds,searchId,sessionId':'consultantId,searchId,sessionId';
+    if(!body || typeof body!=='object' || Array.isArray(body) || Object.keys(body).sort().join(',')!==expected || [body.sessionId,body.searchId].some(v=>typeof v!=='string'||!v||v.length>200)) return res.status(400).json({error:'Provide identifiers from the search results.'});
+    const ids=comparison?body.consultantIds:[body.consultantId];
+    if(!Array.isArray(ids) || (comparison && (ids.length<2||ids.length>3)) || ids.some(v=>typeof v!=='string'||!v||v.length>200) || new Set(ids).size!==ids.length) return res.status(400).json({error:'Choose two or three distinct consultants from this search.'});
+    const session=sessions.get(body.sessionId),snapshot=session?.snapshots.get(body.searchId);
     if(!snapshot) return res.status(410).json({error:'This search has expired. Run the search again to explain its matches.'});
-    const context=snapshot.results.get(body.consultantId);
-    if(!context) return res.status(404).json({error:'This consultant was not returned by that search.'});
+    if(ids.some(id=>!snapshot.results.has(id))) return res.status(404).json({error:'This consultant was not returned by that search.'});
+    const sorted=[...ids].sort();
+    const context=comparison?comparisonSnapshot(sorted.map(id=>snapshot.results.get(id))):snapshot.results.get(ids[0]);
+    const key=comparison?'comparison:'+JSON.stringify(sorted):ids[0];
+    const explain=comparison?explainComparison:explainMatch;
     session.updated=state.now;
     const cacheStarted=performance.now();
-    if(snapshot.cache.has(body.consultantId)) {
-      const answer=snapshot.cache.get(body.consultantId);
+    if(snapshot.cache.has(key)) {
+      const answer=snapshot.cache.get(key);
       serverTiming(res,'cache',performance.now()-cacheStarted);
       return res.json(answer);
     }
-    if(snapshot.pending.has(body.consultantId)) return res.json(await timed(res,'dedup',()=>snapshot.pending.get(body.consultantId)));
-    const attempts=snapshot.attempts.get(body.consultantId)||0;
-    const paid=explainMatch.configured===true;
+    if(snapshot.pending.has(key)) return res.json(await timed(res,'dedup',()=>snapshot.pending.get(key)));
+    const attempts=snapshot.attempts.get(key)||0;
+    const paid=explain.configured===true;
     if(activeGenerations>=budget.concurrent) return res.set('Retry-After','5').status(429).json({error:'Other explanations are being prepared. Please retry in a few seconds.'});
     if(paid && (attempts>=budget.cardAttempts || session.generations>=budget.sessionGenerations || state.rate.generations>=budget.ipGenerationsPerHour || globalWindow.count>=budget.globalGenerationsPerHour)) return res.set('Retry-After','3600').status(429).json({error:'The demo’s AI explanation limit has been reached. The sourced profile evidence remains available.'});
     if(paid) {session.generations++;state.rate.generations++;globalWindow.count++;}
-    snapshot.attempts.set(body.consultantId,attempts+1); activeGenerations++;
+    snapshot.attempts.set(key,attempts+1); activeGenerations++;
     const phases={draft:{durationMs:0,calls:0},check:{durationMs:0,calls:0}}; const measured=new Set();
     const onTiming=event=>{
       if(!event || !['draft','check'].includes(event.phase) || ![1,2].includes(event.attempt) || !['ok','error'].includes(event.outcome)
@@ -119,19 +161,20 @@ function createApp(engine,{explainMatch=createMatchExplainer(),interpretQuery=cr
       phases[event.phase].durationMs+=event.durationMs; phases[event.phase].calls++;
     };
     const addPhaseTimings=()=>{for(const phase of ['draft','check']) if(phases[phase].calls) serverTiming(res,`ai_${phase}`,phases[phase].durationMs,phases[phase].calls);};
-    const pending=Promise.resolve().then(()=>explainMatch(context,{onTiming})).then(answer=>{
-      if(!answer.retryable) snapshot.cache.set(body.consultantId,answer);
+    const pending=Promise.resolve().then(()=>explain(context,{onTiming})).then(answer=>{
+      if(comparison) answer={...answer,consultantIds:sorted};
+      if(!answer.retryable) snapshot.cache.set(key,answer);
       return answer;
-    }).finally(()=>{snapshot.pending.delete(body.consultantId);activeGenerations--;});
-    snapshot.pending.set(body.consultantId,pending);
+    }).finally(()=>{snapshot.pending.delete(key);activeGenerations--;});
+    snapshot.pending.set(key,pending);
     try {const answer=await timed(res,'explanation',()=>pending);addPhaseTimings();res.json(answer);}
     catch {addPhaseTimings();res.status(503).json({error:'The explanation could not be prepared. Please retry.'});}
   });
   app.use('/api',(_req,res)=>res.status(404).json({error:'Endpoint not found.'}));
-  app.get('/for-healthcare-teams',async(_req,res,next)=>{
+  app.get(['/for-healthcare-teams','/directory','/guided'],async(req,res,next)=>{
     try {
       const shell=await require('node:fs/promises').readFile(path.join(__dirname,'../public/index.html'),'utf8');
-      res.type('html').send(shell.replace('<html lang="en">','<html lang="en" data-entry="healthcare">'));
+      res.type('html').send(shell.replace('<html lang="en">',`<html lang="en" data-entry="${req.path==='/for-healthcare-teams'?'healthcare':req.path.slice(1)}">`));
     } catch(error) {next(error);}
   });
   app.use(express.static(path.join(__dirname,'../public'),{index:'index.html',dotfiles:'deny'}));

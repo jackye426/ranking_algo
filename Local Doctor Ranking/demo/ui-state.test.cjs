@@ -40,7 +40,7 @@ const data=(searchId,insurance=null,total=104)=>({sessionId:'session',searchId,c
 test('frontend preserves search state and owns explanation requests across sheet, history and reset',async()=>{
  $('initial-query').value='Find knee London';$('landing-form').requestSubmit();assert.equal(requests.length,1);requests.at(-1).resolve(data('s1'));await flush();
  assert.equal(visible().length,1);assert.equal(requests.filter(r=>r.url==='/api/match-explanation').length,0);
- assert.equal(visible()[0].querySelectorAll('.profile-details').length,0);assert.match(visible()[0].textContent,/Profile includes.*Knee replacement/);
+ assert.equal(visible()[0].querySelectorAll('.profile-details').length,0);assert.match(visible()[0].textContent,/Why consider this consultant.*Knee replacement/);
  let why=visible()[0].querySelector('.explanation-toggle');why.click();let pending=requests.at(-1);
  assert.equal($('match-dialog').open,true);assert.equal(pending.url,'/api/match-explanation');assert.equal(pending.body.searchId,'s1');assert.equal($('sheet-close'),document.activeElement);
  why.click();assert.equal(requests.at(-1),pending);assert.match($('sheet-content').textContent,/Personalising your explanation/);assert.match($('sheet-caveats').textContent,/Not fee assured/);assert.match($('sheet-content').textContent,/Why this could be a match.*From profile evidence.*A source-based summary/);assert.doesNotMatch($('sheet-content').textContent,/AI-generated explanation/);assert.equal($('sheet-content').querySelectorAll('.sheet-skeleton').length,0);

@@ -25,6 +25,7 @@ function explanationSnapshot(criteria,result) {
       entries.push({text:'Profile lists: '+clean(text),sourceUrl:source,criterion:'Relevant profile detail',kind:'profile'});
     }
   }
+  for(const fact of (result.comparisonProcedures || []).slice(0,4)) entries.push({text:fact.text,sourceUrl:fact.sourceUrl,criterion:fact.label,kind:'profile'});
   if(consultant.name && safeSource(evidenceUrl)) entries.push({text:consultant.name+(consultant.specialty?' is listed as '+consultant.specialty:' is the named consultant on this profile')+'.',sourceUrl:evidenceUrl,criterion:'Consultant identity',kind:'profile'});
   const profile=deduplicateCitations(entries).filter(c=>c.text && safeSource(c.sourceUrl)).slice(0,16)
     .map((c,i)=>({...c,id:'e'+(i+1),text:c.text.slice(0,1600)}));
@@ -103,15 +104,15 @@ function parseResponse(response) {
   if(response?.output?.some(item=>item.content?.some(content=>content.type==='refusal'))) throw new Error('ModelRefusal');
   return JSON.parse(response.output_text);
 }
-async function structuredResponse(client,provider,body,{signal}) {
-  if(provider!=='openrouter') return client.responses.create(body,{signal});
+async function structuredResponse(client,provider,body,{signal,timeout}) {
+  if(provider!=='openrouter') return client.responses.create(body,{signal,...(timeout?{timeout}:{})});
   const {name,strict,schema}=body.text.format;
   const response=await client.chat.completions.create({model:body.model,temperature:body.temperature,max_tokens:body.max_output_tokens,
     messages:[{role:'system',content:body.instructions},{role:'user',content:body.input}],
     response_format:{type:'json_schema',json_schema:{name,strict,schema}},
     ...(/^deepseek\//.test(body.model)?{reasoning:{enabled:false}}:{}),
     provider:openRouterProvider(body.model,{check:name==='explanation_support_check'}),
-  },{signal});
+  },{signal,...(timeout?{timeout}:{})});
   const choice=response.choices?.[0];
   if(choice?.message?.refusal) throw new Error('ModelRefusal');
   if(choice?.finish_reason!=='stop') throw new Error('IncompleteResponse');
@@ -175,4 +176,4 @@ function createMatchExplainer({client=explanationClient(),provider=process.env.O
   explain.configured=!!client;explain.provider=client?provider:'evidence';explain.model=client?model:null;
   return explain;
 }
-module.exports={explanationSnapshot,evidenceFallback,validateDraft,createMatchExplainer};
+module.exports={explanationSnapshot,evidenceFallback,validateDraft,createMatchExplainer,structuredResponse,parseResponse};

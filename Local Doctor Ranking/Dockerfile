@@ -29,10 +29,10 @@ COPY package.json package-lock.json bm25Service.cjs location-filter.js ./
 COPY demo/server.cjs demo/search.cjs demo/models.cjs demo/geo.cjs \
     demo/data-source.cjs demo/supabase-reader.cjs demo/supabase-mapper.cjs \
     demo/criteria.cjs demo/query-interpreter.cjs demo/clinical-filters.cjs demo/personalized-match.cjs \
-    demo/match-explanation.cjs demo/evidence-page.cjs ./demo/
+    demo/match-explanation.cjs demo/comparison-explanation.cjs demo/evidence-page.cjs ./demo/
 COPY demo/data/public-spire-records.cjs ./demo/data/public-spire-records.cjs
 COPY public/index.html public/styles.css public/app.js public/profiles.css public/walkthrough.css public/walkthrough.js public/healthcare.css public/healthcare.js ./public/
-COPY public/comparison-data.js public/comparison.js public/comparison.css ./public/
+COPY public/decision.css public/comparison-data.js public/comparison.js public/comparison.css ./public/
 COPY public/brand/docmap-logo.jpg ./public/brand/docmap-logo.jpg
 COPY public/fonts/inter-variable.ttf public/fonts/OFL-Inter.txt ./public/fonts/
 # Live records and their fingerprint-checked embedding index are generated at

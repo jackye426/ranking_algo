@@ -59,8 +59,8 @@ test('profile essentials and expanded reading state survive AI loading, success,
 
 test('the single primary card action opens immediately with AI, while history restoration does not request it',()=>{
   const {runtime:r,$,loads}=harness();const card=r.consultantCard(consultant,0,{criteria:{topic:'knee'},sessionId:'session',searchId:'search'});
-  assert.equal(card.querySelectorAll('.card-focus-text').length,3);assert.match(card.textContent,/listed practice/);assert.match(card.textContent,/A grounded summary/);
-  const view=card.querySelector('.view-consultant');assert.equal(card.querySelectorAll('button').length,1);view.click();const first=r.matchSheet.entry;
+  assert.equal(card.querySelectorAll('.card-focus-text').length,1);assert.match(card.textContent,/listed practice/);assert.match(card.textContent,/Why consider this consultant/);
+  const view=card.querySelector('.view-consultant');assert.equal(card.querySelectorAll('.view-consultant').length,1);view.click();const first=r.matchSheet.entry;
   assert.equal(r.matchSheet.dialog.open,true);assert.equal(loads.length,1);assert.equal(r.matchSheet.returnFocus,view);assert.match($('sheet-content').textContent,/Practice locations/);
   r.closeMatchSheet();r.openMatchSheet(first,{explain:false});assert.equal(r.matchSheet.entry,first);assert.equal(loads.length,1);assert.equal(loads[0],first);assert.equal(r.matchSheet.returnFocus,view);assert.equal(loads[0].request.searchId,'search');assert.equal(loads[0].request.consultantId,'example');
 });
@@ -95,7 +95,7 @@ test('malformed display fragments are withheld without losing valid short clinic
 test('card and initial Why relevance use a complete clinical sentence without duplicate summary sections',()=>{
   const {runtime:r,$}=harness();const summary='Dr Example is an orthopaedic surgeon whose profile includes knee replacement. That connects with your knee search and gives you a specific area of practice to discuss, without assuming which treatment would be right for you. The nearest listed Spire practice is about 4.2 miles away in a straight line.';
   const person={...consultant,personalizedMatch:{...consultant.personalizedMatch,summary}};
-  const card=r.consultantCard(person,0,{criteria:{topic:'knee'}});const concise=card.querySelector('.card-match-summary').textContent;
+  const card=r.consultantCard(person,0,{criteria:{topic:'knee'}});const concise=r.conciseProfileRelevance(person,{criteria:{topic:'knee'}});
   assert.equal(concise,'The profile includes knee replacement.');assert.doesNotMatch(concise,/Dr Example|That connects|nearest|\.\.\.|…/);
   const selected=entry(person);r.matchSheet.entry=selected;r.renderSheet(selected);
   const profile=$('sheet-content').querySelector('.consultant-profile');assert.equal(profile.children[0].classList.contains('profile-about'),true);assert.equal(profile.querySelector('.profile-full-summary'),null);assert.equal($('sheet-content').querySelector('.sheet-preview').textContent,'From profile evidenceThe profile includes knee replacement.');
@@ -129,7 +129,7 @@ test('the Rahij Anwar source corruption stays in evidence and falls back to an i
     description:`I am a highly-qualified Consultant Orthopaedic and Trauma Surgeon with over 20 years of experience in various capacities and have been a consultant for over seven years. ${clinical}`,
     personalizedMatch:{summary:'Mr Rahij Anwar has a profile that includes yGene.',citations:[{text:'Record lists: yGene',sourceUrl:'/sources/supabase-c-4752679',criterion:'Clinical interest'}]}};
   assert.equal(r.profileHighlights(person,{criteria:{topic:'knee'}},3).length,0);
-  const card=r.consultantCard(person,0,{criteria:{topic:'knee'}});assert.doesNotMatch(card.textContent,/yGene|thopaedicsâ|highly-qualified/);assert.equal(card.querySelector('.card-match-summary').textContent,clinical);
+  const card=r.consultantCard(person,0,{criteria:{topic:'knee'}});assert.doesNotMatch(card.textContent,/yGene|thopaedicsâ|highly-qualified/);assert.equal(r.conciseProfileRelevance(person,{criteria:{topic:'knee'}}),clinical);
   const selected=entry(person);r.matchSheet.entry=selected;r.renderSheet(selected);assert.equal($('sheet-content').querySelector('.profile-clinical'),null);
   r.validCitations=value=>value||[];r.fullCaveats=()=>[];r.sourceLabel=()=> 'Source';vm.runInContext(section('  function renderSheetSources(', '  function renderSheetCaveats('),r);r.renderSheetSources(selected);
   for(const text of raw)assert.ok($('sheet-provenance').textContent.includes(text),text);
@@ -139,7 +139,7 @@ test('the Rahij Anwar source corruption stays in evidence and falls back to an i
 
 test('whole-card activation delegates once to its native button and leaves links and selected text independent',()=>{
   const {runtime:r,loads}=harness();const card=r.consultantCard(consultant,0,{criteria:{topic:'knee'},sessionId:'session',searchId:'search'});
-  assert.equal(card.getAttribute('role'),undefined);assert.equal(card.getAttribute('tabindex'),undefined);assert.equal(card.querySelectorAll('button').length,1);
+  assert.equal(card.getAttribute('role'),undefined);assert.equal(card.getAttribute('tabindex'),undefined);assert.equal(card.querySelectorAll('.view-consultant').length,1);
   const sourceLink=new Element('a'),linkIcon=new Element('svg');sourceLink.append(linkIcon);card.append(sourceLink);linkIcon.click();assert.equal(loads.length,0);
   r.window.getSelection=()=>({isCollapsed:false,toString:()=> 'selected profile words'});card.click();assert.equal(loads.length,0);
   r.window.getSelection=()=>({isCollapsed:true,toString:()=> ''});r.state.busy=true;card.click();assert.equal(loads.length,0);r.state.busy=false;

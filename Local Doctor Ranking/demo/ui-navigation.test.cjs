@@ -94,7 +94,7 @@ function harness({pathname='/'}={}) {
   const requests=[];
   const fetch=(url,options)=>{
     if(url==='/api/health')return Promise.resolve({ok:true,json:async()=>({ready:true,recordCount:4031})});
-    assert.ok(['/api/chat','/api/match-explanation'].includes(url),'Unexpected offline transport request: '+url);
+    assert.ok(['/api/chat','/api/match-explanation','/api/search-results','/api/comparison-explanation'].includes(url),'Unexpected offline transport request: '+url);
     return new Promise((resolve,reject)=>requests.push({url,options,body:JSON.parse(options.body),reject,
       resolve:(body,status=200)=>resolve({ok:status>=200&&status<300,status,headers:{get:()=>null},json:async()=>body})}));
   };
@@ -294,7 +294,7 @@ test('healthcare navigation preserves an in-flight search, draft and focus throu
   assert.equal(h.$('healthcare-view').hidden,false);assert.equal(h.$('workspace').hidden,true);assert.equal(h.document.activeElement,focus);assert.equal(h.$('followup-query').value,'Closer to SW5');
   const count=h.requests.length;h.$('healthcare-return').click();await h.flush();
   assert.equal(h.$('workspace').hidden,false);assert.equal(h.$('healthcare-view').hidden,true);assert.equal(h.requests.length,count);assert.equal(region.scrollTop,260);assert.equal(h.$('followup-query').value,'Closer to SW5');
-  assert.equal(h.visible().length,1);assert.equal(h.window.location.pathname,'/');
+  assert.equal(h.visible().length,1);assert.equal(h.window.location.pathname,'/directory');
 });
 
 test('direct healthcare route initializes without search or AI and survives Back/Forward',async t=>{
@@ -302,7 +302,50 @@ test('direct healthcare route initializes without search or AI and survives Back
   assert.equal(h.$('healthcare-view').hidden,false,'route is applied synchronously before queued tasks');
   assert.equal(h.$('landing').hidden,true);assert.equal(h.$('workspace').hidden,true);assert.equal(h.requests.length,0);
   await h.flush();assert.equal(h.requests.length,0);h.$('healthcare-return').click();await h.flush();
-  assert.equal(h.$('landing').hidden,false);assert.equal(h.window.location.pathname,'/');
+  assert.equal(h.$('landing').hidden,false);assert.equal(h.window.location.pathname,'/directory');
   h.history.back();await h.flush();assert.equal(h.$('healthcare-view').hidden,false);assert.equal(h.window.location.pathname,'/for-healthcare-teams');
   h.history.forward();await h.flush();assert.equal(h.$('landing').hidden,false);assert.equal(h.requests.length,0);
+});
+
+
+test('directory and top options share results, draft, selection and cached profile state without transport',async t=>{
+  const h=harness();t.after(h.dispose);const people=Array.from({length:6},(_,i)=>({...person,id:'p'+i,name:'Doctor '+i}));await ready(h,'dual',people);
+  h.$('followup-query').value='My next detail';const count=h.requests.length;
+  const cards=h.visible()[0].querySelectorAll('.consultant-card');cards[0].querySelector('.compare-select').click();cards[1].querySelector('.compare-select').click();
+  h.$('guided-view').click();assert.equal(h.window.location.pathname,'/guided');assert.equal(cards.filter(c=>!c.hidden).length,3);assert.equal(h.$('followup-query').value,'My next detail');assert.equal(h.requests.length,count);
+  h.$('compare-open').click();assert.equal(h.$('compare-dialog').open,true);assert.match(h.$('compare-evidence').textContent,/Doctor 0/);assert.match(h.$('compare-evidence').textContent,/Doctor 1/);assert.equal(h.requests.length,count);
+  h.$('compare-close').click();h.$('directory-view').click();assert.equal(cards.filter(c=>!c.hidden).length,6);assert.equal(h.$('compare-count').textContent,'2 selected');assert.equal(h.requests.length,count);
+  h.history.back();await h.flush();assert.equal(h.window.location.pathname,'/guided');assert.equal(cards.filter(c=>!c.hidden).length,3);
+});
+
+test('view switching during retrieval keeps the new draft and selected view when results arrive',async t=>{
+  const h=harness({pathname:'/guided'});t.after(h.dispose);await ready(h);const pending=h.refine('Only Bupa');h.$('followup-query').value='I am still typing';h.$('directory-view').click();const focus=h.document.activeElement;
+  pending.resolve(result('new',Array.from({length:6},(_,i)=>({...person,id:'new'+i}))));await h.flush();
+  assert.equal(h.window.location.pathname,'/directory');assert.equal(h.$('followup-query').value,'I am still typing');assert.equal(h.document.activeElement,focus);assert.equal(h.visible()[0].querySelectorAll('.consultant-card').filter(c=>!c.hidden).length,6);
+});
+
+test('live comparison AI is deliberate and selections reset only for a new search',async t=>{
+  const h=harness();t.after(h.dispose);await ready(h,'compare',[person,{...person,id:'other',name:'Other doctor'}]);
+  const cards=h.visible()[0].querySelectorAll('.consultant-card');cards.forEach(c=>c.querySelector('.compare-select').click());h.$('compare-open').click();const count=h.requests.length;
+  h.$('compare-personalise').click();assert.equal(h.requests.length,count+1);const req=h.requests.at(-1);assert.equal(req.url,'/api/comparison-explanation');assert.equal(req.body.searchId,'compare');
+  req.resolve({provider:'openrouter',consultantIds:['other','tim'],differences:[{consultantId:'c1',text:'Other recorded practice.',evidenceIds:[]}],citations:[],retryable:false});await h.flush();assert.match(h.$('compare-ai-content').textContent,/Other recorded practice/);
+  h.$('compare-close').click();h.$('guided-view').click();h.$('compare-open').click();assert.equal(h.requests.length,count+1);assert.match(h.$('compare-ai-content').textContent,/Other recorded practice/);
+  h.$('compare-close').click();h.refine('London').resolve(result('refined',[person]));await h.flush();assert.equal(h.$('compare-tray').hidden,true);
+});
+
+
+test('comparison Back and Forward restore evidence without generating AI',async t=>{
+  const h=harness();t.after(h.dispose);await ready(h,'comparison-history',[person,{...person,id:'other'}]);
+  h.visible()[0].querySelectorAll('.compare-select').forEach(button=>button.click());h.$('compare-open').click();const count=h.requests.length;
+  h.history.back();await h.flush();assert.equal(h.$('compare-dialog').open,false);
+  h.history.forward();await h.flush();assert.equal(h.$('compare-dialog').open,true);assert.equal(h.requests.length,count);
+});
+
+test('pagination updates only its own search and never replaces a continued draft',async t=>{
+  const h=harness();t.after(h.dispose);const first=result('pages',Array.from({length:6},(_,i)=>({...person,id:'p'+i})));first.nextCursor='cursor';first.total=20;
+  h.start('Knee pain').resolve(first);await h.flush();h.$('followup-query').value='A continued draft';
+  h.visible()[0].querySelector('.load-more').click();const request=h.requests.at(-1);assert.equal(request.url,'/api/search-results');h.$('guided-view').click();
+  request.resolve({results:[{...person,id:'p6'}],total:20,nextCursor:'next'});await h.flush();
+  assert.equal(h.$('followup-query').value,'A continued draft');assert.equal(h.visible()[0].querySelectorAll('.consultant-card').length,7);assert.equal(h.visible()[0].querySelectorAll('.consultant-card').filter(c=>!c.hidden).length,3);
+  h.$('directory-view').click();assert.equal(h.visible()[0].querySelectorAll('.consultant-card').filter(c=>!c.hidden).length,7);
 });

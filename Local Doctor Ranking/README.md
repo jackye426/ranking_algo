@@ -231,3 +231,35 @@ Restart the server after changes:
 ## License
 
 ISC
+
+
+## Directory and top-options demo
+
+The same live search is available at `/directory` (also the `/` default) and `/guided`.
+The Directory retains the existing cards and conversational criteria and loads six results at a time.
+Top options displays the first three from the same ranking. The view switch preserves the active
+conversation, draft, selected comparison, profile explanation cache and per-view reading position;
+it does not search again or call a model. Conversation state stays in the current tab, not in URLs.
+
+Select two or three consultants to open the live evidence comparison. Facts and source links appear
+immediately. “Explain these differences for me” is an explicit, optional DeepSeek request through the
+existing OpenRouter configuration. This is independent of the prepared comparison on the homepage.
+Missing data is not a negative assessment of a consultant, and the comparison does not choose a
+clinically superior doctor or recommend treatment.
+
+The server retains the ranked candidate pool in each bounded, expiring search snapshot. The search
+response includes an opaque `nextCursor`; `POST /api/search-results` accepts `sessionId`, `searchId`
+and `cursor`, returning the next six results and continuation cursor without reinterpreting or
+reranking. Only served consultants can receive explanations. `POST /api/comparison-explanation`
+accepts those session/search identifiers and two or three distinct `consultantIds`. Comparison
+requests share existing generation limits, deduplicate by search and canonical selected set, and
+require local citation-ownership validation plus an independent support check. Fallback leaves
+sourced facts available. No database migration or additional model credentials are required.
+
+Requests without a clinical anchor now return `needsClarification: true` with no generic ranked
+results. Existing meaningful context is retained for vague follow-ups. Removing the last clinical
+criterion clears that context and asks what the patient wants help with; earlier searches remain in History.
+
+Validation: `npm test` covers both views, navigation, snapshot paging, comparison and grounding.
+`npm run verify:comparison` checks the real cached corpus with actual BM25 and semantic retrieval,
+including preserved running goals after unsuccessful physiotherapy, without paid API calls.

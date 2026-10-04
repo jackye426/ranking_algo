@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/comparison.css">
   <link rel="stylesheet" href="/walkthrough.css">
   <link rel="stylesheet" href="/healthcare.css">
+  <link rel="stylesheet" href="/decision.css">
   <script src="/app.js" defer></script>
   <script src="/comparison-data.js" defer></script>
   <script src="/comparison.js" defer></script>
@@ -46,6 +47,9 @@
       <button class="icon-button about-button" id="about-open" aria-label="About DocMap" title="About DocMap"><svg class="icon"><use href="#icon-info"/></svg></button>
     </div>
   </header>
+  <nav class="experience-switch" aria-label="Demo experience">
+    <span>View</span><button id="directory-view" type="button" aria-pressed="true">Directory</button><button id="guided-view" type="button" aria-pressed="false">Top options</button>
+  </nav>
   <main id="main">
     <section class="landing" id="landing" aria-labelledby="hero-title">
       <div class="search-hero">
@@ -77,6 +81,7 @@
       <div id="conversation" class="shortlist" aria-label="Consultant results"></div>
       </div>
       <div class="composer-wrap">
+        <div id="compare-tray" class="compare-tray" hidden><span id="compare-count"></span><button id="compare-open" class="text-button" type="button">What’s the difference?</button><button id="compare-clear" class="text-button" type="button">Clear</button></div>
         <div class="composer-status"><div id="submitted-message" class="submitted-message" hidden></div><div id="search-status" class="search-status" aria-live="polite"></div><button type="button" id="view-updated-matches" class="text-button" hidden>View updated matches <span aria-hidden="true">↑</span></button></div>
         <form class="search-form followup-form" id="followup-form"><label class="sr-only" for="followup-query">Tell us more, or refine your search</label><div class="search-input-row"><textarea id="followup-query" name="message" rows="1" maxlength="1500" placeholder="Tell us more, or refine your search…" required></textarea><button type="submit" class="send-button" aria-label="Send refinement"><svg class="icon"><use href="#icon-arrow"/></svg></button></div></form>
       </div>
@@ -96,6 +101,10 @@
       <div id="sheet-provenance"></div>
     </div>
     <div id="sheet-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+  </dialog>
+  <dialog id="compare-dialog" class="live-comparison" aria-labelledby="compare-title">
+    <header class="comparison-header"><div><p class="sheet-eyebrow">Your selected profiles</p><h2 id="compare-title">What’s the difference?</h2></div><button id="compare-close" class="icon-button" aria-label="Close comparison" autofocus>×</button></header>
+    <div class="comparison-body"><p id="compare-context" class="comparison-context"></p><div id="compare-evidence"></div><section class="comparison-ai" aria-label="Personalised comparison"><button id="compare-personalise" class="comparison-primary" type="button">Explain these differences for me</button><div id="compare-ai-content" aria-live="polite"></div></section></div>
   </dialog>
   <dialog id="history-dialog" class="history-dialog" aria-labelledby="history-title">
     <div class="dialog-heading"><h2 id="history-title">Search history</h2><button class="icon-button" id="history-close" aria-label="Close search history"><svg class="icon"><use href="#icon-close"/></svg></button></div>

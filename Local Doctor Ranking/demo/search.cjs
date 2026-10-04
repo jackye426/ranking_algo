@@ -2,7 +2,7 @@ const { rankPractitionersBM25 } = require('../bm25Service.cjs');
 const { embed, cosine, getGenerator, EMBEDDING_MODEL, GENERATION_MODEL } = require('./models.cjs');
 const { initGeo, enrichLocations, resolveLocation, distanceTo } = require('./geo.cjs');
 const { loadRecords } = require('./data-source.cjs');
-const {matchesClinicalCriteria,matchClinicalCriteria,positiveClinicalText} = require('./clinical-filters.cjs');
+const {matchesClinicalCriteria,matchClinicalCriteria,positiveClinicalText,PROCEDURES,findProcedureEvidence} = require('./clinical-filters.cjs');
 const {createPersonalizedMatch} = require('./personalized-match.cjs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -153,7 +153,6 @@ class SearchEngine {
     if (!this.ready) throw new Error('Search is still preparing.');
     const notices=[];
     const query=clinicalRetrievalQuery(criteria);
-    const evidenceQuery=clinicalRetrievalQuery(criteria,{forEvidence:true});
     const origin=await resolveLocation(criteria.location);
     const knownCity=origin?.city;
     if(criteria.location && !origin) notices.push(criteria.radiusMiles || criteria.sortByDistance
@@ -173,9 +172,25 @@ class SearchEngine {
     const [qv]=await this.embedQuery([query]);
     const semantic=this.records.map((r,i)=>({id:r.id,score:cosine(qv,this.vectors[i])})).sort((a,b)=>b.score-a.score);
     const {ranked,lexicalCandidates,semanticCandidates,fusion,semMap,lexMap}=rerankCandidates(eligible,lexical,semantic,criteria,origin);
+    const searchSnapshot={criteria:JSON.parse(JSON.stringify(criteria)),ranked,records:this.records};
+    const {results,generationModes}=await this.resultsPage(searchSnapshot,0);
+    const total=ranked.length;
+    if(criteria.insurance) notices.push(`Only records with linked ${criteria.insurance} evidence are included; other consultants’ insurance status is unknown.${total ? ' Check your policy, procedure and any fee shortfall with the insurer before booking.' : ''}`);
+    let message=total ? `I found ${total} matching Spire consultant${total===1?'':'s'}${criteria.insurance ? ` with documented ${criteria.insurance} recognition` : ''}. ${criteria.sortByDistance && origin ? `Nearest to ${criteria.location} first.` : 'Ranked by profile relevance.'}` : 'I couldn’t find a verified match for all your criteria. Try removing a filter or widening the location.';
+    if(this.source==='public-profile-snapshot') message += ' Results are limited to this demo collection.';
+    return {results,total,message,notices,searchSnapshot,suggestions:!total?['Search anywhere','Any insurer']: !criteria.insurance ? ['Only those accepting Bupa','Closer to SW5'] : !criteria.sortByDistance ? ['Closer to SW5','Any insurer'] : ['Within 20 miles','Any insurer'],
+      diagnostics:{embeddingModel:EMBEDDING_MODEL,generationModel:GENERATION_MODEL,
+        generationModes,keywordMethod:'BM25 (k1=1.5, b=0.75)',fusion:'RRF (k=60)',
+        bm25Candidates:lexicalCandidates.map(x=>({id:x.document.id,score:x.bm25Score})),semanticCandidates:semanticCandidates,
+        ranking:ranked.map(x=>({id:x.record.id,bm25:lexMap.get(x.record.id)||0,semantic:semMap.get(x.record.id),rrf:fusion.get(x.record.id),rerank:x.relevance,distanceMiles:x.distance?.miles??null}))}};
+  }
+  async resultsPage(snapshot,offset=0) {
+    if(snapshot.records!==this.records) throw new Error('Search snapshot expired');
+    const {criteria,ranked}=snapshot;
+    const evidenceQuery=clinicalRetrievalQuery(criteria,{forEvidence:true});
     const generationModes=[];
     const results=[];
-    for(const {record:r,distance} of ranked.slice(0,6)) {
+    for(const {record:r,distance} of ranked.slice(offset,offset+6)) {
       const availableFacts=explanationFacts(r);
       const facts=shortlistEvidence(lexicalClinicalQuery(evidenceQuery),availableFacts);
       const key=JSON.stringify([r.id,criteria]);
@@ -188,20 +203,16 @@ class SearchEngine {
       generationModes.push(generated.generationMode);
       const reasons=[...generated.selected];
       if(criteria.insurance) { const e=r.insuranceEvidence.find(e=>e.insurer.toLowerCase()===criteria.insurance.toLowerCase()); if(e) reasons.push({text:e.text,sourceUrl:e.sourceUrl}); }
-      if(distance && origin) reasons.push({text:`${distance.miles.toFixed(1)} miles from ${criteria.location} to ${distance.location.name} (straight line).`,sourceUrl:distance.location.sourceUrl});
-      results.push({...r,personalizedMatch:generated.personalizedMatch,reasons:reasons.slice(0,4),distanceMiles:distance ? Math.round(distance.miles*10)/10 : null,
+      if(distance && criteria.location) reasons.push({text:`${distance.miles.toFixed(1)} miles from ${criteria.location} to ${distance.location.name} (straight line).`,sourceUrl:distance.location.sourceUrl});
+      const documented=PROCEDURES.map(rule=>({rule,evidence:findProcedureEvidence(r,rule.label)})).filter(item=>item.evidence);
+      const procedureFacts=documented.filter(item=>!documented.some(other=>other!==item&&other.rule.implies?.includes(item.rule.label)))
+        .map(({rule,evidence})=>({label:rule.label,text:evidence.text,sourceUrl:evidence.sourceUrl}));
+      results.push({...r,comparisonProcedures:procedureFacts,personalizedMatch:generated.personalizedMatch,reasons:reasons.slice(0,4),distanceMiles:distance ? Math.round(distance.miles*10)/10 : null,
         distanceLabel:distance ? `${distance.miles.toFixed(1)} mi from ${criteria.location}` : null,
         locations:[...(distance?[distance.location]:[]),...r.locations.filter(l=>l !== distance?.location)]});
     }
-    const total=ranked.length;
-    if(criteria.insurance) notices.push(`Only records with linked ${criteria.insurance} evidence are included; other consultants’ insurance status is unknown.${total ? ' Check your policy, procedure and any fee shortfall with the insurer before booking.' : ''}`);
-    let message=total ? `I found ${total} matching Spire consultant${total===1?'':'s'}${criteria.insurance ? ` with documented ${criteria.insurance} recognition` : ''}. ${criteria.sortByDistance && origin ? `Nearest to ${criteria.location} first.` : 'Ranked by profile relevance.'}` : 'I couldn’t find a verified match for all your criteria. Try removing a filter or widening the location.';
-    if(this.source==='public-profile-snapshot') message += ' Results are limited to this demo collection.';
-    return {results,total,message,notices,suggestions:!total?['Search anywhere','Any insurer']: !criteria.insurance ? ['Only those accepting Bupa','Closer to SW5'] : !criteria.sortByDistance ? ['Closer to SW5','Any insurer'] : ['Within 20 miles','Any insurer'],
-      diagnostics:{embeddingModel:EMBEDDING_MODEL,generationModel:GENERATION_MODEL,
-        generationModes,keywordMethod:'BM25 (k1=1.5, b=0.75)',fusion:'RRF (k=60)',
-        bm25Candidates:lexicalCandidates.map(x=>({id:x.document.id,score:x.bm25Score})),semanticCandidates:semanticCandidates,
-        ranking:ranked.map(x=>({id:x.record.id,bm25:lexMap.get(x.record.id)||0,semantic:semMap.get(x.record.id),rrf:fusion.get(x.record.id),rerank:x.relevance,distanceMiles:x.distance?.miles??null}))}};
+    return {results,generationModes};
   }
+
 }
 module.exports={SearchEngine,mapToRanking,reciprocalRankFusion,matchesFilters,explicitClinicalMatch,rerankCandidates,explanationFacts,shortlistEvidence,clinicalRetrievalQuery,clinicalText,lexicalClinicalQuery};

@@ -9,10 +9,10 @@ if(fs.existsSync(destination) && fs.readdirSync(destination).length) throw new E
 // Keep deployment uploads independent of the wider research repository. Never
 // copy .env files, node_modules, model/raw-data caches, or unrelated datasets.
 const files=['Dockerfile','.dockerignore','railway.toml','package.json','package-lock.json','bm25Service.cjs','location-filter.js',
-  ...['server','search','models','geo','data-source','supabase-reader','supabase-mapper','criteria','query-interpreter','clinical-filters','personalized-match','match-explanation','evidence-page'].map(name=>`demo/${name}.cjs`),
+  ...['server','search','models','geo','data-source','supabase-reader','supabase-mapper','criteria','query-interpreter','clinical-filters','personalized-match','match-explanation','comparison-explanation','evidence-page'].map(name=>`demo/${name}.cjs`),
   'demo/data/public-spire-records.cjs','demo/scripts/prewarm-models.cjs','public/index.html','public/styles.css','public/app.js',
   'public/fonts/inter-variable.ttf','public/fonts/OFL-Inter.txt',
-  'public/profiles.css','public/comparison-data.js','public/comparison.js','public/comparison.css',
+  'public/decision.css','public/profiles.css','public/comparison-data.js','public/comparison.js','public/comparison.css',
   'public/walkthrough.css','public/walkthrough.js','public/healthcare.css','public/healthcare.js','public/brand/docmap-logo.jpg'];
 for(const file of files) if(!fs.statSync(path.join(source,file)).isFile()) throw new Error(`Missing deployment file: ${file}`);
 fs.mkdirSync(destination,{recursive:true});
