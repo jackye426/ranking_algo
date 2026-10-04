@@ -128,6 +128,12 @@ function createApp(engine,{explainMatch=createMatchExplainer(),interpretQuery=cr
     catch {addPhaseTimings();res.status(503).json({error:'The explanation could not be prepared. Please retry.'});}
   });
   app.use('/api',(_req,res)=>res.status(404).json({error:'Endpoint not found.'}));
+  app.get('/for-healthcare-teams',async(_req,res,next)=>{
+    try {
+      const shell=await require('node:fs/promises').readFile(path.join(__dirname,'../public/index.html'),'utf8');
+      res.type('html').send(shell.replace('<html lang="en">','<html lang="en" data-entry="healthcare">'));
+    } catch(error) {next(error);}
+  });
   app.use(express.static(path.join(__dirname,'../public'),{index:'index.html',dotfiles:'deny'}));
   app.use((err,_req,res,_next)=>res.status(err.status||500).json({error:err.status===413?'Your request is too long.':'The request could not be read.'}));
   return app;

@@ -2,15 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#f8f9ff">
   <meta name="description" content="Find a Spire consultant with DocMap. Search naturally, then refine your shortlist.">
   <title>DocMap — Find your specialist</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/profiles.css">
   <link rel="stylesheet" href="/walkthrough.css">
+  <link rel="stylesheet" href="/healthcare.css">
   <script src="/app.js" defer></script>
   <script src="/walkthrough.js" defer></script>
+  <script src="/healthcare.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to search</a>
@@ -30,7 +32,7 @@
     <symbol id="icon-back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol>
   </defs></svg>
   <header class="site-header">
-    <button class="brand" id="brand-home" aria-label="DocMap home"><span class="brand-mark" aria-hidden="true"><img src="/brand/docmap-logo.jpg" alt="" width="987" height="987"></span><span>docmap</span></button>
+    <button class="brand" id="brand-home" aria-label="DocMap home"><span class="brand-mark" aria-hidden="true"><img src="/brand/docmap-logo.jpg" alt="" width="987" height="987"></span><span>DocMap</span></button>
     <div class="header-actions">
       <span class="scope-badge"><span class="status-dot" aria-hidden="true"></span>Spire consultants</span>
       <nav class="search-actions" aria-label="Search actions" hidden id="search-actions">
@@ -62,17 +64,21 @@
       <div id="homepage-story"></div>
     </section>
     <section class="workspace" id="workspace" hidden aria-label="Your consultant shortlist">
+      <div class="results-region" id="results-region" tabindex="0" role="region" aria-label="Scrollable consultant results">
       <div class="search-overview">
         <div class="overview-heading"><h1 id="search-title">Your shortlist</h1><span class="result-total" id="result-total"></span></div>
         <div class="active-criteria" id="active-criteria" aria-label="Active search criteria"></div>
         <div class="history-preview" id="history-preview" hidden><span>Viewing an earlier search</span><button id="return-current" class="text-button">Back to current search <span aria-hidden="true">↗</span></button></div>
       </div>
-      <div id="submitted-message" class="submitted-message" hidden></div>
-      <div id="search-status" class="search-status" aria-live="polite"></div>
       <div id="search-error"></div>
       <div id="conversation" class="shortlist" aria-label="Consultant results"></div>
-      <div class="composer-wrap"><form class="search-form followup-form" id="followup-form"><label class="sr-only" for="followup-query">Tell us more, or refine your search</label><div class="search-input-row"><textarea id="followup-query" name="message" rows="1" maxlength="1500" placeholder="Tell us more, or refine your search…" required></textarea><button type="submit" class="send-button" aria-label="Send refinement"><svg class="icon"><use href="#icon-arrow"/></svg></button></div></form></div>
+      </div>
+      <div class="composer-wrap">
+        <div class="composer-status"><div id="submitted-message" class="submitted-message" hidden></div><div id="search-status" class="search-status" aria-live="polite"></div><button type="button" id="view-updated-matches" class="text-button" hidden>View updated matches <span aria-hidden="true">↑</span></button></div>
+        <form class="search-form followup-form" id="followup-form"><label class="sr-only" for="followup-query">Tell us more, or refine your search</label><div class="search-input-row"><textarea id="followup-query" name="message" rows="1" maxlength="1500" placeholder="Tell us more, or refine your search…" required></textarea><button type="submit" class="send-button" aria-label="Send refinement"><svg class="icon"><use href="#icon-arrow"/></svg></button></div></form>
+      </div>
     </section>
+    <section id="healthcare-view" hidden aria-labelledby="healthcare-title"></section>
   </main>
   <div class="sr-only" id="announcer" role="status" aria-live="polite" aria-atomic="true"></div>
   <dialog id="match-dialog" class="match-sheet" aria-labelledby="sheet-title sheet-consultant-name">

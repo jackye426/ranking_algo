@@ -37,6 +37,8 @@ public/**
 !public/profiles.css
 !public/walkthrough.css
 !public/walkthrough.js
+!public/healthcare.css
+!public/healthcare.js
 !public/brand/
 public/brand/**
 !public/brand/docmap-logo.jpg

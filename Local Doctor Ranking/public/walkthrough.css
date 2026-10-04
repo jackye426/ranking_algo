@@ -46,28 +46,14 @@
 .wt-source:hover{text-decoration:underline}.wt-source .wt-icon{width:12px;height:12px}
 .wt-source-links{display:flex;align-items:center;flex-wrap:wrap;gap:0 19px}.wt-source-secondary{color:var(--muted)}
 .wt-footnote{font-size:10px;line-height:1.7;margin:18px 0 0;color:#767c90;max-width:350px}
-.wt-value{border-top:1px solid #dcdfee;margin-top:clamp(120px,15vw,180px);padding-top:clamp(60px,7vw,88px);display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr);align-items:start;gap:clamp(56px,7vw,96px)}
-.wt-value-intro{max-width:440px}
-.wt-value .wt-eyebrow{font-size:13px;margin-bottom:24px}
-.wt-value-title{font-size:clamp(36px,3.8vw,48px);line-height:1.12;font-weight:550;letter-spacing:-.045em;margin:0 0 26px}
-.wt-value-title span{display:block}.wt-value-emphasis{color:#4d4ec5}
-.wt-value-copy{font-size:17px;line-height:1.75;color:#5e657b;margin:0;max-width:355px}
-.wt-value-outcomes{min-width:0;padding-top:3px}
-.wt-measure-heading{font-size:13px;line-height:1.6;font-weight:550;color:#646b82;margin:0 0 10px}
-.wt-benefits{display:grid}
-.wt-benefit{display:grid;grid-template-columns:25px minmax(0,1fr);column-gap:21px;padding:28px 0 31px;border-bottom:1px solid #dcdfee}
-.wt-benefit-number{font-size:13px;line-height:1.5;font-weight:550;color:var(--accent);letter-spacing:.02em;padding-top:5px}
-.wt-benefit h3{font-size:clamp(21px,2vw,25px);line-height:1.3;font-weight:550;letter-spacing:-.025em;margin:0 0 10px;text-wrap:balance}
-.wt-benefit p{grid-column:2;font-size:16px;line-height:1.65;color:#626a80;margin:0}
-.wt-value-note{font-size:12px;line-height:1.75;color:#697086;margin:25px 0 0}
+.wt-footer{display:flex;justify-content:center;border-top:1px solid #e2e5f0;margin-top:clamp(85px,10vw,120px);padding-top:28px}
+.wt-healthcare-link{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:10px 12px;color:var(--muted);font-size:12px;text-decoration:none;border-radius:12px}
+.wt-healthcare-link:hover{color:var(--accent);background:#ffffff80}.wt-healthcare-link .wt-icon{width:14px;height:14px}
 @media(min-width:1100px){.wt-panel{min-height:680px}}
 @media(max-width:1000px) and (min-width:861px){.wt-layout{grid-template-columns:240px minmax(0,1fr);gap:64px}}
 @media(max-width:860px){
   .wt-layout{grid-template-columns:1fr;gap:40px}
   .wt-navigation{max-width:560px;padding-top:0}
-  .wt-value{grid-template-columns:1fr;gap:44px}
-  .wt-value-intro{max-width:560px}.wt-value-copy{max-width:510px}
-  .wt-value-outcomes{padding-top:0}
 }
 @media(max-width:760px){
   #homepage-story{margin-top:110px}
@@ -80,7 +66,6 @@
   .wt-try{align-self:flex-start;margin:12px 0 0;padding:10px 16px;min-height:44px}
   .wt-panel{min-height:660px;padding:12px 25px 25px}
   .wt-conversation{padding-left:24px}.wt-followup{max-width:88%}
-  .wt-value{margin-top:110px;padding-top:54px}
 }
 @media(max-width:480px){
   .wt-eyebrow{font-size:10px;letter-spacing:.015em;max-width:270px}
@@ -90,9 +75,5 @@
   .wt-message{padding:14px 15px;border-radius:18px 18px 5px 18px}.wt-message p{font-size:13px}
   .wt-followup{max-width:92%}.wt-context{gap:5px}.wt-context span{padding:5px 8px}
   .wt-evidence{padding:20px 18px 12px;border-radius:19px}.wt-consultant{font-size:16px}
-  .wt-value{gap:36px}.wt-value-title{font-size:36px}.wt-value-copy{font-size:16px}
-  .wt-benefit{grid-template-columns:22px minmax(0,1fr);column-gap:14px;padding:25px 0 28px}
-  .wt-benefit h3{font-size:22px}.wt-benefit p{font-size:15px}
-  .wt-value-note{max-width:310px}
 }
 @media(prefers-reduced-motion:reduce){.wt-tab,.wt-try{transition:none}}

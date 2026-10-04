@@ -13,10 +13,11 @@
       navigation.pendingTraversal.after = { screen, extra };
       navigation.screen = screen; return;
     }
-    if (!navigation.restoring) history[replace ? 'replaceState' : 'pushState']?.({ docmap: true, epoch: state.epoch, screen, ...extra }, '');
+    if (!navigation.restoring) history[replace ? 'replaceState' : 'pushState']?.({ docmap: true, epoch: state.epoch, screen, ...extra }, '', screen === 'healthcare' ? '/for-healthcare-teams' : '/');
     navigation.screen = screen;
   }
-  routeTo('home', {}, true);
+  const initialScreen = window.location.pathname === '/for-healthcare-teams' ? 'healthcare' : 'home';
+  routeTo(initialScreen, {}, true);
   let explanationNumber = 0;
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   let reducedMotion = motionPreference.matches;
@@ -58,7 +59,56 @@
     a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a;
   };
   const announce = (message) => { $('announcer').textContent = message; };
-  const resizeInput = (input) => { input.style.height = 'auto'; input.style.height = `${Math.min(input.scrollHeight, 140)}px`; };
+  const inputMirrors = new Map();
+  const resizeInput = (input) => {
+    // Measure a separate, inaccessible textarea. Collapsing the focused field
+    // to measure it can make the browser scroll its caret into view mid-keystroke.
+    if (!input.getBoundingClientRect().width) return;
+    let mirror = inputMirrors.get(input);
+    if (!mirror) {
+      mirror = el('textarea', 'input-measure'); mirror.tabIndex = -1; mirror.setAttribute('aria-hidden', 'true');
+      document.body.append(mirror); inputMirrors.set(input, mirror);
+    }
+    const style = window.getComputedStyle(input);
+    ['font', 'fontSize', 'fontFamily', 'fontWeight', 'lineHeight', 'letterSpacing', 'padding', 'border', 'boxSizing', 'wordBreak', 'overflowWrap'].forEach((key) => { mirror.style[key] = style[key]; });
+    mirror.style.width = `${input.getBoundingClientRect().width}px`;
+    mirror.value = input.value || ' ';
+    input.style.height = `${Math.min(140, Math.max(parseFloat(style.minHeight) || 44, mirror.scrollHeight))}px`;
+  };
+
+  function captureResultsPosition() {
+    const region = $('results-region'); const boundary = region.getBoundingClientRect();
+    const card = [...(state.activeTurn?.node.querySelectorAll('.consultant-card') || [])].find((node) => {
+      const rect = node.getBoundingClientRect(); return rect.bottom > boundary.top && rect.top < boundary.bottom;
+    });
+    return { top: region.scrollTop, id: card?.dataset.consultantId || null, offset: card ? card.getBoundingClientRect().top - boundary.top : 0 };
+  }
+  function restoreResultsPosition(position = { top: 0 }) {
+    const region = $('results-region');
+    const card = position.id && [...(state.activeTurn?.node.querySelectorAll('.consultant-card') || [])].find((node) => node.dataset.consultantId === position.id);
+    const top = card ? region.scrollTop + card.getBoundingClientRect().top - region.getBoundingClientRect().top - position.offset : position.top;
+    region.scrollTop = Math.max(0, Math.min(top || 0, Math.max(0, region.scrollHeight - region.clientHeight)));
+  }
+  function showUpdatedMatches() {
+    $('results-region').scrollTo({ top: 0, behavior: reducedMotion ? 'instant' : 'smooth' });
+    $('view-updated-matches').hidden = true;
+  }
+  function setHealthcareVisible(visible) {
+    $('healthcare-view').hidden = !visible;
+    document.body.classList.toggle('healthcare-mode', visible);
+    window.DocMapHealthcare?.setVisible(visible);
+    document.title = visible ? 'DocMap — For healthcare teams' : 'DocMap — Find your specialist';
+  }
+  function showHealthcare({ record = true, focus = true } = {}) {
+    if (document.body.classList.contains('chat-mode')) navigation.resultsPosition = captureResultsPosition();
+    closeMatchSheet({ immediate: true, restoreFocus: false });
+    ['about-dialog', 'history-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
+    examplePrompt.pause(); $('landing').hidden = true; $('workspace').hidden = true; $('search-actions').hidden = true;
+    document.body.classList.remove('chat-mode', 'search-entering'); setHealthcareVisible(true);
+    if (record) routeTo('healthcare');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (focus) $('healthcare-title')?.focus({ preventScroll: true });
+  }
 
   // DEMO_SCENARIOS_START: exact, locally verified prompts; never auto-submitted.
   const demoScenarios = [
@@ -87,7 +137,7 @@
   window.DocMapScenarios = demoScenarios;
   function animateElement(node, frames, options) {
     if (reducedMotion || typeof node?.animate !== 'function') return;
-    const animation = node.animate(frames, { easing: 'cubic-bezier(.2,.7,.2,1)', ...options });
+    const animation = node.animate(frames, { easing: 'cubic-bezier(.22,1,.36,1)', ...options });
     runningAnimations.add(animation);
     Promise.resolve(animation.finished).catch(() => {}).then(() => runningAnimations.delete(animation));
   }
@@ -100,15 +150,15 @@
 
   function animateShortlist(turn, previous) {
     if (reducedMotion) return;
-    if (!previous.size) { animateElement(turn.node, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 280 }); return; }
+    if (!previous.size) { animateElement(turn.node, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 220 }); return; }
     turn.node.querySelectorAll('.consultant-card').forEach((card) => {
       const before = previous.get(card.dataset.consultantId); const after = card.getBoundingClientRect();
       card.classList.add(before ? 'is-retained' : 'is-new');
       if (after.bottom < 0 || after.top > window.innerHeight) return;
       if (before && before.bottom >= 0 && before.top <= window.innerHeight) {
         const distance = before.top - after.top;
-        if (Math.abs(distance) > 1 && Math.abs(distance) < window.innerHeight) animateElement(card, [{ transform: `translateY(${distance}px)` }, { transform: 'translateY(0)' }], { duration: 240 });
-      } else if (!before) animateElement(card, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 200 });
+        if (Math.abs(distance) > 1 && Math.abs(distance) < window.innerHeight) animateElement(card, [{ transform: `translateY(${distance}px)` }, { transform: 'translateY(0)' }], { duration: 220 });
+      } else if (!before) animateElement(card, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 220 });
     });
   }
 
@@ -173,10 +223,10 @@
   }
 
   function showHome({ record = true } = {}) {
-    if (document.body.classList.contains('chat-mode')) navigation.resultsScroll = window.scrollY;
+    if (document.body.classList.contains('chat-mode')) navigation.resultsPosition = captureResultsPosition();
     closeMatchSheet({ immediate: true, restoreFocus: false });
     ['about-dialog', 'history-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
-    $('workspace').hidden = true; $('landing').hidden = false; $('search-actions').hidden = true;
+    setHealthcareVisible(false); $('workspace').hidden = true; $('landing').hidden = false; $('search-actions').hidden = true;
     document.body.classList.remove('chat-mode', 'search-entering', 'is-refining');
     if (record) routeTo('home');
     updateResume(); examplePrompt.reset();
@@ -188,14 +238,14 @@
   function resumeSearch({ record = true, focus = true } = {}) {
     if (!state.turns.length && !state.busy && !state.failedRequest) return;
     openConversation({ record });
-    window.scrollTo({ top: navigation.resultsScroll, behavior: 'instant' });
+    restoreResultsPosition(navigation.resultsPosition);
     if (focus) $('followup-query').focus({ preventScroll: true });
   }
 
   function profileRouteOpened(entry, explain) {
     const key = `${entry.context.searchId}:${entry.person.id}`;
     navigation.profiles.set(key, entry);
-    navigation.profileReturn = { trigger: matchSheet.returnFocus, top: matchSheet.scrollY, left: matchSheet.scrollX };
+    navigation.profileReturn = { trigger: matchSheet.returnFocus, position: matchSheet.resultsPosition };
     routeTo('profile', { profileKey: key, explain: Boolean(explain) }, navigation.screen === 'profile');
   }
 
@@ -216,12 +266,14 @@
     if (!target?.docmap) return; // Ordinary in-page anchors are not app navigation.
     navigation.restoring = true;
     try {
-      if (!target?.docmap || target.epoch !== state.epoch || target.screen === 'home') {
+      if (target.screen === 'healthcare') {
+        navigation.screen = 'healthcare'; showHealthcare({ record: false });
+      } else if (!target?.docmap || target.epoch !== state.epoch || target.screen === 'home') {
         navigation.screen = 'home'; showHome({ record: false });
       } else {
         const leavingProfile = Boolean(matchSheet.entry || queued || navigation.screen === 'profile');
         const returnPosition = leavingProfile && navigation.profileReturn;
-        if (returnPosition) navigation.resultsScroll = returnPosition.top;
+        if (returnPosition) navigation.resultsPosition = returnPosition.position;
         closeMatchSheet({ immediate: true, restoreFocus: false });
         navigation.screen = 'results'; resumeSearch({ record: false, focus: !returnPosition });
         const entry = target.screen === 'profile' && navigation.profiles.get(target.profileKey);
@@ -233,18 +285,18 @@
 
   function openConversation({ record = true } = {}) {
     if (document.body.classList.contains('chat-mode')) return;
-    const source = $('landing-form').getBoundingClientRect(); const epoch = state.epoch;
+    const epoch = state.epoch;
     examplePrompt.pause();
-    $('landing').hidden = true; $('workspace').hidden = false; $('search-actions').hidden = false;
+    setHealthcareVisible(false); $('landing').hidden = true; $('workspace').hidden = false; $('search-actions').hidden = false;
     if (record) routeTo('results');
     document.body.classList.add('chat-mode', 'search-entering');
     window.scrollTo({ top: 0, behavior: 'instant' });
     window.requestAnimationFrame(() => {
       if (epoch !== state.epoch || reducedMotion) return;
-      const form = $('followup-form'); const target = form.getBoundingClientRect();
-      if (source.width && target.width) animateElement(form, [{ transform: `translate(${source.left - target.left}px,${source.top - target.top}px) scale(${source.width / target.width},${source.height / target.height})`, transformOrigin: '0 0', opacity: .8 }, { transform: 'translate(0,0) scale(1)', transformOrigin: '0 0', opacity: 1 }], { duration: 340 });
+      resizeInput($('followup-query'));
+      animateElement($('followup-form'), [{ opacity: .6 }, { opacity: 1 }], { duration: 220 });
     });
-    window.setTimeout(() => { if (epoch === state.epoch) document.body.classList.remove('search-entering'); }, reducedMotion ? 0 : 380);
+    window.setTimeout(() => { if (epoch === state.epoch) document.body.classList.remove('search-entering'); }, reducedMotion ? 0 : 220);
   }
 
   function reset() {
@@ -254,11 +306,12 @@
     state.controller?.abort();
     state.explanationControllers.forEach((controller) => controller.abort()); state.explanationControllers.clear();
     Object.assign(state, { sessionId: null, busy: false, criteria: {}, criteriaLabels: [], controller: null, turns: [], activeTurn: null, lastMessage: '', failedRequest: null });
-    navigation.profiles.clear(); navigation.resultsScroll = 0; routeTo('home', {}, true);
+    navigation.profiles.clear(); navigation.resultsPosition = { top: 0 }; routeTo('home', {}, true);
     ['conversation', 'active-criteria', 'search-status', 'search-error', 'history-list', 'submitted-message'].forEach((id) => $(id).replaceChildren());
     $('submitted-message').hidden = true;
     ['history-dialog', 'about-dialog'].forEach((id) => { if ($(id).open) $(id).close(); });
-    $('workspace').hidden = true; $('landing').hidden = false; $('search-actions').hidden = true; $('history-preview').hidden = true;
+    setHealthcareVisible(false); $('workspace').hidden = true; $('landing').hidden = false; $('search-actions').hidden = true; $('history-preview').hidden = true;
+    $('results-region').scrollTop = 0; $('view-updated-matches').hidden = true;
     $('result-total').textContent = ''; $('search-title').textContent = 'Your shortlist';
     document.body.classList.remove('chat-mode', 'search-entering', 'is-refining');
     ['initial-query', 'followup-query'].forEach((id) => { $(id).value = ''; resizeInput($(id)); });
@@ -329,6 +382,7 @@
   }
 
   function loading() {
+    $('submitted-message').hidden = true; $('view-updated-matches').hidden = true;
     $('search-status').replaceChildren(el('span', 'status-pulse'), el('span', '', state.turns.length ? 'Updating your shortlist…' : 'Finding your specialists…'));
     if (state.turns.length) return null;
     const skeleton = el('div', 'skeleton-list'); skeleton.setAttribute('aria-hidden', 'true');
@@ -363,7 +417,7 @@
     ...list(entry.person.insuranceEvidence).filter(Boolean).filter((item) => !entry.context.criteria?.insurance || !item.insurer || String(item.insurer).toLowerCase() === entry.context.criteria.insurance.toLowerCase())
       .map((item) => typeof item === 'string' ? item : item.text || item.note || '').filter((text) => /not fee assured|not in (?:the |bupa.s )?open referral/i.test(text)),
   ].filter((value) => typeof value === 'string' && value.trim()))];
-  const matchSheet = { dialog: $('match-dialog'), entry: null, version: 0, closeTimer: null, returnFocus: null, scrollX: 0, scrollY: 0 };
+  const matchSheet = { dialog: $('match-dialog'), entry: null, version: 0, closeTimer: null, returnFocus: null, resultsPosition: { top: 0 } };
 
   function cancelExplanation(entry, reason = 'closed') {
     if (!entry?.pending) return;
@@ -377,6 +431,7 @@
     if (!matchSheet.entry && !matchSheet.dialog.open) return;
     if (restoreFocus) profileRouteClosed();
     const entry = matchSheet.entry; const version = ++matchSheet.version;
+    if (entry) entry.sheetState = { scrollTop: $('sheet-scroll').scrollTop, sourcesOpen: Boolean($('sheet-provenance').querySelector('details')?.open) };
     cancelExplanation(entry);
     entry?.button.setAttribute('aria-expanded', 'false');
     window.clearTimeout(matchSheet.closeTimer);
@@ -394,10 +449,10 @@
       document.body.classList.remove('sheet-open');
       $('sheet-content').setAttribute('aria-busy', 'false');
       if (restoreFocus && trigger?.isConnected) trigger.focus({ preventScroll: true });
-      if (restoreFocus && (window.scrollX !== matchSheet.scrollX || window.scrollY !== matchSheet.scrollY)) window.scrollTo({ left: matchSheet.scrollX, top: matchSheet.scrollY, behavior: 'instant' });
+      if (restoreFocus) restoreResultsPosition(matchSheet.resultsPosition);
     };
     if (immediate || reducedMotion || !matchSheet.dialog.open) finish();
-    else matchSheet.closeTimer = window.setTimeout(finish, 240);
+    else matchSheet.closeTimer = window.setTimeout(finish, 280);
   }
 
   function sourceLabel(url) {
@@ -578,39 +633,39 @@
 
   function renderConsultantProfile(entry) {
     const person = entry.person; const profile = el('div', 'consultant-profile');
-    const summary = typeof person.personalizedMatch?.summary === 'string' && baselineCitations(person).length ? person.personalizedMatch.summary.trim() : '';
-    if (person.description && person.description.trim() !== summary) {
-      const about = el('section', 'profile-section profile-about'); about.append(el('h3', 'profile-section-title', 'About'), profileText(person.description)); profile.append(about);
-    }
-    if (summary) {
-      const preview = el('section', 'profile-section sheet-preview');
-      const concise = conciseProfileRelevance(person, entry.context);
-      preview.append(el('h3', 'profile-section-title', 'Relevant to your search'));
-      if (concise) preview.append(profileText(concise, 'profile-baseline'));
-      if (summary !== concise) {
-        const full = el('details', 'profile-more profile-full-summary'); const toggle = el('summary'); toggle.append(el('span', '', 'Full profile summary'), icon('chevron'));
-        full.append(toggle, el('p', 'profile-description', displayProfileText(summary))); preview.append(full);
+    const accordion = (title, className) => {
+      const details = el('details', `profile-accordion ${className}`); const toggle = el('summary', 'profile-accordion-toggle');
+      toggle.append(el('span', '', title), icon('chevron')); details.append(toggle);
+      const body = el('div', 'profile-accordion-body'); details.append(body); return { details, body };
+    };
+    const languages = [...new Set(list(person.languages).map(textValue).filter(Boolean))];
+    const insurers = list(person.insurers).map(textValue).filter(Boolean);
+    if (person.description || languages.length || insurers.length || person.gmc) {
+      const about = accordion('About', 'profile-about');
+      if (person.description) about.body.append(el('p', 'profile-description', displayProfileText(person.description)));
+      if (languages.length || insurers.length || person.gmc) {
+        const facts = el('dl', 'profile-facts');
+        const fact = (label, value) => { const row = el('div'); row.append(el('dt', '', label), el('dd', '', value)); facts.append(row); };
+        if (languages.length) fact('Languages listed', languages.join(' · '));
+        if (insurers.length) fact('Insurer recognition listed', insurers.join(' · '));
+        if (person.gmc) fact('GMC registration', person.gmc);
+        about.body.append(facts);
       }
-      profile.append(preview);
+      profile.append(about.details);
     }
-    const interests = [...new Set(list(person.clinicalInterests).map(textValue).map(text => text.trim()).filter(text => readableProfileExcerpt(text, 500)))];
+    const interests = [...new Set(list(person.clinicalInterests).map(textValue).map(text => text.trim()).filter(text => readableProfileExcerpt(text, 500) && informativeProfilePhrase(text)))];
     const highlights = profileHighlights(person, entry.context, 3);
     if (interests.length || highlights.length) {
-      const focus = el('section', 'profile-section profile-clinical'); focus.append(el('h3', 'profile-section-title', 'Clinical focus'));
+      const focus = accordion('Clinical focus', 'profile-clinical');
       const items = el('ul', 'profile-focus-list');
       const shown = highlights.length ? highlights.map(item => item.text) : interests.slice(0, 3);
-      shown.forEach(text => items.append(el('li', '', text))); focus.append(items);
       const shownKeys = new Set(shown.map(text => text.toLowerCase().replace(/[.]+$/, '')));
       const remaining = interests.filter(text => !shownKeys.has(text.toLowerCase().replace(/[.]+$/, '')));
-      if (remaining.length) {
-        const more = el('details', 'profile-more'); const toggle = el('summary'); toggle.append(el('span', '', `More clinical interests (${remaining.length})`), icon('chevron')); more.append(toggle);
-        const rest = el('ul', 'profile-focus-list'); remaining.forEach(text => rest.append(el('li', '', text))); more.append(rest); focus.append(more);
-      }
-      profile.append(focus);
+      [...shown, ...remaining].forEach(text => items.append(el('li', '', text))); focus.body.append(items); profile.append(focus.details);
     }
     const locations = list(person.locations).filter(Boolean);
     if (locations.length) {
-      const section = el('section', 'profile-section profile-locations'); section.append(el('h3', 'profile-section-title', locations.length === 1 ? 'Practice location' : 'Practice locations'));
+      const section = accordion(locations.length === 1 ? 'Practice location' : 'Practice locations', 'profile-locations');
       locations.forEach((location, index) => {
         const place = el('div', 'profile-location'); const name = typeof location === 'string' ? location : location.name || location.address || location.postcode;
         const heading = el('p', 'profile-location-name'); heading.append(icon('pin'), el('span', '', name || 'Recorded practice')); place.append(heading);
@@ -619,20 +674,9 @@
           if (address && address !== name) place.append(el('p', 'profile-location-address', address));
         }
         if (index === 0 && (person.distanceLabel || Number.isFinite(person.distanceMiles))) place.append(el('p', 'profile-location-distance', `${person.distanceLabel || `${person.distanceMiles.toFixed(1)} miles away`} · approximate straight-line distance`));
-        section.append(place);
+        section.body.append(place);
       });
-      profile.append(section);
-    }
-    const languages = [...new Set(list(person.languages).map(textValue).filter(Boolean))];
-    const insurers = list(person.insurers).map(textValue).filter(Boolean);
-    if (languages.length || insurers.length || person.gmc) {
-      const details = el('section', 'profile-section profile-practical'); details.append(el('h3', 'profile-section-title', 'Useful details'));
-      const facts = el('dl', 'profile-facts');
-      const fact = (label, value) => { const row = el('div'); row.append(el('dt', '', label), el('dd', '', value)); facts.append(row); };
-      if (languages.length) fact('Languages listed', languages.join(' · '));
-      if (insurers.length) fact('Insurer recognition listed', insurers.join(' · '));
-      if (person.gmc) fact('GMC registration', person.gmc);
-      details.append(facts); profile.append(details);
+      profile.append(section.details);
     }
     const external = link('View full Spire profile', person.profileUrl, 'profile-external-link');
     if (external) { external.append(icon('external')); profile.append(external); }
@@ -642,22 +686,32 @@
   function renderSheet(entry) {
     if (matchSheet.entry !== entry || entry.epoch !== state.epoch) return;
     const content = $('sheet-content'); const fragment = document.createDocumentFragment();
-    // Keep the profile mounted while only the AI panel changes. Open disclosures,
-    // selected text and a patient's reading position survive generation/retries.
-    if (!content.querySelector('.consultant-profile')) content.append(renderConsultantProfile(entry));
+    const scroller = $('sheet-scroll'); const priorScroll = scroller.scrollTop;
+    // Keep accordions mounted while only the first, independent AI panel changes.
+    // Retaining the node per result also retains disclosure states on reopening.
+    const profile = entry.profileNode || (entry.profileNode = renderConsultantProfile(entry));
     let panel = content.querySelector('.profile-match-panel');
-    if (!panel) { panel = el('section', 'profile-match-panel'); panel.setAttribute('aria-label', 'Why this could be a match'); content.append(panel); }
+    const preserveBelow = panel && panel.getBoundingClientRect().bottom <= scroller.getBoundingClientRect().top;
+    const beforeProfileTop = preserveBelow ? profile.getBoundingClientRect().top : null;
+    if (!panel) {
+      panel = el('section', 'profile-match-panel'); panel.setAttribute('aria-label', 'Why this could be a match');
+      matchSheet.caveatsNode ||= $('sheet-caveats'); content.append(panel, matchSheet.caveatsNode, profile);
+    }
     const busy = Boolean(entry.pending); const data = entry.cached;
     matchSheet.dialog.classList.toggle('is-loading', busy); matchSheet.dialog.classList.toggle('is-ready', Boolean(data));
     content.setAttribute('aria-busy', 'false'); panel.setAttribute('aria-busy', String(busy));
     const heading = el('h3', 'profile-match-heading'); heading.append(icon('spark'), el('span', '', 'Why this could be a match')); fragment.append(heading);
+    const baseline = conciseProfileRelevance(entry.person, entry.context);
+    if (!data && baseline) {
+      const preview = el('section', 'sheet-preview'); preview.append(el('p', 'sheet-provider', 'From profile evidence'), el('p', 'sheet-summary', baseline)); fragment.append(preview);
+    }
     if (busy) {
-      const hasSummary = Boolean(content.querySelector('.sheet-preview'));
+      const hasSummary = Boolean(baseline);
       const progress = el('div', `sheet-progress${hasSummary ? ' has-summary' : ''}`); const label = el('p', 'sheet-progress-text'); label.append(el('span', 'explanation-pulse'), document.createTextNode(data ? 'Checking your explanation…' : 'Personalising your explanation…')); progress.append(label);
       if (!data && !hasSummary) { const skeleton = el('div', 'sheet-skeleton'); skeleton.setAttribute('aria-hidden', 'true'); for (let index = 0; index < 3; index++) skeleton.append(el('span')); progress.append(skeleton); }
       fragment.append(progress);
     } else if (!data && !entry.error) {
-      fragment.append(el('p', 'profile-match-intro', 'Connect your search with the details in this consultant’s profile.'));
+      if (!baseline) fragment.append(el('p', 'profile-match-intro', 'Connect your search with the details in this consultant’s profile.'));
       const start = el('button', 'explanation-start', 'Personalise my match'); start.type = 'button'; start.addEventListener('click', () => loadMatchExplanation(entry)); fragment.append(start);
     }
     if (data) {
@@ -675,6 +729,8 @@
     }
     if (panel.contains(document.activeElement)) { panel.setAttribute('tabindex', '-1'); panel.focus({ preventScroll: true }); }
     panel.replaceChildren(fragment); renderSheetCaveats(entry); renderSheetSources(entry);
+    if (preserveBelow) scroller.scrollTop = priorScroll + profile.getBoundingClientRect().top - beforeProfileTop;
+    else if (scroller.scrollTop !== priorScroll) scroller.scrollTop = priorScroll;
   }
 
   function checkedExplanation(data) {
@@ -734,7 +790,7 @@
     closeMatchSheet({ immediate: true, restoreFocus: false });
     entry.button = trigger;
     matchSheet.entry = entry; matchSheet.version += 1; matchSheet.returnFocus = trigger;
-    matchSheet.scrollX = window.scrollX; matchSheet.scrollY = window.scrollY;
+    matchSheet.resultsPosition = captureResultsPosition();
     entry.button.setAttribute('aria-expanded', 'true');
     const identity = el('div', 'sheet-person'); const title = el('div', 'sheet-person-copy');
     title.append(el('h2', 'sheet-name', entry.person.name || 'Consultant profile')); title.firstElementChild.id = 'sheet-consultant-name';
@@ -744,11 +800,12 @@
     identity.append(portrait(entry.person, 'sheet-avatar'), title); $('sheet-identity').replaceChildren(identity);
     $('sheet-provenance').replaceChildren(); $('sheet-content').replaceChildren(); $('sheet-status').textContent = '';
     matchSheet.dialog.classList.remove('is-closing'); matchSheet.dialog.classList.add('is-opening'); document.body.classList.add('sheet-open');
-    renderSheet(entry); matchSheet.dialog.showModal(); $('sheet-scroll').scrollTop = 0; $('sheet-close').focus({ preventScroll: true });
+    renderSheet(entry); matchSheet.dialog.showModal();
+    const sources = $('sheet-provenance').querySelector('details'); if (sources) sources.open = Boolean(entry.sheetState?.sourcesOpen);
+    $('sheet-scroll').scrollTop = entry.sheetState?.scrollTop || 0; $('sheet-close').focus({ preventScroll: true });
     const version = matchSheet.version;
-    window.setTimeout(() => { if (version === matchSheet.version) matchSheet.dialog.classList.remove('is-opening'); }, reducedMotion ? 0 : 360);
+    window.setTimeout(() => { if (version === matchSheet.version) matchSheet.dialog.classList.remove('is-opening'); }, reducedMotion ? 0 : 280);
     if (explain && !entry.cached && !entry.error) loadMatchExplanation(entry);
-    if (explain) $('sheet-content').querySelector('.profile-match-panel')?.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'instant' : 'smooth' });
     profileRouteOpened(entry, explain);
   }
 
@@ -816,16 +873,17 @@
     const relevance = conciseProfileRelevance(person, searchContext) || (!focus.length ? profileSentences(person.description)[0] : '');
     if (relevance) article.append(el('p', 'card-match-summary', relevance));
     const actions = el('div', 'card-actions');
-    const view = el('button', 'view-consultant', 'View consultant'); view.type = 'button'; view.setAttribute('aria-haspopup', 'dialog'); view.setAttribute('aria-controls', 'match-dialog'); view.setAttribute('aria-expanded', 'false'); view.setAttribute('aria-label', `View ${person.name || 'this consultant'}’s profile`); view.append(icon('chevron'));
-    const why = el('button', 'explanation-toggle'); why.type = 'button'; why.id = `explanation-toggle-${++explanationNumber}`;
-    why.setAttribute('aria-haspopup', 'dialog'); why.setAttribute('aria-controls', 'match-dialog'); why.setAttribute('aria-expanded', 'false');
-    why.setAttribute('aria-label', `Why ${person.name || 'this consultant'} matches your search`);
-    why.title = 'Uses your search preferences and profile evidence'; why.append(icon('spark'), el('span', 'explanation-toggle-label', 'Why this could be a match'));
-    const disclosure = el('span', 'sr-only', 'Uses your search preferences and profile evidence to prepare an explanation.'); disclosure.id = `${why.id}-disclosure`; why.setAttribute('aria-describedby', disclosure.id);
-    const entry = { person, context: searchContext, epoch: state.epoch, button: why, cached: null, pending: null, error: null,
+    const view = el('button', 'view-consultant explanation-toggle', 'View consultant'); view.type = 'button'; view.id = `explanation-toggle-${++explanationNumber}`; view.setAttribute('aria-haspopup', 'dialog'); view.setAttribute('aria-controls', 'match-dialog'); view.setAttribute('aria-expanded', 'false'); view.setAttribute('aria-label', `View ${person.name || 'this consultant'}’s profile and match explanation`); view.append(icon('chevron'));
+    const disclosure = el('span', 'sr-only', 'Opens the profile and prepares an explanation using your search and linked profile evidence.'); disclosure.id = `${view.id}-disclosure`; view.setAttribute('aria-describedby', disclosure.id);
+    const entry = { person, context: searchContext, epoch: state.epoch, button: view, cached: null, pending: null, error: null,
       request: Object.freeze({ sessionId: searchContext.sessionId, searchId: searchContext.searchId, consultantId: person.id }) };
-    view.addEventListener('click', () => openMatchSheet(entry, { explain: false, trigger: view }));
-    why.addEventListener('click', () => openMatchSheet(entry, { explain: true, trigger: why })); actions.append(view, why, disclosure);
+    view.addEventListener('click', () => openMatchSheet(entry, { explain: true, trigger: view })); actions.append(view, disclosure);
+    article.addEventListener('click', event => {
+      if (event.defaultPrevented || (event.button !== undefined && event.button !== 0) || state.busy || view.disabled) return;
+      if (event.target.closest('button, a, input, textarea, select, summary, details, [contenteditable="true"]')) return;
+      const selection = window.getSelection?.(); if (selection && !selection.isCollapsed && String(selection).trim()) return;
+      view.click();
+    });
     article.append(actions); return article;
   }
 
@@ -856,7 +914,6 @@
     if (!turn) return;
     closeMatchSheet({ immediate: true, restoreFocus: false });
     state.activeTurn = turn;
-    if (!state.busy) renderSubmittedMessage(turn.message);
     const preview = turn !== state.turns.at(-1);
     state.turns.forEach((entry) => { entry.node.hidden = entry !== turn; });
     $('history-preview').hidden = !preview;
@@ -868,7 +925,7 @@
     setBusy(state.busy);
     if (scroll) {
       const epoch = state.epoch;
-      window.requestAnimationFrame(() => { if (epoch === state.epoch) document.querySelector('.search-overview').scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' }); });
+      window.requestAnimationFrame(() => { if (epoch === state.epoch) showUpdatedMatches(); });
     }
   }
 
@@ -916,7 +973,8 @@
 
   function renderSubmittedMessage(message, pending = false) {
     const container = $('submitted-message'); container.replaceChildren(); container.hidden = !message;
-    if (message) container.append(el('span', 'message-eyebrow', pending ? 'Your request · sent' : 'Your latest request'), el('p', 'message-text', message));
+    container.title = message;
+    if (message) container.append(icon('check'), el('span', 'message-text', pending ? 'Request sent' : 'Shortlist updated'));
   }
 
   async function send(request, displayMessage, { preserveDraft = false } = {}) {
@@ -927,13 +985,16 @@
     const epoch = state.epoch;
     closeMatchSheet({ immediate: true, restoreFocus: false });
     if (navigation.screen === 'profile') routeTo('results', {}, true);
-    openConversation(); $('search-error').replaceChildren();
+    openConversation();
+    const beforeClear = captureResultsPosition(); $('search-error').replaceChildren(); restoreResultsPosition(beforeClear);
     state.lastMessage = message; state.failedRequest = null;
     renderSubmittedMessage(message, true);
     if (payload.message && !preserveDraft) {
       ['initial-query', 'followup-query'].forEach((id) => { $(id).value = ''; resizeInput($(id)); });
     }
     const skeleton = loading(); setBusy(true);
+    // Focus follows submission, never a later network response.
+    $('followup-query').focus({ preventScroll: true });
     const controller = new AbortController(); state.controller = controller;
     const timeout = window.setTimeout(() => controller.abort('timeout'), 90000);
     announce(state.turns.length ? 'Updating your shortlist. Your current results remain available.' : 'Searching Spire consultant records.');
@@ -949,11 +1010,15 @@
       if (!Array.isArray(data.results) || !data.sessionId) throw new Error('The search response was incomplete. Please try again.');
       // Build first; only commit criteria and shortlist after a complete response.
       const turn = { message, data, labels: labelsFor(data), node: renderResponse(data) };
+      const position = $('workspace').hidden ? navigation.resultsPosition || { top: 0 } : captureResultsPosition();
       const previous = cardPositions();
       state.sessionId = data.sessionId; state.criteria = data.criteria || {}; state.criteriaLabels = turn.labels;
       state.turns.push(turn); $('conversation').append(turn.node);
       skeleton?.remove(); $('search-status').replaceChildren();
-      showTurn(turn, false); animateShortlist(turn, previous);
+      showTurn(turn, false);
+      if (!$('workspace').hidden) { restoreResultsPosition(position); animateShortlist(turn, previous); }
+      else navigation.resultsPosition = position;
+      $('view-updated-matches').hidden = state.turns.length < 2;
       renderSubmittedMessage(message);
       announce((data.message || 'Your shortlist is ready.') + ' ' + data.results.length + ' profiles displayed.');
     } catch (error) {
@@ -961,12 +1026,15 @@
       skeleton?.remove(); $('search-status').replaceChildren();
       if (controller.signal.aborted) error = new Error('This is taking longer than expected. Please try again. Your current shortlist is unchanged.');
       state.failedRequest = { request: payload, message };
+      const position = captureResultsPosition();
       renderError(error, payload, message);
+      if (!$('workspace').hidden) restoreResultsPosition(position);
+      renderSubmittedMessage('Search not updated'); $('submitted-message').querySelector('.message-text').textContent = 'Search not updated';
+      $('view-updated-matches').hidden = false;
     } finally {
       window.clearTimeout(timeout);
       if (epoch === state.epoch && state.controller === controller) {
         state.controller = null; setBusy(false);
-        if (!$('workspace').hidden && !matchSheet.dialog.open && document.activeElement !== $('initial-query')) $('followup-query').focus({ preventScroll: true });
       }
     }
   }
@@ -978,6 +1046,14 @@
   window.addEventListener('resize', () => {
     window.requestAnimationFrame(() => ['initial-query', 'followup-query'].forEach((id) => resizeInput($(id))));
   });
+  function updateViewport() {
+    const viewport = window.visualViewport;
+    document.documentElement.style.setProperty('--app-height', `${viewport?.height || window.innerHeight}px`);
+    document.documentElement.style.setProperty('--viewport-top', `${viewport?.offsetTop || 0}px`);
+  }
+  window.visualViewport?.addEventListener('resize', updateViewport);
+  window.visualViewport?.addEventListener('scroll', updateViewport);
+  window.addEventListener('resize', updateViewport); updateViewport();
   function startSearch(message) {
     if (!message.trim()) return;
     if (state.sessionId || state.turns.length || state.busy || state.failedRequest) reset();
@@ -990,6 +1066,16 @@
   $('brand-home').addEventListener('click', () => showHome());
   $('back-search').addEventListener('click', () => { if (history.back && navigation.screen === 'results') history.back(); else showHome(); });
   $('resume-search').addEventListener('click', () => resumeSearch());
+  $('view-updated-matches').addEventListener('click', showUpdatedMatches);
+  document.addEventListener('click', (event) => {
+    const anchor = event.target.closest?.('#healthcare-open, #healthcare-return');
+    if (!anchor || event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (anchor.id === 'healthcare-open') showHealthcare();
+    else if (state.turns.length || state.busy || state.failedRequest) resumeSearch();
+    else showHome();
+  });
+  window.addEventListener('docmap:healthcare-ready', () => window.DocMapHealthcare?.setVisible(navigation.screen === 'healthcare'));
   $('see-how').addEventListener('click', (event) => { event.preventDefault(); $('homepage-story').scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' }); });
   $('return-current').addEventListener('click', () => { showTurn(state.turns.at(-1), true); $('followup-query').focus({ preventScroll: true }); announce('Back to your current search.'); });
   $('history-open').addEventListener('click', () => { renderHistory(); $('history-dialog').showModal(); });
@@ -1005,6 +1091,8 @@
     });
     // Native dialog restores focus to its opener on Escape, close and backdrop.
   });
+  if (initialScreen === 'healthcare') showHealthcare({ record: false, focus: false });
+  document.documentElement.removeAttribute('data-entry');
   fetch('/api/health').then((response) => response.ok ? response.json() : null).then((health) => {
     if (health?.sourceLabel) $('data-source-label').textContent = health.sourceLabel;
     if (health?.recordCount > 0) $('data-description').textContent = Number(health.recordCount).toLocaleString() + ' consultant records with evidence of Spire affiliation. Every profile links to its sources.' + (health.notice ? ' ' + health.notice : '');

@@ -82,7 +82,8 @@ test('walkthrough navigation and replay never submit a search or overwrite the p
   assert.equal(calls.requests, 0);
   assert.equal(calls.animations.length, 0, 'reduced motion shows all content immediately');
   assert.match(mount.textContent, /Example walkthrough/);
-  assert.match(mount.textContent, /Outcomes to evaluate with your team in a pilot/);
+  assert.doesNotMatch(mount.textContent, /What a pilot can measure|For hospitals/);
+  assert.equal(mount.querySelectorAll('.wt-healthcare-link')[0].href, '/for-healthcare-teams');
   assert.match(mount.textContent, /stage 3 disease still needs to be confirmed/);
 });
 

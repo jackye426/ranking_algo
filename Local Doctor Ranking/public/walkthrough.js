@@ -142,29 +142,12 @@
   layout.append(navigation, panel);
   section.append(introduction, layout);
 
-  const value = element('section', 'wt-value');
-  value.setAttribute('aria-labelledby', 'wt-value-title');
-  const valueIntro = element('div', 'wt-value-intro');
-  valueIntro.append(element('p', 'wt-eyebrow', 'For hospitals'));
-  const valueTitle = element('h2', 'wt-value-title');
-  valueTitle.append(element('span', '', 'Your expertise.'), element('span', 'wt-value-emphasis', 'Easier to find.'));
-  valueTitle.id = 'wt-value-title';
-  valueIntro.append(valueTitle, element('p', 'wt-value-copy', 'Give patients a clearer route from their own words to a relevant consultant.'));
-  const outcomes = element('div', 'wt-value-outcomes');
-  outcomes.append(element('p', 'wt-measure-heading', 'What a pilot can measure'));
-  const benefits = element('div', 'wt-benefits');
-  [
-    ['Make expertise discoverable', 'Relevant consultant profiles explored.'],
-    ['Turn interest into a next step', 'Enquiries and booking starts.'],
-    ['See where search falls short', 'Search abandonment, compared with today.']
-  ].forEach(([heading, measure], index) => {
-    const item = element('article', 'wt-benefit');
-    item.append(element('span', 'wt-benefit-number', `0${index + 1}`), element('h3', '', heading), element('p', '', measure));
-    benefits.append(item);
-  });
-  outcomes.append(benefits, element('p', 'wt-value-note', 'Outcomes to evaluate with your team in a pilot.'));
-  value.append(valueIntro, outcomes);
-  mount.replaceChildren(section, value);
+  const footer = element('footer', 'wt-footer');
+  const healthcare = element('a', 'wt-healthcare-link');
+  healthcare.id = 'healthcare-open'; healthcare.href = '/for-healthcare-teams';
+  healthcare.append(element('span', '', 'For healthcare teams'), icon('arrow'));
+  footer.append(healthcare);
+  mount.replaceChildren(section, footer);
 
   function stop() {
     for (const animation of animations) animation.cancel();
