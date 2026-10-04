@@ -35,6 +35,9 @@ public/**
 !public/styles.css
 !public/app.js
 !public/profiles.css
+!public/comparison-data.js
+!public/comparison.js
+!public/comparison.css
 !public/walkthrough.css
 !public/walkthrough.js
 !public/healthcare.css

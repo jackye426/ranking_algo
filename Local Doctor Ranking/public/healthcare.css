@@ -1,78 +1,56 @@
-/* An editorial presentation surface; the patient search retains its own flow. */
+/* A quiet presentation wrapper around the shared, verified search comparison. */
 #healthcare-view{width:100%;min-height:calc(100svh - 100px)}
-.hc-page{width:min(1120px,100%);padding:24px 32px 112px;margin:0 auto}
+.hc-page{width:min(1200px,100%);padding:24px 40px 120px;margin:0 auto}
 .hc-icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .hc-return{display:inline-flex;align-items:center;gap:9px;min-height:44px;padding:10px 0;text-decoration:none;font-size:13px;color:var(--muted)}
 .hc-return:hover{color:var(--accent)}.hc-return .hc-icon{width:16px;height:16px}
-.hc-header{text-align:center;max-width:780px;margin:62px auto 58px}
-.hc-eyebrow{margin:0 0 23px;font-size:12px;line-height:1.5;font-weight:550;color:var(--accent);letter-spacing:.025em}
-.hc-title{font-size:clamp(43px,6.2vw,72px);line-height:1.04;letter-spacing:-.057em;font-weight:570;margin:0 0 27px}
-.hc-title span{display:block}.hc-title-accent{color:var(--accent)}
-.hc-title:focus{outline:none}
-.hc-intro{font-size:18px;line-height:1.65;letter-spacing:-.014em;color:#62697e;max-width:570px;margin:0 auto}
-.hc-story{position:relative;border:1px solid #fff;border-radius:36px;padding:18px 32px 34px;background:linear-gradient(135deg,#f7f8ff 0%,#eff0ff 53%,#e9edfc 100%);box-shadow:0 28px 80px -56px #4542833b,inset 0 1px 0 #ffffff}
-.hc-story-controls{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:42px}
-.hc-prepared{font-size:11px;line-height:1.5;margin:0;color:#747a91}
-.hc-replay{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:10px 0 10px 12px;border:0;border-radius:10px;background:transparent;color:#696f86;font-size:11px}
-.hc-replay:hover{color:var(--accent)}.hc-replay .hc-icon{width:13px;height:13px}
-.hc-question{text-align:center;max-width:760px;margin:26px auto 37px;padding:0 18px}
-.hc-step-label{font-size:11px;font-weight:550;line-height:1.5;color:#747a8f;margin:0 0 15px;letter-spacing:.012em}
-.hc-patient-words{margin:0;font-size:clamp(20px,2.45vw,27px);line-height:1.45;letter-spacing:-.025em;font-weight:450;color:#30394e}
-.hc-patient-emphasis{color:var(--accent)}
-.hc-bridge{display:grid;grid-template-columns:minmax(0,.87fr) 51px minmax(0,1.13fr);gap:23px;align-items:center}
-.hc-identity{min-width:0;padding:32px 28px 22px;border-radius:25px;background:#ffffffa8;border:1px solid #ffffff}
-.hc-specialty{font-size:clamp(24px,2.9vw,32px);font-weight:500;line-height:1.16;letter-spacing:-.036em;margin:0 0 31px;max-width:295px;color:#545d73}
-.hc-person{display:flex;align-items:center;gap:12px;margin:0 0 7px}
-.hc-person-initials{display:grid;place-items:center;flex-shrink:0;width:41px;height:41px;border-radius:14px;background:#e8ebf7;color:#68728c;font-size:13px;font-weight:500;letter-spacing:-.01em}
-.hc-person-copy{min-width:0}.hc-person-name{font-size:14px;font-weight:550;line-height:1.5;letter-spacing:-.01em;margin:0}
-.hc-person-caption{font-size:11px;color:#767e92;line-height:1.5;margin:3px 0 0}
-.hc-connector{display:flex;align-items:center;justify-content:center;color:#8b8bd6;gap:0;overflow:hidden}
-.hc-connector-line{width:29px;height:1px;background:linear-gradient(90deg,#bfc3e0,#8b8bd6)}
-.hc-connector .hc-icon{width:24px;height:24px;flex-shrink:0;margin-left:-7px}
-.hc-detail{min-width:0;border:1px solid #fff;border-radius:25px;background:#fff;padding:28px 29px 25px;box-shadow:0 11px 35px -20px #42447135}
-.hc-detail .hc-step-label{color:var(--accent);margin-bottom:18px}
-.hc-record-label{font-size:11px;line-height:1.6;color:#7a8092;margin:0 0 9px}
-.hc-record-excerpt{font-size:clamp(19px,2.1vw,24px);line-height:1.45;letter-spacing:-.027em;font-weight:470;margin:0 0 10px;color:#343b54}
-.hc-evidence-highlight{color:var(--accent);background:#eeedff;border-radius:5px;padding:1px 3px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
-.hc-source{display:inline-flex;align-items:center;gap:7px;min-height:44px;font-size:11px;line-height:1.5;text-decoration:none;color:var(--accent);padding:10px 0}
-.hc-source:hover{text-decoration:underline}.hc-source .hc-icon{width:12px;height:12px}.hc-secondary-source{color:#737b93}
-.hc-limit{font-size:11px;line-height:1.7;color:#71788b;border-top:1px solid #edf0f6;margin:9px 0 0;padding-top:14px}
-.hc-takeaway{text-align:center;margin:47px auto 0;max-width:730px}
-.hc-takeaway-title{font-size:clamp(22px,2.7vw,30px);line-height:1.3;letter-spacing:-.035em;font-weight:530;margin:0 0 13px}
-.hc-takeaway-copy{font-size:15px;line-height:1.75;color:#697186;margin:0}
-.hc-pilot{max-width:840px;margin:86px auto 0;border-top:1px solid #dde1ef;border-bottom:1px solid #dde1ef}
-.hc-pilot-summary{display:flex;align-items:center;justify-content:space-between;gap:24px;list-style:none;cursor:pointer;padding:26px 0;min-height:80px}
+.hc-header{text-align:center;max-width:1050px;margin:68px auto 0}
+.hc-eyebrow{margin:0 0 27px;font-size:12px;line-height:1.5;font-weight:550;color:var(--accent);letter-spacing:.025em}
+.hc-title{font-size:clamp(36px,4.8vw,60px);line-height:1.09;letter-spacing:-.052em;font-weight:500;margin:0 auto 30px;text-wrap:balance}
+.hc-title span{display:block}.hc-title-accent{color:var(--accent)}.hc-title:focus{outline:none}
+.hc-intro{font-size:17px;line-height:1.8;letter-spacing:-.01em;color:#62697e;max-width:675px;margin:0 auto;text-wrap:pretty}
+.hc-story{margin:72px auto 0;min-width:0}
+.hc-context{font-size:15px;line-height:1.85;letter-spacing:-.008em;color:#687087;max-width:710px;margin:0 auto 29px;text-align:center;text-wrap:pretty}
+.hc-comparison{min-width:0;width:100%}
+.hc-comparison-loading{display:grid;place-items:center;min-height:280px;padding:30px;border:1px solid #e9eaf7;border-radius:30px;background:#f4f5fe;color:var(--muted);font-size:14px;text-align:center}
+.hc-next-step{margin:102px auto 0}
+.hc-next-step-title{max-width:650px;margin:0 auto 39px;text-align:center;font-size:clamp(29px,3.4vw,41px);font-weight:550;line-height:1.2;letter-spacing:-.042em;text-wrap:balance}
+.hc-value-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:21px}
+.hc-value{position:relative;min-width:0;padding:34px 29px 32px;border:1px solid #e6e8f3;border-radius:27px;background:linear-gradient(150deg,#ffffffed,#f7f8fddd);box-shadow:0 15px 40px -34px #42417135}
+.hc-value::before{content:'';display:block;width:24px;height:3px;background:#bcbbef;border-radius:4px;margin:0 0 28px}
+.hc-value h3{font-size:22px;line-height:1.25;letter-spacing:-.029em;font-weight:550;margin:0 0 17px;max-width:250px;text-wrap:balance}
+.hc-value p{font-size:14px;line-height:1.8;color:#697186;margin:0;text-wrap:pretty}
+.hc-pilot{max-width:920px;margin:90px auto 0;border-top:1px solid #dde1ef;border-bottom:1px solid #dde1ef}
+.hc-pilot-summary{display:flex;align-items:center;justify-content:space-between;gap:24px;list-style:none;cursor:pointer;padding:26px 1px;min-height:88px}
 .hc-pilot-summary::-webkit-details-marker{display:none}.hc-pilot-heading{display:block;min-width:0}
 .hc-pilot-title{display:block;font-size:18px;font-weight:530;line-height:1.45;letter-spacing:-.023em}
-.hc-pilot-caption{display:block;font-size:13px;line-height:1.65;color:var(--muted);margin-top:5px}
-.hc-pilot-summary .hc-icon{width:20px;height:20px;color:#8289a2;transition:transform .18s}
+.hc-pilot-caption{display:block;font-size:13px;line-height:1.65;color:var(--muted);margin-top:6px}
+.hc-pilot-summary .hc-icon{width:20px;height:20px;color:#8289a2;transition:transform .16s}
 .hc-pilot[open] .hc-pilot-summary .hc-icon{transform:rotate(45deg)}
-.hc-pilot-body{padding:0 0 26px}.hc-pilot-intro{font-size:14px;line-height:1.75;color:var(--muted);max-width:550px;margin:2px 0 28px}
-.hc-measures{list-style:none;counter-reset:hc-measure;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:34px;margin:0;padding:0}
-.hc-measure{counter-increment:hc-measure}.hc-measure::before{content:'0' counter(hc-measure);font-size:11px;color:var(--accent);font-weight:500;letter-spacing:.035em;display:block;margin:0 0 12px}
-.hc-measure h3{font-size:15px;line-height:1.5;font-weight:550;letter-spacing:-.016em;margin:0 0 8px}.hc-measure p{font-size:12px;line-height:1.8;color:var(--muted);margin:0}
-.hc-pilot-note{font-size:11px;line-height:1.7;color:#858ba0;margin:28px 0 0}
-@media(max-width:850px){
-  .hc-page{padding:16px 28px 90px}.hc-header{margin:46px auto 45px}.hc-intro{font-size:17px;max-width:520px}
-  .hc-story{padding:16px 24px 26px;border-radius:30px}.hc-question{padding:0 5px;margin:22px auto 31px}
-  .hc-bridge{gap:15px;grid-template-columns:minmax(0,.9fr) 27px minmax(0,1.1fr)}
-  .hc-identity{padding:27px 22px 17px}.hc-detail{padding:26px 23px 22px}.hc-specialty{font-size:26px}
-  .hc-connector-line{width:12px}.hc-record-excerpt{font-size:21px}.hc-person-name{font-size:13px}
+.hc-pilot-body{padding:0 1px 31px}.hc-pilot-intro{font-size:14px;line-height:1.8;color:var(--muted);max-width:650px;margin:2px 0 32px;text-wrap:pretty}
+.hc-measures{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:30px 50px;margin:0;padding:0}
+.hc-measure h3{font-size:15px;line-height:1.5;font-weight:550;letter-spacing:-.016em;margin:0 0 9px}
+.hc-measure p{font-size:13px;line-height:1.8;color:var(--muted);margin:0}
+.hc-pilot-note{font-size:12px;line-height:1.7;color:#7c849a;margin:30px 0 0}
+@media(max-width:950px){
+  .hc-page{padding:20px 30px 100px}.hc-header{margin-top:50px}.hc-title{font-size:clamp(36px,5.5vw,52px)}
+  .hc-story{margin-top:60px}.hc-next-step{margin-top:82px}.hc-value-grid{gap:16px}.hc-value{padding:29px 23px}.hc-value h3{font-size:20px}
 }
-@media(max-width:670px){
-  .hc-header{margin:41px auto 37px}.hc-title{font-size:clamp(39px,7.5vw,50px);margin-bottom:23px}
-  .hc-eyebrow{font-size:11px;margin-bottom:20px}.hc-intro{font-size:16px;max-width:450px}
-  .hc-story{padding:13px 20px 23px}.hc-question{margin:22px auto 29px}.hc-patient-words{font-size:21px}
-  .hc-bridge{grid-template-columns:1fr;gap:13px}.hc-connector{height:27px;transform:rotate(90deg);width:40px;justify-self:center}
-  .hc-identity{padding:24px 24px 13px}.hc-specialty{max-width:none;font-size:27px;margin-bottom:22px}
-  .hc-identity .hc-step-label{margin-bottom:13px}.hc-detail{padding:25px 24px 22px}.hc-record-excerpt{font-size:24px}
-  .hc-takeaway{margin-top:35px}.hc-takeaway-title{font-size:25px;max-width:390px;margin:0 auto 13px}.hc-takeaway-copy{font-size:14px;max-width:440px;margin:auto}
-  .hc-pilot{margin-top:65px}.hc-measures{grid-template-columns:1fr;gap:23px}.hc-measure{display:grid;grid-template-columns:23px 1fr;column-gap:14px}
-  .hc-measure::before{grid-row:1 / 3;padding-top:4px;margin:0}.hc-measure p{grid-column:2}.hc-measure h3{margin-bottom:5px}
+@media(max-width:720px){
+  .hc-page{padding:15px 24px 85px}.hc-header{margin-top:39px}.hc-eyebrow{font-size:11px;margin-bottom:23px}
+  .hc-title{font-size:clamp(34px,6.5vw,46px);line-height:1.1;margin-bottom:25px}.hc-intro{font-size:16px;max-width:540px}
+  .hc-story{margin-top:49px}.hc-context{font-size:14px;line-height:1.85;max-width:550px;margin-bottom:25px}
+  .hc-next-step{margin-top:68px}.hc-next-step-title{font-size:32px;max-width:420px;margin-bottom:29px}
+  .hc-value-grid{grid-template-columns:1fr;gap:17px;max-width:550px;margin:0 auto}
+  .hc-value{padding:28px 29px 29px;border-radius:24px}.hc-value::before{margin-bottom:23px}
+  .hc-value h3{font-size:23px;max-width:none;margin-bottom:12px}.hc-value p{font-size:15px;max-width:430px}
+  .hc-pilot{margin-top:64px}.hc-measures{grid-template-columns:1fr;gap:25px}.hc-pilot-intro{margin-bottom:27px}
 }
 @media(max-width:400px){
-  .hc-page{padding:12px 19px 75px}.hc-title{font-size:38px}.hc-story{padding:11px 15px 19px;border-radius:25px}
-  .hc-question{padding:0;margin:22px auto 27px}.hc-patient-words{font-size:20px}.hc-identity,.hc-detail{padding-left:20px;padding-right:20px;border-radius:21px}
-  .hc-specialty{font-size:25px}.hc-record-excerpt{font-size:22px}.hc-pilot-caption{font-size:12px}
+  .hc-page{padding:12px 19px 75px}.hc-title{font-size:34px;letter-spacing:-.046em}.hc-intro{font-size:15px}
+  .hc-header{margin-top:34px}.hc-story{margin-top:42px}.hc-next-step-title{font-size:29px}
+  .hc-value{padding:26px 25px}.hc-value h3{font-size:22px}.hc-pilot-caption{font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){.hc-pilot-summary .hc-icon{transition:none}}
+@media(prefers-contrast:more){.hc-intro,.hc-context,.hc-value p{color:#464e65}.hc-value,.hc-pilot{border-color:#9299b3}}
+@media(forced-colors:active){.hc-value{border:1px solid CanvasText}.hc-value::before{background:CanvasText}}

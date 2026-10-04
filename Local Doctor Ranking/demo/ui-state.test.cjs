@@ -78,4 +78,4 @@ test('frontend preserves search state and owns explanation requests across sheet
  $('new-search').click();
 });
 
-// The replaced homepage guide is exercised in walkthrough.test.cjs.
+// The prepared homepage comparison is exercised in comparison.test.cjs.

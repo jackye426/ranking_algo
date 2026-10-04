@@ -1,0 +1,70 @@
+/* A prepared comparison shared by the patient and healthcare-team surfaces. */
+.cmp-comparison{width:100%;text-align:left;color:var(--ink);min-width:0}
+.cmp-prepared{font-size:11px;font-weight:500;line-height:1.6;letter-spacing:.015em;margin:0 0 21px;color:#797f94}
+.cmp-grid{display:grid;grid-template-columns:minmax(235px,.72fr) minmax(0,1.28fr);gap:clamp(48px,6.5vw,88px);align-items:start}
+.cmp-baseline{min-width:0;padding:29px 0 0}
+.cmp-eyebrow{font-size:11px;font-weight:550;line-height:1.5;letter-spacing:.025em;color:#7a8195;margin:0 0 9px}
+.cmp-section-heading{font-size:23px;font-weight:530;line-height:1.3;letter-spacing:-.035em;margin:0}
+.cmp-baseline .cmp-section-heading{color:#687187;font-size:21px}
+.cmp-baseline-prompt{font-size:26px;line-height:1.4;font-weight:500;letter-spacing:-.035em;margin:23px 0 28px;color:#3c475d}
+.cmp-baseline-results{display:grid;border-top:1px solid #dee3ef}
+.cmp-contextual{min-width:0;padding:28px;border:1px solid #fff;border-radius:30px;background:linear-gradient(140deg,#f1f2ffef,#eff2fbe8);box-shadow:0 18px 54px -36px #48438435,inset 0 1px 0 #fff}
+.cmp-context-top{display:flex;align-items:start;justify-content:space-between;gap:20px}
+.cmp-contextual .cmp-eyebrow{color:var(--accent)}
+.cmp-tabs{display:flex;gap:3px;align-items:center;width:fit-content;max-width:100%;padding:4px;border:1px solid #e0e3f1;background:#e6e9f5bd;border-radius:14px;margin:23px 0 24px}
+.cmp-tab{min-height:40px;white-space:nowrap;padding:9px 18px;border:1px solid transparent;border-radius:10px;background:transparent;color:#667089;font-size:12px;line-height:1.5;font-weight:500;transition:background 160ms,color 160ms,box-shadow 160ms}
+.cmp-tab[aria-selected="true"]{background:#fff;color:var(--accent);border-color:#ffffff;box-shadow:0 2px 8px #2f3b7310}
+.cmp-tab:hover:not([aria-selected="true"]){color:var(--accent);background:#ffffff50}
+.cmp-context-stage{display:grid;min-width:0}
+.cmp-context-panel,.cmp-context-sizing{grid-area:1 / 1;min-width:0;align-self:start}
+.cmp-context-sizing{display:grid;visibility:hidden;pointer-events:none;user-select:none}
+.cmp-size-variant{grid-area:1 / 1;min-width:0;align-self:start}
+.cmp-patient{margin:0 1px 24px}
+.cmp-patient-prompt{font-size:19px;line-height:1.55;font-weight:450;letter-spacing:-.025em;margin:0;color:#354159;max-width:510px}
+.cmp-followup{border-left:2px solid #b9b8ec;margin:16px 0 0;padding:1px 0 2px 13px}
+.cmp-followup-label{display:block;font-size:12px;line-height:1.5;color:#777c95;margin-bottom:4px}
+.cmp-followup-text{font-size:15px;font-weight:450;line-height:1.6;letter-spacing:-.013em;margin:0;color:#414a66}
+.cmp-understanding{font-size:13px;line-height:1.75;color:#71798e;margin:14px 0 0;max-width:510px}
+.cmp-context-results,.cmp-size-results{display:grid;gap:14px}
+.cmp-result,.cmp-size-card{min-width:0;padding:22px 23px 13px;border:1px solid #fff;border-radius:21px;background:#fffffff5;box-shadow:0 5px 20px -14px #34406d1c}
+.cmp-name{font-size:17px;font-weight:560;line-height:1.4;letter-spacing:-.022em;margin:0 0 5px;overflow-wrap:anywhere}
+.cmp-specialty{font-size:12px;line-height:1.65;color:#657087;margin:0;overflow-wrap:anywhere}
+.cmp-location{display:flex;align-items:start;gap:6px;font-size:12px;line-height:1.65;color:#7c8395;margin:8px 0 0}
+.cmp-icon{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.cmp-location .cmp-icon{width:12px;height:12px;margin-top:3px;color:#8a92a6}
+.cmp-reason{font-size:14px;line-height:1.75;letter-spacing:-.007em;margin:15px 0 0;color:#4d5871}
+.cmp-evidence{padding:0 0 0 10px;margin:11px 0 2px;border-left:2px solid #c9c8ee;font-size:12px;line-height:1.7;color:#747d94;overflow-wrap:anywhere}
+.cmp-sources{display:flex;align-items:center;flex-wrap:wrap;gap:0 17px;margin-top:4px}
+.cmp-source{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:8px 0;color:var(--accent);font-size:12px;line-height:1.6;text-decoration:none}
+.cmp-source:hover{text-decoration:underline}.cmp-source .cmp-icon{width:11px;height:11px}.cmp-source-secondary{color:#7c8397}
+.cmp-result-compact{padding:23px 0 15px;background:transparent;border:0;border-bottom:1px solid #dee3ef;border-radius:0;box-shadow:none}
+.cmp-result-compact .cmp-name{font-size:15px;font-weight:530;color:#566179}
+.cmp-result-compact .cmp-specialty{font-size:12px;color:#828a9c}.cmp-result-compact .cmp-location{font-size:12px;color:#858d9e;margin-top:6px}
+.cmp-result-compact .cmp-sources{margin-top:1px}.cmp-result-compact .cmp-source{min-height:40px;font-size:12px;color:#858ca0}
+.cmp-notice{font-size:11px;line-height:1.8;color:#80879b;margin:25px 0 0;max-width:590px}
+@media(max-width:1050px){
+ .cmp-grid{grid-template-columns:minmax(210px,.72fr) minmax(0,1.28fr);gap:42px}
+ .cmp-contextual{padding:24px}.cmp-result,.cmp-size-card{padding:21px 20px 12px}.cmp-result-compact{padding:22px 0 13px}
+ .cmp-section-heading{font-size:22px}.cmp-baseline .cmp-section-heading{font-size:20px}
+ .cmp-patient-prompt{font-size:18px}.cmp-tab{padding-left:15px;padding-right:15px}
+}
+@media(max-width:760px){
+ .cmp-grid{grid-template-columns:1fr;gap:38px}
+ .cmp-baseline{padding:0}.cmp-baseline .cmp-eyebrow{margin-bottom:7px}
+ .cmp-baseline-prompt{font-size:24px;margin:15px 0 18px}
+ .cmp-result-compact{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;padding:17px 0}
+ .cmp-result-compact .cmp-name{font-size:14px;margin-bottom:3px}.cmp-result-compact .cmp-specialty{grid-column:1;font-size:12px}
+ .cmp-result-compact .cmp-location{grid-column:1;margin-top:4px}.cmp-result-compact .cmp-sources{grid-column:2;grid-row:1 / 4;align-self:center;margin:0}
+ .cmp-result-compact .cmp-source{min-height:44px}.cmp-result-compact .cmp-location .cmp-icon{display:none}
+ .cmp-prepared{margin-bottom:20px}.cmp-contextual{border-radius:27px;padding:25px}.cmp-notice{font-size:10px;margin-top:20px}
+}
+@media(max-width:440px){
+ .cmp-grid{gap:31px}.cmp-contextual{padding:21px 17px 18px;border-radius:24px}
+ .cmp-section-heading{font-size:23px}.cmp-tabs{margin-top:20px;margin-bottom:22px;gap:2px;width:100%;padding:4px}
+ .cmp-tab{flex:1;padding:9px 9px;font-size:11px;min-height:40px}.cmp-patient-prompt{font-size:17px}
+ .cmp-result,.cmp-size-card{padding:19px 17px 10px;border-radius:18px}.cmp-result-compact{padding:15px 0;border-radius:0}
+ .cmp-name{font-size:16px}.cmp-reason{font-size:14px;line-height:1.75}.cmp-specialty{font-size:12px}.cmp-location{font-size:12px}
+ .cmp-understanding{font-size:13px}.cmp-followup-text{font-size:14px}.cmp-sources{gap:0 13px}.cmp-source{font-size:12px}
+ .cmp-patient{margin-bottom:21px}.cmp-result-compact .cmp-name{font-size:14px}.cmp-result-compact .cmp-specialty{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){.cmp-tab{transition:none}}

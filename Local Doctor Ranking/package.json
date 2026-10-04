@@ -8,7 +8,8 @@
     "start:legacy": "node server.js",
     "test": "node --test demo/*.test.cjs",
     "verify:demo": "node demo/scripts/verify.cjs",
-    "verify:refinements": "node demo/scripts/verify-refinements.cjs"
+    "verify:refinements": "node demo/scripts/verify-refinements.cjs",
+    "verify:comparison": "node demo/scripts/verify-comparison.cjs"
   },
   "keywords": [],
   "author": "",
