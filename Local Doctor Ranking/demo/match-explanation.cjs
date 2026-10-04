@@ -111,7 +111,7 @@ async function structuredResponse(client,provider,body,{signal,timeout}) {
     messages:[{role:'system',content:body.instructions},{role:'user',content:body.input}],
     response_format:{type:'json_schema',json_schema:{name,strict,schema}},
     ...(/^deepseek\//.test(body.model)?{reasoning:{enabled:false}}:{}),
-    provider:openRouterProvider(body.model,{check:name==='explanation_support_check'}),
+    provider:openRouterProvider(body.model,{check:['explanation_support_check','consultant_comparison'].includes(name)}),
   },{signal,...(timeout?{timeout}:{})});
   const choice=response.choices?.[0];
   if(choice?.message?.refusal) throw new Error('ModelRefusal');

@@ -60,5 +60,15 @@ test('comparison generation requires an independent support check and falls back
   const client={responses:{create:async(body)=>{calls.push(body);return {status:'completed',output_text:JSON.stringify(responses.shift())};}}};
   const answer=await createComparisonExplainer({client,provider:'openai',model:'test-model'})(context);assert.equal(answer.provider,'openai');assert.equal(calls.length,2);assert.ok(answer.citations.every(c=>/^c[12]:/.test(c.id)));assert.ok(calls.every(c=>c.store===false));
   responses.push(draft,{unsupportedClaims:['Unsupported claim']},draft,{unsupportedClaims:['Unsupported claim']});
-  const rejected=await createComparisonExplainer({client,provider:'openai',model:'test-model'})(context);assert.equal(rejected.provider,'evidence');assert.equal(rejected.retryable,true);assert.deepEqual(rejected.differences,[]);assert.equal(calls.length,6);
+  const rejected=await createComparisonExplainer({client,provider:'openai',model:'test-model'})(context);assert.equal(rejected.provider,'evidence');assert.equal(rejected.retryable,true);assert.deepEqual(rejected.differences,[]);assert.equal(calls.length,6);assert.deepEqual(JSON.parse(calls[4].input).repair,['Unsupported claim']);
+});
+
+test('comparison routes DeepSeek for latency while retaining privacy and price limits',async()=>{
+  const calls=[];const responses=[draft,{unsupportedClaims:[]}];
+  const client={chat:{completions:{create:async(body,options)=>{calls.push({body,options});return {choices:[{finish_reason:'stop',message:{content:JSON.stringify(responses.shift())}}]};}}}};
+  const answer=await createComparisonExplainer({client,provider:'openrouter',model:'deepseek/deepseek-v3.2'})(context);
+  assert.equal(answer.provider,'openrouter');assert.equal(calls.length,2);
+  for(const call of calls){assert.equal(call.body.provider.sort,'latency');assert.equal(call.body.provider.data_collection,'deny');assert.deepEqual(call.body.provider.max_price,{prompt:0.6,completion:1.7});assert.equal(call.options.timeout,25000);assert.ok(call.options.signal);}
+  const checked=JSON.parse(calls[1].body.messages[1].content).context;
+  assert.ok(checked.consultants.every(p=>p.evidence.length===1));
 });
