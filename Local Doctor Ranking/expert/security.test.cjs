@@ -196,7 +196,7 @@ const reviewedEvidence = {
 
 function assertReviewedProof(html) {
   assert.match(html, /Reviewed source summary/);
-  assert.match(html, /Exact supporting passage/);
+  assert.match(html, /Exact source excerpt/);
   assert.ok(html.includes(reviewedEvidence.text));
   assert.ok(html.includes('<blockquote>I report cardiac CT &amp; MRI.</blockquote>'));
   assert.ok(!html.includes('<blockquote>' + reviewedEvidence.text + '</blockquote>'), 'A reviewed summary cannot masquerade as a literal quotation');

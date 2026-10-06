@@ -83,3 +83,33 @@ One new hosted workflow run used the three fixed fictional demonstration briefs 
 All three completed owned-citation, JSON roundtrip and HTML-pack checks. The cardiac workflow additionally verified active requirement removal, stale saved-review marking and an outreach draft without creating a recruitment event. The application exposed only bounded failure stage/reason metadata, not rejected prose or raw checker messages. These hosted rejections therefore cannot be independently classified as true or false positives from the public response alone.
 
 **Hosted validated AI explanations: 0/3.** These are safe fallbacks, not successful personalised model explanations. The final public-only run separately passed the cardiac brief in 6,340 ms; it does not override the hosted outcome. The three-brief AI reliability criterion remains unmet. No same-run retries or additional prompt tuning followed this acceptance round. All **476 expert/evaluation tests and 243 patient regressions** pass; model-service behavior remains a distinct limitation. Full diagnostic history is in [Friendli verification](FRIENDLI_VERIFICATION.md).
+
+## Discovery-first corrections — final release, 6 October 2026
+
+This later release implements the agreed discovery-first scope. Optional AI explanations are explicitly experimental and deferred; the historical generation results above are not relabelled as successes.
+
+Deployment **`bbf241c0-d7ad-40ee-97e2-9cf0f084075e`** reached Ready at **21:33:08 UTC** and reported SUCCESS. It serves the unchanged `expert-corpus-v1-fc67aacfcc3999fc230c` corpus through the separate expert service. Only the twenty allowlisted runtime files (1,287,572 bytes) were staged. Patient deployment, source database, credentials, private evaluation cache and project notes were not changed or published.
+
+Runtime fingerprints:
+
+| File | SHA-256 |
+| --- | --- |
+| `expert/brief.cjs` | `b6b0b0271fd7a7c2e715175ec72c5ddd199875547bded7263eb79cb38889f026` |
+| `expert/search.cjs` | `802749d5a0aec1f340cb79acf21278f33a884a0ce22e99b61b9551b644255368` |
+
+The final hosted workflow round completed at **21:35:11 UTC**: **38/38 checks across nine requests passed**. It verifies cardiac CT reporting and adult evidence, strict eligibility, removal/readdition, fresh-assessment isolation, preferred research, GP-only restrictions, negative roles, later role replacement, clearing role restrictions, clarification, and evidence-preserving JSON/HTML preparation. The model-backed duplicate question is now one canonical criterion. No optional AI generation requests were made.
+
+The separate fixed twenty-search run completed at **21:36:39 UTC**, with no concurrent hosted browser searches:
+
+| Measure | Final observed result |
+| --- | ---: |
+| Successful searches with sourced results | 20 / 20 |
+| Median | 3,094 ms |
+| 95th percentile, nearest rank | 5,139 ms |
+| Eight-second target | Met |
+| DeepSeek-backed interpretation responses, including cache hits | 20 / 20 |
+| Routes, release asset hashes, CSP and blocked paths | 11 / 11 |
+
+This follows a preserved failed timing run on deployment `53f8d84e-dc31-4fd0-8b05-6b41cd93102e`: median 7,338 ms, p95 11,153 ms. A bounded, source-invalidated passage-analysis cache removes repeated classification work. Model responsiveness also improved in the later observation (eight versus twenty model-backed interpretation responses), so these timings are not a controlled measure of caching alone. No interpretation timeout or model configuration was loosened to meet the target.
+
+All **624 expert/evaluation and 243 patient tests pass**. The full deterministic retrieval replay retained 105 development and 228 held-out checks per mode, with 95.833% hybrid known-reference recall at twenty. Source coverage is unchanged; these results do not imply that all indexed professionals were independently source-checked. Detailed corrections, browser observations, unsuccessful attempts and cache equivalence are recorded in [Discovery QA corrections](DISCOVERY_QA_FIXES.md).

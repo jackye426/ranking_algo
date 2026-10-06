@@ -20,3 +20,42 @@ test('HTML pack retains all source-review limitations alongside each evidence pa
 test('import recomputes stale review decisions even when a backup clears its warning flag',()=>{let s=p.changeReview(saved(),'expert-a','qualification','reviewed-by-team',{actor:'user'});const newer={...brief,version:2,manufacturer:'Different engagement'};s=p.setBrief(s,newer,'corpus-v1');s=p.saveCandidate(s,candidate,newer,'corpus-v1');s.candidates[0].needsReview=false;const restored=p.importJSON(JSON.stringify({format:'docmap-expert-project',schema:1,project:s}));assert.equal(restored.candidates[0].needsReview,true);assert.equal(restored.candidates[0].qualification,'reviewed-by-team');assert.deepEqual(restored.candidates[0].decisions,s.candidates[0].decisions);assert.equal(s.candidates[0].needsReview,false,'Validation does not mutate its input');assert.match(p.exportHTML(restored),/NEEDS REVIEW after scope\/evidence change/);});
 test('import recomputes stale source versions without erasing a current explicit warning',()=>{const s=saved();s.corpusVersion='corpus-v2';s.candidates[0].needsReview=false;const restored=p.importJSON(JSON.stringify({format:'docmap-expert-project',schema:1,project:s}));assert.equal(restored.candidates[0].needsReview,true);const current=saved();current.candidates[0].needsReview=true;assert.equal(p.validateProject(current).candidates[0].needsReview,true);});
 test('current review provenance remains current after validation and import',()=>{let s=p.changeReview(saved(),'expert-a','qualification','reviewed-by-team',{actor:'user'});s=p.changeReview(s,'expert-a','independence','team-reviewed',{actor:'user'});const restored=p.importJSON(p.exportJSON(s));assert.equal(restored.candidates[0].needsReview,false);assert.deepEqual(restored.candidates[0].decisions,s.candidates[0].decisions);});
+
+test('adding exclusion polarity or a restricted role set marks prior decisions stale without rewriting history',()=>{
+  const role={id:'role',label:'Clinical psychologist',text:'Clinical psychologist',kind:'role',importance:'essential'},initial={...brief,requirements:[...brief.requirements,role],roles:['Clinical psychologist']};
+  let project=p.saveCandidate(p.createProject('Role constraints'),candidate,initial,'corpus-v1');project=p.changeReview(project,candidate.id,'qualification','reviewed-by-team',{actor:'user'});const oldDecisions=structuredClone(project.candidates[0].decisions);
+  for(const changed of [{...initial,requirements:[...brief.requirements,{...role,polarity:'exclude'}]}, {...initial,excludedRoles:['Psychiatrist']}, {...initial,roleMode:'only'}, {...initial,requirements:[...brief.requirements,{...role,strictRole:true}]}]){
+    const updated=p.setBrief(project,changed,'corpus-v1');assert.equal(updated.candidates[0].needsReview,true);assert.equal(updated.candidates[0].qualification,'reviewed-by-team');assert.deepEqual(updated.candidates[0].decisions,oldDecisions);assert.equal(updated.briefVersions.length,2);
+  }
+  const explicitInclude={...initial,requirements:initial.requirements.map(r=>({...r,polarity:'include',strictRole:false})),excludedRoles:[]};assert.equal(p.scope(explicitInclude),p.scope(initial));assert.equal(p.setBrief(project,explicitInclude,'corpus-v1').candidates[0].needsReview,false);
+});
+
+test('legacy scope serialization stays stable for unchanged positive requirements',()=>{
+  const expected=JSON.stringify({requirements:[{id:'ct',label:'Cardiac CT',text:'Cardiac CT',kind:'modality',importance:'essential'}],manufacturer:null,panelSize:null,roles:[],geography:null,timing:null});assert.equal(p.scope(brief),expected);
+});
+
+test('negative role constraints export as filters rather than credentials and optional Home drafts round trip',()=>{
+  const role={id:'role',label:'Psychiatrist',text:'Psychiatrist',kind:'role',importance:'essential',polarity:'exclude'},allowed={id:'allowed',label:'Clinical psychologist',text:'Clinical psychologist',kind:'role',importance:'essential',strictRole:true};
+  const assessment={...brief,requirements:[role,allowed],roleMode:'only',excludedRoles:['Psychiatrist'],roles:['Clinical psychologist']},person={...candidate,requirementMatrix:[{requirementId:'role',label:'Psychiatrist',status:'unknown',importance:'essential',evidenceIds:[],note:'Irrelevant credential note.'}]};
+  const project=p.saveCandidate(p.createProject('Roles'),person,assessment,'corpus-v1');project.draft='Existing refinement';project.newAssessmentDraft='Separate unsent brief';const html=p.exportHTML(project);
+  assert.match(html,/Exclude: Psychiatrist/);assert.match(html,/Allowed role: Clinical psychologist/);assert.match(html,/Permitted roles only: Clinical psychologist/);assert.match(html,/Role exclusion filter/);assert.match(html,/Incomplete role data does not prove absence/);assert.doesNotMatch(html,/Irrelevant credential note/);
+  const restored=p.importJSON(p.exportJSON(project));assert.equal(restored.newAssessmentDraft,project.newAssessmentDraft);assert.equal(restored.draft,project.draft);assert.equal(p.scope(restored.activeBrief),p.scope(assessment));
+});
+
+test('review packs use source-owned requirement spans and label historical reviewed context',()=>{
+  const person=structuredClone(candidate),row=person.requirementMatrix[0];row.supportingEvidence=[{evidenceId:'e1',kind:'reviewed-summary',text:'Reviewed study context in primary care.',sourceQuote:'Author name only',sourceDate:'2010-05-11',limits:['Coauthorship is not proof of study appraisal.']}];
+  const project=p.saveCandidate(p.createProject('Source spans'),person,brief,'corpus-v1'),html=p.exportHTML(project),matrix=html.slice(html.indexOf('<table>'),html.indexOf('</table>'));
+  assert.match(matrix,/Reviewed source summary/);assert.match(matrix,/Reviewed study context in primary care/);assert.match(matrix,/2010-05-11/);assert.match(matrix,/Coauthorship is not proof/);assert.doesNotMatch(matrix,/Author name only|<blockquote>/);
+  row.supportingEvidence.push({evidenceId:'another-person',kind:'source-quote',text:'Do not render this unmatched evidence.'});const unsafe=p.saveCandidate(p.createProject('Owned only'),person,brief,'corpus-v1');assert.doesNotMatch(p.exportHTML(unsafe),/Do not render this unmatched evidence/);
+});
+
+test('negative source statements do not invert an exclusion into a recorded positive role',()=>{
+  const assessment={...brief,requirements:[{id:'excluded',label:'Dermatologist',kind:'role',importance:'essential',polarity:'exclude'}]};
+  for(const [status,expected]of [['documented','The excluded role is recorded'],['mismatch','negative role statement needs scope and date review'],['needs-review','negative role statement needs scope and date review'],['unknown','Incomplete role data does not prove absence']]){
+    const person={...candidate,requirementMatrix:[{requirementId:'excluded',label:'Dermatologist',status,importance:'essential',evidenceIds:[]}]},html=p.exportHTML(p.saveCandidate(p.createProject(),person,assessment,'corpus-v1'));assert.ok(html.includes(expected));assert.doesNotMatch(html,/recorded role conflicts with this exclusion/);
+  }
+});
+
+test('source appendix labels attribution-only literal excerpts neutrally',()=>{
+  const project=saved(),e=project.candidates[0].candidate.evidence[0];e.reviewedParaphrase=true;e.text='A reviewed account of the study setting.';e.sourceQuote='A. Example';e.review={limitations:['The author excerpt establishes attribution, not clinical activity.']};const html=p.exportHTML(project);assert.match(html,/Exact source excerpt/);assert.doesNotMatch(html,/Exact supporting passage/);assert.match(html,/<blockquote>A\. Example<\/blockquote>/);assert.match(html,/establishes attribution, not clinical activity/);
+});

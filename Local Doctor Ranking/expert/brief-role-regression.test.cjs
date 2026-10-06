@@ -61,9 +61,9 @@ for(const generic of ['clinical expertise','medical experts','healthcare profess
   const result=await mockInterpreter([{...role(generic),importance:'essential'}])({message:anchor+'Find '+generic+'.'});assert.equal(result.brief.roles.length,0);
 });
 
-test('a quoted clinician role does not incorporate an independent UK geography requirement',async()=>{
+test('generic clinicians do not add a credential while geography and current-practice requirements remain explicit',async()=>{
   const result=await mockInterpreter([role('UK clinicians')])({message:anchor+'Find UK clinicians. Current clinical practice is essential.'});
-  assert.ok(result.brief.roles.includes('clinicians'));assert.ok(!result.brief.roles.some(r=>/UK/.test(r)));assert.equal(result.brief.requirements.filter(r=>r.kind==='geography').length,1);
+  assert.equal(result.brief.roles.length,0);assert.equal(result.brief.requirements.filter(r=>r.kind==='geography').length,1);assert.ok(result.brief.requirements.some(r=>r.kind==='currentPractice'&&r.importance==='essential'));
 });
 
 test('explicit unfamiliar research experience and non-doctor roles still pass the quote boundary',async()=>{

@@ -8,3 +8,29 @@
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 .status-badge.mismatch{background:#fff0ef;color:#9b4b49}.source-proof-label{margin-top:12px}.reviewed-source-summary{font-size:13px;line-height:1.7;margin-top:6px;color:#506886}
+
+/* Evidence stays primary; generated prose is a deliberately optional layer. */
+.resume-assessment{margin-top:5px;max-width:100%;overflow-wrap:anywhere}
+.requirement-proof{margin-top:15px}.requirement-proof>.small-label{font-size:10px;letter-spacing:.035em;text-transform:none;color:#526789}
+.requirement-proof .evidence-excerpt{margin-top:7px}.proof-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 11px;margin-top:8px}
+.proof-meta .source-link{font-size:10px;white-space:nowrap}.proof-limit{margin-top:8px}.proof-kind{margin-top:6px;color:#687594}
+.evidence-excerpt,.source-quote,.reviewed-source-summary{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal}
+.optional-ai{border-top:1px solid #dce4f1;margin-top:22px;padding-top:14px}
+.optional-ai>summary{cursor:pointer;font-size:12px;font-weight:500;line-height:1.7;color:#5c6c85;list-style:none}
+.optional-ai>summary::before{content:'+';display:inline-block;width:18px;font-weight:400}.optional-ai[open]>summary::before{content:'−'}
+.optional-ai>summary::-webkit-details-marker{display:none}.optional-ai>summary span{font-size:9px;font-weight:400;margin-left:9px;border:1px solid #d9e0ec;border-radius:5px;padding:2px 5px;color:#6a7487}
+.optional-ai>.notice,.optional-ai>p{margin:12px 0;font-size:11px;line-height:1.7;color:#64718a}.optional-ai .subtle-button{font-size:11px}
+.comparison-ai{background:transparent;border-radius:0;padding:16px 0 0}.comparison-candidate-name{display:none}
+.comparison-table .requirement-proof{margin-top:5px}.comparison-table .reviewed-source-summary{font-size:12px}.followup-search textarea{line-height:24px}
+@media(max-width:760px){
+  .brief-sidebar{max-height:27%;padding:5px 0}.sidebar-heading{min-height:33px}.brief-sidebar.expanded{overflow:auto;overscroll-behavior:contain}
+  .brief-sidebar h2{font-size:17px;margin:8px 0}.sidebar-note{margin-bottom:14px}.brief-sidebar.expanded .sidebar-heading{position:sticky;top:-5px;background:#f6f8ff;z-index:1}
+  .results-column{padding-top:12px}.results-heading{padding-bottom:9px}.results-heading .eyebrow{display:none}.results-heading h1{font-size:22px;margin:0 0 5px}.results-heading .muted{font-size:11px}.results-toolbar{padding-bottom:10px}
+  .composer-wrap{padding:5px 0 max(8px,env(safe-area-inset-bottom))}.composer-status{min-height:19px;line-height:1.5;padding-left:3px;padding-bottom:2px}.followup-search{padding:8px 10px 8px 14px;gap:9px}.followup-search textarea{font-size:16px;line-height:24px;padding:6px 0}.followup-search .send-button{flex-shrink:0}
+  .compare-tray{gap:8px;font-size:11px;padding:6px 2px}.compare-tray .primary-button{font-size:11px;min-height:32px;padding:7px 9px}.compare-tray .text-button{font-size:11px}
+  .compare-dialog{padding:17px;max-height:94dvh}.comparison-table{overflow:visible;border:0;background:transparent;border-radius:0;margin-top:19px}.comparison-table table{min-width:0;display:block}.comparison-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .comparison-table tbody{display:block}.comparison-table tbody tr{display:block;border:1px solid var(--line);border-radius:15px;overflow:hidden;margin-bottom:17px;background:#fff}
+  .comparison-table tbody th,.comparison-table tbody td{display:block;width:auto!important;border-right:0;padding:13px 15px;position:static}.comparison-table tbody th{font-size:13px;background:#edf2fc}.comparison-table tbody td:last-child{border-bottom:0}.comparison-table tbody tr:last-child td{border-bottom:1px solid var(--line)}
+  .comparison-candidate-name{display:block;font-weight:550;font-size:12px;color:#3e587e;margin:0 0 9px}.comparison-table .evidence-excerpt{font-size:12px}
+  .compact-viewport .site-header{height:54px}.compact-viewport .workspace{height:calc(var(--viewport-height,100dvh) - 54px)}.compact-viewport .results-column{padding-top:7px}.compact-viewport .results-heading{padding-bottom:6px}.compact-viewport .results-heading h1{font-size:18px}.compact-viewport .results-heading .muted{font-size:10px}.compact-viewport .results-toolbar{padding-bottom:6px}.compact-viewport .composer-wrap{padding-bottom:max(5px,env(safe-area-inset-bottom))}
+}

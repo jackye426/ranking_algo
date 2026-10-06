@@ -1,5 +1,15 @@
 # Expert Discovery release audit
 
+## Discovery-first scope update
+
+After reviewing explanation reliability, the user agreed that evidence-backed expert discovery is the product priority and optional generated prose can improve later. The three-successful-explanations criterion is therefore **deferred**, not passed. The historical explanation results below remain unchanged. Optional generation must stay clearly labelled, deliberate, and unable to replace sourced evidence with an unchecked claim.
+
+The following live QA uncovered independent discovery defects: a negative role constraint became positive, explicit adult-cardiology evidence failed the strict filter, and a homepage submission continued the previous brief. Those defects are part of the core discovery gate and cannot be excused by deferring AI prose. Their correction and new regression evidence are recorded in [Discovery QA corrections](DISCOVERY_QA_FIXES.md). Earlier passing packs do not establish correctness for unrestricted new briefs.
+
+**Latest discovery checkpoint:** deployment `bbf241c0-d7ad-40ee-97e2-9cf0f084075e`, Ready 21:33:08 UTC on 6 October 2026. All 624 expert/evaluation and 243 patient tests pass. The corrected hosted workflow passes 38/38 checks and the route/asset/isolation check passes 11/11. Twenty warm hosted searches return results at median 3,094 ms and p95 5,139 ms. Exact source descriptors are cached without caching requirement decisions; model configuration and timeout remain unchanged. See the [latest deployment record](DEPLOYMENT_VERIFICATION.md#discovery-first-corrections--final-release-6-october-2026) for final runtime hashes and the earlier failed latency observation. The source counts and enrichment limits below remain applicable; the earlier code hashes and generation checkpoints are historical.
+
+## Earlier release audit
+
 Checkpoint: 6 October 2026, including the approved Friendli explanation investigation. **This is an implementation and verification manifest, not a blanket release pass.** The earlier corrected deployment passed hosted asset checks and twenty warm searches at p95 7,937 ms. The copied-backup persistence roundtrip and two targeted live interpretation corrections pass. The explanation follow-up passes 476 expert/evaluation tests and 243 patient regressions; retrieval and source preparation are unchanged. The latest public-profile round verified one of three explanations. The remaining AI gate is recorded separately below and in [Friendli verification](FRIENDLI_VERIFICATION.md).
 
 The objective is assessment brief → relevant candidates → comparison → qualification pack → recruitment preparation. Scarlet is the reference persona; no partnership, internal roster access, formal assessor approval or measured ROI is claimed. The patient application and `synaptic_care_fe` are outside this release's implementation scope.
