@@ -124,6 +124,6 @@ The final staging check covered 94 files (2.28 MB including all immutable review
 - [x] Record hosted health/assets/source-page, twenty warm searches and real-evidence workflow checks separately from runtime readiness.
 - [x] Complete the latest brief-correction replay: development 105/105 and final held-out 228/228 per mode; preserve the earlier observations.
 - [x] Final deployment `09022aa3-51e0-4b86-ad94-98309930e45d` reached Ready at 18:20:53 UTC. All served asset hashes match. Twenty searches returned results (p50 6,848 ms, p95 7,937 ms); five used DeepSeek and fifteen explicit fallback. Both targeted corrected briefs passed through live DeepSeek interpretation. See the separate deployment report.
-- [ ] Commit/push the actual release state and record the final revision and URL. Completion of these actions is not recorded at this checkpoint.
+- [x] Implementation commit `0954827` was pushed to [codex/docmap-expert-discovery](https://github.com/jackye426/ranking_algo/tree/codex/docmap-expert-discovery). Subsequent audit-only updates remain on that branch. The [independent preview](https://docmap-expert-discovery-production.up.railway.app/expert-discovery) serves the tested runtime; the patient service was not redeployed.
 
-No new sample should be generated merely to obtain a passing label. Completed checks support an evidence-led demonstration; unmet reliability and final deployment checks remain visible in the delivery.
+No new sample should be generated merely to obtain a passing label. Completed checks support an evidence-led demonstration; the unmet explanation-reliability criterion and verification limitations remain visible in the delivery.
