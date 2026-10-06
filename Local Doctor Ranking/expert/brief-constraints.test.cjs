@@ -89,7 +89,8 @@ test('broad permission clears old role words from retained retrieval context',()
   assert.doesNotMatch(brief.requirements.find(r=>r.id==='context-role').text,/general practitioner|dermatologist/i);assert.match(brief.requirements.find(r=>r.id==='context-role').text,/dermoscopy/i);
 });
 for(const message of ['Research preferred.','Clinical research optional.','Research essential.','Clinical research required.'])test('importance consumed inside a matched concept is retained: '+message,()=>{
-  const brief=parseBrief({previous:prior(),message}).brief;assert.equal(req(brief,'Clinical research').importance,/preferred|optional/.test(message)?'preferred':'essential');
+  const brief=parseBrief({previous:prior(),message}).brief;assert.equal(req(brief,/^Research/.test(message)?'Diagnostic study evaluation':'Clinical research').importance,/preferred|optional/.test(message)?'preferred':'essential');
+  if(/^Research/.test(message))assert.equal(req(brief,'Clinical research'),undefined,'a generic follow-up edits the existing research criterion instead of adding a broader one');
 });
 test('coordinated clinical priorities stay essential alongside a separate research preference',()=>{
   const brief=parseBrief({previous:prior(),message:'Keep dermoscopy and primary care essential, and diagnostic research preferred.'}).brief;assert.equal(req(brief,'Skin-lesion imaging').importance,'essential');assert.equal(req(brief,'Primary care').importance,'essential');assert.equal(req(brief,'Diagnostic research').importance,'preferred');

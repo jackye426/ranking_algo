@@ -7,8 +7,7 @@ const {randomUUID}=require('node:crypto');
 const {performance}=require('node:perf_hooks');
 const {createBriefInterpreter}=require('./brief.cjs');
 const {createExpertAI}=require('./ai.cjs');
-const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const safeLink=value=>{try{const u=new URL(value);return u.protocol==='https:'?u.href:null;}catch{return null;}};
+const {restoreBrief}=require('./resume.cjs');
 function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),generate=createExpertAI(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),clock=Date.now,limits={},publicOrigin=process.env.PUBLIC_ORIGIN}={}){
   const app=express(),sessions=new Map(),rates=new Map();
   const limit={sessions:60,retainedCandidateRows:30000,concurrentSearches:2,concurrentAI:2,searchesPerHour:120,aiPerHour:40,globalAI:300,globalInterpretations:500,...limits};
@@ -38,19 +37,21 @@ function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_O
   app.post('/api/expert/search',async(req,res)=>{
     const prep=prepare(req,res,'search');if(!prep)return;
     const body=req.body||{};
-    if(!fields(body,['sessionId','message','removeRequirementId','patch','documentedOnly','excludeContactedIds']) || (body.sessionId!==undefined&&!identifier(body.sessionId)) || (body.message!==undefined&&(typeof body.message!=='string'||body.message.length>4000)) || (body.removeRequirementId!==undefined&&!identifier(body.removeRequirementId)) || (body.patch!==undefined&&(!fields(body.patch,['requirementId','importance'])||!identifier(body.patch.requirementId)||!['essential','preferred'].includes(body.patch.importance))) || (body.documentedOnly!==undefined&&typeof body.documentedOnly!=='boolean') || (!body.removeRequirementId&&!body.patch&&(typeof body.message!=='string'||!body.message.trim()))){return res.status(400).json({error:'Describe an assessment brief in up to 4,000 characters, or update an active requirement.'});}
+    const operations=['message','removeRequirementId','patch'].filter(key=>body[key]!==undefined);
+    if(!fields(body,['sessionId','resumeBrief','message','removeRequirementId','patch','documentedOnly','excludeContactedIds']) || operations.length>1 || (body.resumeBrief!==undefined&&body.sessionId!==undefined) || (body.sessionId!==undefined&&!identifier(body.sessionId)) || (body.message!==undefined&&(typeof body.message!=='string'||!body.message.trim()||body.message.length>4000)) || (body.removeRequirementId!==undefined&&!identifier(body.removeRequirementId)) || (body.patch!==undefined&&(!fields(body.patch,['requirementId','importance'])||!identifier(body.patch.requirementId)||!['essential','preferred'].includes(body.patch.importance))) || (body.documentedOnly!==undefined&&typeof body.documentedOnly!=='boolean') || (!operations.length&&body.resumeBrief===undefined)){return res.status(400).json({error:'Describe an assessment brief in up to 4,000 characters, update one active requirement, or resume a saved brief.'});}
+    let resumed=null;try{if(body.resumeBrief!==undefined)resumed=restoreBrief(body.resumeBrief);}catch(error){return res.status(400).json({error:error.message});}
     if(body.sessionId&&!sessions.has(body.sessionId))return res.status(410).json({error:'This search expired. Start a new live search; saved projects are unchanged.'});
     if(!body.sessionId&&sessions.size>=limit.sessions)return res.status(503).json({error:'The preview is busy. Retry shortly.'});
     if(body.excludeContactedIds&&(!Array.isArray(body.excludeContactedIds)||body.excludeContactedIds.length>1000||body.excludeContactedIds.some(id=>!identifier(id))))return res.status(400).json({error:'Invalid project contact filter.'});
     const id=body.sessionId||randomUUID(),s=sessions.get(id)||{brief:null,snapshots:new Map(),updated:prep.now,busy:false,ai:0,interpretations:0};
     if(s.busy||activeSearches>=limit.concurrentSearches)return res.set('Retry-After','3').status(429).json({error:'A search is already running. Please retry shortly.'});
     if(s.interpretations>=50)return res.status(429).json({error:'This conversation has reached its interpretation limit. Start a new live search; saved work remains available.'});
-    if(!body.patch&&!body.removeRequirementId&&global.interpretations>=limit.globalInterpretations)return res.status(429).json({error:'The preview has reached its hourly interpretation budget. Your saved work and sourced evidence remain available.'});
+    if(body.message&&global.interpretations>=limit.globalInterpretations)return res.status(429).json({error:'The preview has reached its hourly interpretation budget. Your saved work and sourced evidence remain available.'});
     activeSearches++;s.busy=true;sessions.set(id,s);const start=performance.now();
     try{
-      s.interpretations++;
-      if(!body.patch&&!body.removeRequirementId)global.interpretations++;
-      const parsed=await interpret({previous:s.brief,message:body.message||'',removeRequirementId:body.removeRequirementId,patch:body.patch});
+      if(operations.length)s.interpretations++;
+      if(body.message)global.interpretations++;
+      const parsed=resumed&&!operations.length?resumed:await interpret({previous:resumed?.brief||s.brief,message:body.message||'',removeRequirementId:body.removeRequirementId,patch:body.patch});
       if(parsed.needsClarification){s.brief=parsed.brief||s.brief;s.updated=clock();return res.json({sessionId:id,brief:s.brief,needsClarification:true,question:parsed.question,notices:parsed.notices||[],results:[],total:0});}
       const found=await engine.search(parsed.brief,{documentedOnly:body.documentedOnly===true});
       const excluded=new Set(body.excludeContactedIds||[]);
@@ -89,7 +90,11 @@ function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_O
   app.get('/api/expert/sources/:id',(req,res)=>{
     const corpus=engine.corpus,candidate=corpus?.candidates.find(c=>c.id===req.params.id&&!c.needsIdentityReview);if(!candidate)return res.status(404).type('text').send('Evidence record not found.');
     const facts=corpus.passages.filter(p=>p.candidateId===candidate.id);
-    res.set('Cache-Control','no-store').type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(candidate.name)} — source evidence</title><link rel="stylesheet" href="/expert-assets/styles.css"><body class="source-page"><main><a href="/expert-discovery">DocMap Expert Discovery</a><h1>${escape(candidate.name)}</h1><p>Professional source evidence. These records do not establish current registration, availability, independence or assessment approval.</p>${facts.map(p=>`<article><h2>${escape(p.type)} · ${escape(p.field)}</h2>${p.reviewedParaphrase?`<p class="muted">Reviewed source summary</p><p>${escape(p.text)}</p>${p.sourceQuote?`<p class="muted">Exact source excerpt</p><blockquote>${escape(p.sourceQuote)}</blockquote>`:'<p class="muted">No literal excerpt was recorded; this is a reviewed summary.</p>'}`:`<blockquote>${escape(p.text)}</blockquote>`}<p class="muted">${escape(p.sourceLabel||'Stored professional record')} · ${escape(p.sourceRecordId)}<br>Source date: ${escape(p.dates?.sourceDate||'Not recorded')} · Observed: ${escape(p.dates?.observedAt||'Not recorded')} · Merge: ${escape(p.dates?.mergeDate||'Not recorded')}</p>${(p.review?.limitations||[]).map(limitation=>`<p class="muted">Source limitation: ${escape(limitation)}</p>`).join('')}${safeLink(p.sourceUrl)?`<a href="${escape(safeLink(p.sourceUrl))}" rel="noopener noreferrer" target="_blank">Open supporting source</a>`:'<p>Original source URL not recorded; attribution is to the stored source record.</p>'}</article>`).join('')}</main></body></html>`);
+    const requested=req.query.evidence;
+    if(requested!==undefined&&(typeof requested!=='string'||requested.length>180))return res.status(400).type('text').send('Choose one evidence passage.');
+    const selected=requested===undefined?null:facts.find(p=>p.id===requested);
+    if(requested!==undefined&&!selected)return res.status(404).type('text').send('This passage is not available for this professional. It may have changed since the review pack was saved.');
+    res.set('Cache-Control','no-store').type('html').send(require('./sources.cjs').renderSourcePage(candidate,facts,selected));
   });
   app.use('/expert-assets',express.static(path.join(__dirname,'public'),{dotfiles:'deny',index:false}));
   app.use('/brand',express.static(path.join(__dirname,'../public/brand'),{dotfiles:'deny',index:false}));

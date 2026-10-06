@@ -147,7 +147,7 @@ const emptyAttributes=()=>Object.fromEntries(Object.keys(ATTRIBUTES).map(key=>[k
 const aspirationalActivity=text=>/\b(?:hopes? to|plans? to|would like to|aims? to|interested in becoming|aspir(?:e|es|ing) to)\b/i.test(text);
 const activityClauses=text=>sourceStatements(text).flatMap(part=>part.split(/\s+(?=(?:but|however|whereas)\b)/i)).filter(Boolean);
 const degreeStatement=text=>/\b(?:MSc|MClinRes|BSc|MBBS|MBChB|Master[’']?s|Bachelor[’']?s|Research MD|PhD|doctorate|degree|diploma|certificates?)\b/i.test(text)&&/\b(?:complet(?:ed|ing|es)|stud(?:y|ied|ying)|hold(?:s|ing)?|has|have|obtain(?:ed|ing)|award(?:ed)?|graduat(?:ed|ing)|undertook|pursu(?:ed|ing))\b/i.test(text);
-const interestScoped=text=>/\b(?:interests?\s+(?:is|are|was|were|in|to)|interested in|interest\s+is\s+to|expertise\s+in)\b/i.test(text);
+const interestScoped=text=>/\b(?:interests?\s+(?:is|are|was|were|in|to|includes?|involves?)|interested in|interest\s+is\s+to|expertise\s+in)\b/i.test(text);
 const personalActivity=text=>/\b(?:marathon runner|triathlete|keen runner|amateur athlete|my\s+(?:wife|husband|children|family)|spare\s+time|outside\s+(?:of\s+)?work|hobbies|golf club|married with)\b|\benjoys?\s+(?:running|strength training|playing|skiing|golf|tennis|travel|music|cycling|walking)\b/i.test(text);
 function teachingActivity(text) {
   // A training placement or a teaching-hospital name identifies the learner or

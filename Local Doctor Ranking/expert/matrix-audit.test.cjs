@@ -102,7 +102,8 @@ test('saved JSON and HTML preserve the same matrix and owned evidence used for c
     assert.ok(pack.candidate.evidence.some(item => item.id === id && item.candidateId === person.id));
   }
   const html = projects.exportHTML(saved);
-  assert.ok(html.includes('Supported'));
+  assert.ok(html.includes('Recorded activity'));
+  assert.ok(!html.includes('>Supported<'), 'Export must preserve the kind of evidence rather than flatten it into generic support');
   assert.ok(html.includes('source-related'));
   assert.ok(html.includes('I interpret cardiac CT scans in adults.'));
 });

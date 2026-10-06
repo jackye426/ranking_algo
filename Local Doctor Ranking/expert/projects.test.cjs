@@ -44,6 +44,7 @@ test('negative role constraints export as filters rather than credentials and op
 
 test('review packs use source-owned requirement spans and label historical reviewed context',()=>{
   const person=structuredClone(candidate),row=person.requirementMatrix[0];row.supportingEvidence=[{evidenceId:'e1',kind:'reviewed-summary',text:'Reviewed study context in primary care.',sourceQuote:'Author name only',sourceDate:'2010-05-11',limits:['Coauthorship is not proof of study appraisal.']}];
+  person.evidence[0].text='Reviewed study context in primary care.';person.evidence[0].reviewedParaphrase=true;person.evidence[0].sourceQuote='Author name only';
   const project=p.saveCandidate(p.createProject('Source spans'),person,brief,'corpus-v1'),html=p.exportHTML(project),matrix=html.slice(html.indexOf('<table>'),html.indexOf('</table>'));
   assert.match(matrix,/Reviewed source summary/);assert.match(matrix,/Reviewed study context in primary care/);assert.match(matrix,/2010-05-11/);assert.match(matrix,/Coauthorship is not proof/);assert.doesNotMatch(matrix,/Author name only|<blockquote>/);
   row.supportingEvidence.push({evidenceId:'another-person',kind:'source-quote',text:'Do not render this unmatched evidence.'});const unsafe=p.saveCandidate(p.createProject('Owned only'),person,brief,'corpus-v1');assert.doesNotMatch(p.exportHTML(unsafe),/Do not render this unmatched evidence/);
@@ -58,4 +59,21 @@ test('negative source statements do not invert an exclusion into a recorded posi
 
 test('source appendix labels attribution-only literal excerpts neutrally',()=>{
   const project=saved(),e=project.candidates[0].candidate.evidence[0];e.reviewedParaphrase=true;e.text='A reviewed account of the study setting.';e.sourceQuote='A. Example';e.review={limitations:['The author excerpt establishes attribution, not clinical activity.']};const html=p.exportHTML(project);assert.match(html,/Exact source excerpt/);assert.doesNotMatch(html,/Exact supporting passage/);assert.match(html,/<blockquote>A\. Example<\/blockquote>/);assert.match(html,/establishes attribution, not clinical activity/);
+});
+
+test('failed request recovery and separate drafts round trip without altering evidence or decisions',()=>{
+  const project=saved();project.originalBrief='Original device assessment';project.discoveryFilters={documentedOnly:true,uncontactedOnly:false};project.draft='Newer draft';project.failedSearch={id:'failure-1',status:'failed',submittedAt:'2026-10-07T10:00:00Z',payload:{message:'Previous refinement'},baseBrief:brief,filters:{documentedOnly:true,uncontactedOnly:false},restoredDraft:false,error:'Offline'};const restored=p.importJSON(p.exportJSON(project));assert.deepEqual(restored.failedSearch,project.failedSearch);assert.deepEqual(restored.candidates,project.candidates);assert.equal(restored.draft,'Newer draft');assert.equal(restored.originalBrief,project.originalBrief);
+});
+
+test('malformed failed request operations cannot enter recovery through imported project data',()=>{
+  const project=saved(),valid={id:'failure',status:'failed',submittedAt:'2026-10-07',payload:{message:'A valid request'},baseBrief:brief,filters:{documentedOnly:false,uncontactedOnly:false}};
+  for(const change of [{payload:{sessionId:'secret'}},{payload:{message:'One',removeRequirementId:'two'}},{filters:{documentedOnly:'yes'}},{payload:{patch:{requirementId:'ct',importance:'invented'}}},{payload:null},{baseBrief:{requirements:'not an array'}}])assert.throws(()=>p.validateProject({...project,failedSearch:{...valid,...change}}),/saved failed/);
+});
+
+test('review pack citations target exact owned evidence on the supplied origin and include all safe sources',()=>{
+  const project=saved();project.candidates[0].candidate.evidence[0].sources=[{sourceUrl:'https://second.example/record',sourceLabel:'Additional source'},{sourceUrl:'javascript:alert(1)',sourceLabel:'Unsafe'}];const html=p.exportHTML(project,{baseUrl:'https://preview.example'});assert.match(html,/https:\/\/preview\.example\/api\/expert\/sources\/expert-a\?evidence=e1#evidence-e1/);assert.match(html,/https:\/\/second\.example\/record/);assert.doesNotMatch(html,/javascript:/);assert.match(p.exportHTML(project),/https:\/\/docmap-expert-discovery-production\.up\.railway\.app\/api\/expert\/sources/);
+});
+
+test('review pack distinguishes listed interests, activities and complete essential/preferred gaps',()=>{
+  const person=structuredClone(candidate);person.evidence[0].type='clinical-interest';person.evidence[0].text='An interest in cardiac CT.';const scope={...brief,requirements:[...brief.requirements,{id:'current',label:'Current practice',kind:'currentPractice',importance:'essential'},{id:'setting',label:'Primary care',kind:'setting',importance:'essential'},{id:'research',label:'Diagnostic studies',kind:'research',importance:'preferred'}]};const html=p.exportHTML(p.saveCandidate(p.createProject(),person,scope,'corpus-v1'));assert.match(html,/Listed interest/);assert.match(html,/does not establish performed clinical work/);assert.match(html,/Essential to confirm/);assert.match(html,/Current practice/);assert.match(html,/Primary care/);assert.match(html,/Preferred evidence gaps/);assert.match(html,/Diagnostic studies/);assert.doesNotMatch(html,/<td>Supported<\/td>/);
 });

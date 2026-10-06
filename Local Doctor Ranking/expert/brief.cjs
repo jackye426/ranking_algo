@@ -2,6 +2,7 @@
 
 const {createHash}=require('node:crypto');
 const clean=value=>String(value||'').replace(/\s+/g,' ').trim();
+const comparable=value=>clean(value).normalize('NFKC').replace(/[\u2010-\u2015-]/g,' ').toLowerCase().replace(/\s+/g,' ');
 const idFor=(kind,text)=>'r-'+createHash('sha256').update(kind+':'+clean(text).toLowerCase()).digest('hex').slice(0,12);
 // Equivalences identify explicitly supplied concepts; they do not infer a
 // diagnosis, device class, accreditation, or a clinician's competence.
@@ -11,18 +12,19 @@ const CONCEPTS=[
   ['modality','MRI',/\b(?:MRI|magnetic resonance imaging)\b/i],
   ['modality','Ultrasound',/\b(?:ultrasound|echocardiograph\w*)\b/i],
   ['modality','Skin-lesion imaging',/\b(?:skin[- ]lesion imag(?:es?|ing)|derm(?:o|ato)scop\w*|skin imaging|images? of skin lesions?)\b/i],
-  ['activity','Image interpretation',/\b(?:interpret(?:s|ing)?|report(?:s|ing)?|read(?:s|ing)?)\s+(?:adult\s+)?(?:cardiac\s*\/\s*coronary|cardiac|coronary|CT|MRI|medical)\s*(?:CT|scans?|images?)?\b/i],
+  ['activity','Image interpretation',/\b(?:(?:interpret(?:s|ing)?|report(?:s|ing)?|read(?:s|ing)?)\s+(?:adult\s+)?(?:cardiac\s*\/\s*coronary|cardiac|coronary|CT|MRI|medical)\s*(?:CT|scans?|images?)?|(?:clinical|cardiac CT|coronary CT|CT|MRI)\s+reporting)\b/i],
   ['condition','Coronary artery disease',/\b(?:coronary\s+(?:(?:artery|heart)\s+)?disease|ischaemic heart disease)\b/i],
   ['condition','Skin lesions',/\b(?:skin[- ]lesions?|melanoma|skin cancer)\b/i],
   ['condition','Diabetes',/\bdiabetes\b/i],
   ['condition','Heart failure',/\bheart[- ]failure\b/i],
   ['population','Adults',/\badults?\b/i],
   ['population','Children',/\b(?:children|paediatric|pediatric)\b/i],
-  ['setting','Primary care',/\b(?:primary care|general practice|GP setting)\b/i],
+  ['setting','Primary care',/\b(?:primary[- \u2010-\u2015]care|general[- \u2010-\u2015]practice|GP[- \u2010-\u2015]setting)\b/i],
   ['setting','Community / home use',/\b(?:home[- ]use|at home|community setting|outside (?:a )?specialist (?:clinical )?setting)\b/i],
   ['setting','Hospital practice',/\b(?:hospital setting|secondary care|hospital practice)\b/i],
   ['research','Diagnostic study evaluation',/\b(?:(?:evaluat\w*|apprais\w*|review(?:s|ed|ing)?) (?:an? |the )?(?:clinical |diagnostic |AI )?(?:performance )?(?:study|studies|evidence)|diagnostic[- ]stud(?:y|ies)[- ](?:evaluation|appraisal|review)|diagnostic studies|clinical performance evidence|diagnostic accuracy)\b/i],
   ['research','Diagnostic research',/\bdiagnostic research\b/i],
+  ['research','Validation research',/\bvalidation research\b/i],
   ['research','Clinical research',/\b(?:clinical research|research specialist|clinical researcher|research expertise|research experience|research (?:requirements?|criterion|preferred|essential|required))\b/i],
   ['regulatory','Medical-device assessment experience',/\b(?:regulatory[- ]assessment|regulatory experience|device[- ]assessment experience|medical[- ]device assessment|clinical evaluation specialist)\b/i],
   ['currentPractice','Current clinical practice',/\b(?:current (?:clinical )?practice|currently practi[cs]ing|practising clinician|practicing clinician)\b/i],
@@ -33,6 +35,77 @@ const CONCEPTS=[
   ['role','Clinical researcher',/\b(?:clinical researcher|research specialist)\b/i],
 ];
 const KINDS=new Set(['modality','activity','condition','population','setting','research','regulatory','currentPractice','role','procedure','technology','workflow','question','geography']);
+const interpretationMeta=new WeakMap();
+const priorityMarker='not essential|not mandatory|nice to have|optional|useful|helpful|preferred|essential|required|mandatory';
+const escapePattern=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function targetWords(value){return comparable(value).replace(/^(?:(?:the|our|this|existing|current)\s+)+/,'').replace(/^(?:experience|expertise|background)\s+(?:in|with|of)\s+/,'').replace(/\b(?:experience|expertise|requirements?|criteria|criterion|filters?|restriction|priority)\b/g,' ').replace(/\s+/g,' ').trim();}
+function canonicalKey(kind,value){
+  if(['question','technology','workflow'].includes(kind))return kind+':'+comparable(value);
+  const text=targetWords(value);
+  if(kind==='geography'&&/^(?:(?:uk|united kingdom|british)(?: location| geography)?|(?:location|geography)(?: uk| united kingdom)?)$/.test(text))return 'geography:uk';
+  for(const [candidateKind,label,pattern] of CONCEPTS){
+    if(candidateKind!==kind)continue;
+    if(text===targetWords(label))return kind+':'+comparable(label);
+    const match=text.match(pattern);
+    if(match&&!targetWords(text.slice(0,match.index)+' '+text.slice(match.index+match[0].length)))return kind+':'+comparable(label);
+  }
+  return kind+':'+text;
+}
+function sameRequirement(kind,value,old){return old.kind===kind&&[old.label,old.text].some(text=>canonicalKey(kind,text)===canonicalKey(kind,value));}
+function resolveTargets(brief,target){
+  const words=targetWords(target),direct=brief.requirements.filter(r=>sameRequirement(r.kind,target,r));
+  if(direct.length)return direct;
+  const categories={research:'research',location:'geography',geography:'geography',population:'population',setting:'setting',modality:'modality',procedure:'procedure',regulatory:'regulatory'};
+  if(categories[words])return brief.requirements.filter(r=>r.kind===categories[words]);
+  const parts=target.split(/\s+(?:and|&)\s+/i);
+  if(parts.length>1){const groups=parts.map(part=>resolveTargets(brief,part));if(groups.every(group=>group.length))return [...new Set(groups.flat())];}
+  return [];
+}
+function negatedInstruction(value){return /\b(?:do not|don['’]t|must not|should not|cannot|can't|never|not)\s+(?:remove|drop|clear|delete|ignore|make|change|prefer|demote|promote)\b/i.test(value);}
+function instructionEdits(brief,raw){
+  const blocked=[],unresolved=[],removedKeys=new Set();
+  // These spans are commands against the current brief, not fresh biography
+  // search text. Unrecognised noun phrases remain available to the model;
+  // unresolved references never become literal directive-shaped criteria.
+  const parts=raw.matchAll(/[^.;]+/g);
+  for(const part of parts){
+    const boundaries=/,|\b(?:but|while|and)\s+(?=(?:keep(?:ing)?|retain(?:ing)?|preserv(?:e|ing)|maintain(?:ing)?|includ(?:e|ing)|continu(?:e|ing)|still|requir(?:e|ing)|remove|drop|clear|delete|make|change|prefer|demote|promote)\b)/gi;
+    let cursor=0;const clauses=[];
+    for(const separator of part[0].matchAll(boundaries)){clauses.push({text:part[0].slice(cursor,separator.index),index:part.index+cursor});cursor=separator.index+separator[0].length;}
+    clauses.push({text:part[0].slice(cursor),index:part.index+cursor});
+    for(const clause of clauses){
+      const segment=clean(clause.text);if(!segment)continue;
+      const start=clause.index,end=clause.index+clause.text.length;
+      if(negatedInstruction(segment)){blocked.push([start,end]);continue;}
+      let operation,target,importance;
+      const removal=segment.match(/^(?:(?:please|we|I)\s+)*(?:remove|drop|clear|delete|ignore|(?:we |I )?(?:no longer|do not|don't|don’t) (?:need|require))\s+(.+)$/i);
+      const postfixRemoval=segment.match(/^(.+?)\s+(?:(?:is|are)\s+)?(?:no longer (?:required|needed)|not (?:required|needed))$/i);
+      const priority=segment.match(new RegExp('^(?:(?:please\\s+)?(?:make|keep|retain|mark|set|change|demote|promote)\\s+)?(.+?)\\s+(?:(?:is|are|should be|would be|can be|must be|remains?|as|to)\\s+)?(?:(?:only|just)\\s+)?('+priorityMarker+')$','i'));
+      const prefer=segment.match(/^(?:please\s+)?prefer\s+(.+)$/i);
+      if(removal||postfixRemoval){operation='remove';target=(removal||postfixRemoval)[1];}
+      else if(priority||prefer){operation='importance';target=(priority||prefer)[1];importance=prefer||!/^(essential|required|mandatory)$/i.test(priority[2])?'preferred':'essential';}
+      else continue;
+      // Role eligibility and result exclusions retain their separate semantics.
+      if(/\b(?:from (?:the )?(?:results?|shortlist|candidates?)|role restrictions?|role filters?|only[- ]role restrictions?)\b/i.test(target))continue;
+      const targets=resolveTargets(brief,target);
+      const unresolvedReference=/^(?:(?:that|this|it|these|those|the)\s*)?(?:one|requirements?|criteria|criterion)?$/i.test(targetWords(target));
+      const missingCategory=operation==='importance'&&brief.requirements.length&&/^(?:research|location|geography|population|setting|modality|procedure|regulatory)$/.test(targetWords(target))&&!CONCEPTS.some(([,,pattern])=>pattern.test(target))&&/\b(?:make|change|should be|requirement|criterion)\b/i.test(segment);
+      const unresolvedRemoval=operation==='remove'&&!/\b(?:manufacturer|timing|deadline|panel size|contact)\b/i.test(target);
+      if(targets.length){
+        blocked.push([start,end]);
+        for(const r of targets){
+          if(operation==='remove'){removedKeys.add(canonicalKey(r.kind,r.text));removeRequirement(brief,r.id);}
+          else {r.importance=importance;releasePreferredRole(brief,r,importance);if(r.kind==='role'&&r.polarity==='exclude'){r.polarity='include';r.strictRole=brief.roleMode==='only'&&importance==='essential';}}
+        }
+      }else if(unresolvedReference||missingCategory||unresolvedRemoval){
+        blocked.push([start,end]);unresolved.push({target:clean(target),operation});
+      }
+    }
+  }
+  let text=raw;for(const [start,end] of blocked)text=text.slice(0,start)+' '.repeat(end-start)+text.slice(end);
+  const question=unresolved.length?'Which active requirement should '+(unresolved[0].operation==='remove'?'be removed':'change priority')+' for “'+unresolved[0].target+'”? '+(brief.requirements.length?'Current requirements: '+brief.requirements.map(r=>r.label).join(', ')+'.':'There are no matching active requirements.') :null;
+  return {text,blocked,question,removedKeys};
+}
 function researchActivityWithoutRole(value){
   const text=clean(value),research=CONCEPTS.filter(([kind])=>kind==='research');
   if(!research.some(([, ,pattern])=>pattern.test(text))||CONCEPTS.some(([kind,,pattern])=>kind==='role'&&pattern.test(text)))return false;
@@ -49,6 +122,8 @@ function normalizeBrief(previous){
   const next={...blankBrief(),...(previous&&typeof previous==='object'?clone(previous):{})};
   next.requirements=Array.isArray(next.requirements)?next.requirements.filter(r=>r&&KINDS.has(r.kind)&&r.id&&r.text).map(r=>({...r,importance:r.importance==='preferred'?'preferred':'essential',...(r.kind==='role'?{polarity:r.polarity==='exclude'?'exclude':'include',strictRole:r.strictRole===true}: {})})):[];
   next.roleMode=next.roleMode==='only'?'only':null;
+  const seen=new Map();
+  next.requirements=next.requirements.filter(r=>{const key=canonicalKey(r.kind,r.text),old=seen.get(key);if(!old){seen.set(key,r);return true;}if(r.importance==='essential')old.importance='essential';return false;});
   return next;
 }
 function localClauseBefore(raw,index,window=65){
@@ -60,8 +135,8 @@ function wordingImportance(raw,start,end){
   // explicit instruction rather than leaking across "and keep/prefer ...".
   const after=raw.slice(end,end+120).split(/[;,\.]|\b(?:but|however|whereas|instead)\b|\band\s+(?=(?:keep|retain|include|exclude|prefer|require|need|only|just)\b)/i)[0];
   const self=raw.slice(start,end);
-  const marker=self.match(/\b(?:not essential|optional|useful|preferred|nice to have|essential|required)\b\s*$/i)?.[0]||after.match(/\b(?:not essential|optional|useful|preferred|nice to have|essential|required)\b/i)?.[0];
-  if(marker)return /^(?:essential|required)$/i.test(marker)?'essential':'preferred';
+  const marker=self.match(/\b(?:not essential|not mandatory|optional|useful|helpful|preferred|nice to have|essential|required|mandatory)\b\s*$/i)?.[0]||after.match(/\b(?:not essential|not mandatory|optional|useful|helpful|preferred|nice to have|essential|required|mandatory)\b/i)?.[0];
+  if(marker)return /^(?:essential|required|mandatory)$/i.test(marker)?'essential':'preferred';
   const before=localClauseBefore(raw,start,35);
   return /\b(?:prefer|prioritis\w*|prioritiz\w*)\b[^.;]*$/i.test(before)?'preferred':null;
 }
@@ -96,11 +171,12 @@ function releasePreferredRole(brief,role,importance){
 }
 function removalIntent(raw,match){
   const before=localClauseBefore(raw,match.index);
+  if(negatedInstruction(before))return false;
   const after=raw.slice(match.index+match[0].length,match.index+match[0].length+70).split(/[;.]|\b(?:and|but)\b/i)[0];
   return /\b(?:remove|drop|ignore|without requiring|no longer (?:require|need)|don['’]t (?:require|need)|do not (?:require|need))\b[^.;]*$/i.test(before)||/^\s*(?:expertise|experience)?\s*(?:is|are)?\s*(?:no longer (?:required|needed)|not (?:required|needed))\b/i.test(after);
 }
 function upsert(brief,{kind,label,text=label,importance='essential',evidence=text,polarity='include',strictRole=false}){
-  const old=brief.requirements.find(r=>r.kind===kind&&r.label.toLowerCase()===label.toLowerCase());
+  const old=brief.requirements.find(r=>sameRequirement(kind,label,r));
   const requirement={id:old?.id||idFor(kind,label),kind,label,text:clean(text),importance,evidence:clean(evidence),...(kind==='role'?{polarity,strictRole:polarity!=='exclude'&&strictRole}: {})};
   if(old) Object.assign(old,requirement);else brief.requirements.push(requirement);
 }
@@ -118,9 +194,9 @@ function removeRequirement(brief,id){
   if(removed.kind==='geography')brief.geography=null;
   // Context is not a hidden copy of removed requirements. Delete its exact
   // mentions from remaining purpose/question text as well as the search chip.
-  const mentions=[removed.label,removed.text,removed.evidence].filter(v=>typeof v==='string'&&v.length>=3);
+  const mentions=[removed.label,removed.text,removed.evidence,...(removed.kind==='geography'&&canonicalKey('geography',removed.label)==='geography:uk'?['UK','United Kingdom','British']:[])].filter(v=>typeof v==='string'&&v.trim().length>=2);
   for(const r of brief.requirements)if(['technology','question','workflow'].includes(r.kind))for(const mention of mentions){
-    const pattern=new RegExp(mention.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+    const pattern=new RegExp('(?<![a-z0-9])'+mention.trim().split(/[-\s\u2010-\u2015]+/).map(escapePattern).join('[-\\s\\u2010-\\u2015]+')+'(?![a-z0-9])','gi');
     r.text=clean(r.text.replace(pattern,''));r.evidence=clean((r.evidence||'').replace(pattern,''));
   }
 }
@@ -130,16 +206,26 @@ function sufficient(brief){
   return anchor&&purpose;
 }
 function parseBrief(input={}){
-  const previous=normalizeBrief(input.previous),brief=clone(previous),raw=clean(input.message);
+  const previous=normalizeBrief(input.previous),brief=clone(previous);let raw=clean(input.message);
+  // An older saved brief can contain duplicate aliases. If its visible chip
+  // used the discarded alias ID, apply the action to the surviving equivalent
+  // requirement rather than rejecting the user's explicit selection.
+  const activeId=id=>{
+    if(brief.requirements.some(r=>r.id===id))return id;
+    const legacy=Array.isArray(input.previous?.requirements)?input.previous.requirements.find(r=>r?.id===id&&KINDS.has(r.kind)&&typeof r.text==='string'):null;
+    return legacy?brief.requirements.find(r=>sameRequirement(legacy.kind,legacy.text,r))?.id:null;
+  };
   if(input.removeRequirementId){
-    if(typeof input.removeRequirementId!=='string'||!brief.requirements.some(r=>r.id===input.removeRequirementId))throw new TypeError('Choose a requirement from the current brief.');
-    removeRequirement(brief,input.removeRequirementId);
+    const id=typeof input.removeRequirementId==='string'?activeId(input.removeRequirementId):null;
+    if(!id)throw new TypeError('Choose a requirement from the current brief.');
+    removeRequirement(brief,id);
     brief.version=previous.version+1;derive(brief);
     return {brief,needsClarification:!sufficient(brief),question:!sufficient(brief)?'What clinical question, technology or assessment do you need help with?':null,notices:[],mode:'deterministic'};
   }
   if(input.patch&&typeof input.patch==='object'){
-    if(Object.keys(input.patch).sort().join(',')!=='importance,requirementId'||!['essential','preferred'].includes(input.patch.importance)||!brief.requirements.some(r=>r.id===input.patch.requirementId))throw new TypeError('Change the importance of a requirement in the current brief.');
-    const r=brief.requirements.find(r=>r.id===input.patch.requirementId);
+    const id=typeof input.patch.requirementId==='string'?activeId(input.patch.requirementId):null;
+    if(Object.keys(input.patch).sort().join(',')!=='importance,requirementId'||!['essential','preferred'].includes(input.patch.importance)||!id)throw new TypeError('Change the importance of a requirement in the current brief.');
+    const r=brief.requirements.find(r=>r.id===id);
     if(r&&['essential','preferred'].includes(input.patch.importance))r.importance=input.patch.importance;
     releasePreferredRole(brief,r,input.patch.importance);
     brief.version=previous.version+1;derive(brief);
@@ -155,17 +241,20 @@ function parseBrief(input={}){
   // preferences in this message are rebuilt by the ordinary concept pass.
   if(allowsAnyRole(raw)||clearsRoleScope(raw)){for(const r of [...brief.requirements])if(r.kind==='role')removeRequirement(brief,r.id);brief.roleMode=null;}
   if(/\bnot only\b/i.test(raw)){brief.roleMode=null;for(const r of brief.requirements)if(r.kind==='role')r.strictRole=false;}
+  const edits=instructionEdits(brief,raw);raw=edits.text;
   const discussion=engagementQuestion(raw);
   for(const [kind,label,pattern] of CONCEPTS){
     if(label==='CT imaging'&&/\b(?:cardiac|coronary)\b/i.test(raw))continue;
-    let removedInMessage=false;
+    let removedInMessage=edits.removedKeys.has(canonicalKey(kind,label));
     // Later explicit instructions can qualify an earlier mention in the same
     // brief. An incidental mention does not silently restore or strengthen it.
     const matches=raw.matchAll(new RegExp(pattern.source,pattern.flags.replace('g','')+'g'));
     for(const match of matches){
       if(discussion&&['activity','research','regulatory','currentPractice','role'].includes(kind)&&match.index>=discussion.index&&match.index+match[0].length<=discussion.index+discussion[0].length)continue;
-      if(label==='Clinical research'&&/\bdiagnostic\s+$/i.test(raw.slice(0,match.index)))continue;
-      const prior=brief.requirements.find(r=>r.kind===kind&&r.label===label);
+      if(label==='Clinical research'&&/\b(?:diagnostic|validation)\s+$/i.test(raw.slice(0,match.index)))continue;
+      if(label==='General practitioner'&&/^GP$/i.test(match[0])&&/^[- \u2010-\u2015]setting\b/i.test(raw.slice(match.index+match[0].length)))continue;
+      if(label==='Image interpretation'&&/^clinical reporting$/i.test(match[0])&&!brief.requirements.some(r=>r.kind==='modality')&&!CONCEPTS.some(([k,,re])=>k==='modality'&&re.test(raw)))continue;
+      const prior=brief.requirements.find(r=>sameRequirement(kind,label,r));
       const role=kind==='role'?roleInstruction(raw,match):null;
       if(removalIntent(raw,match)&&role?.polarity!=='exclude'&&!role?.reversing){if(prior)removeRequirement(brief,prior.id);removedInMessage=true;continue;}
       const importance=wordingImportance(raw,match.index,match.index+match[0].length);
@@ -179,8 +268,12 @@ function parseBrief(input={}){
   if(question){brief.requirements=brief.requirements.filter(r=>r.kind!=='question');upsert(brief,{kind:'question',label:'Assessment question',text:question[0],importance:'essential',evidence:question[0]});}
   const tech=raw.match(/\b(?:software|device|technology|algorithm|AI)\b[^.!?;]{0,180}/i);
   if(tech){const purpose=/\b(?:analys|analyz|assess|diagnos|monitor|scan|image|support|detect|screen|treat)\w*/i.test(tech[0]);const scopedContext=brief.requirements.some(r=>['condition','modality','procedure'].includes(r.kind));if(purpose||scopedContext)upsert(brief,{kind:'technology',label:purpose?'Device purpose':'Device context',text:tech[0],importance:'essential',evidence:tech[0]});}
-  if(/\b(?:UK|United Kingdom|British)\s*(?:only)?\b/i.test(raw)){brief.geography='UK';upsert(brief,{kind:'geography',label:'UK',importance:'essential',evidence:raw.match(/\b(?:UK|United Kingdom|British)\s*(?:only)?\b/i)[0]});}
-  if(/\b(?:anywhere|any country|remove geography|global|worldwide)\b/i.test(raw)){brief.geography=null;brief.requirements=brief.requirements.filter(r=>r.kind!=='geography');}
+  for(const match of raw.matchAll(/\b(?:UK|United Kingdom|British)\s*(?:only)?\b/gi)){
+    const importance=wordingImportance(raw,match.index,match.index+match[0].length);
+    if(edits.removedKeys.has('geography:uk')&&!importance&&!/\b(?:include|require|need|add|keep)\b[^.;]*$/i.test(localClauseBefore(raw,match.index)))continue;
+    brief.geography='UK';upsert(brief,{kind:'geography',label:'UK',importance:importance||brief.requirements.find(r=>r.kind==='geography')?.importance||'essential',evidence:match[0]});
+  }
+  if([...raw.matchAll(/\b(?:anywhere|any country|remove geography|global|worldwide)\b/gi)].some(match=>!(/\b(?:not|never|no|do not|don['’]t|cannot|can't)\b[^.;]*$/i.test(localClauseBefore(raw,match.index,70))))){for(const r of [...brief.requirements])if(r.kind==='geography')removeRequirement(brief,r.id);brief.geography=null;}
   const panel=raw.match(/\b(?:need|find|recruit|panel of)\s+(\d{1,2}|one|two|three|four|five)\s+(?:clinical\s+)?(?:experts?|specialists?|clinicians?)\b/i);
   if(panel)brief.panelSize=({one:1,two:2,three:3,four:4,five:5}[panel[1].toLowerCase()]||Number(panel[1]));
   if(/\bone (?:practising |practicing )?clinician and one (?:clinical )?research/i.test(raw)){brief.panelSize=2;upsert(brief,{kind:'role',label:'Practising clinician',evidence:raw.match(/one (?:practising |practicing )?clinician/i)[0]});upsert(brief,{kind:'role',label:'Clinical researcher',evidence:raw.match(/one (?:clinical )?research\w*/i)[0]});}
@@ -197,15 +290,17 @@ function parseBrief(input={}){
   if(/\b(?:remove|drop|clear)\s+(?:the\s+)?(?:timing|deadline)\b/i.test(raw))brief.timing=null;
   if(/\b(?:remove|drop|clear)\s+(?:the\s+)?panel size\b/i.test(raw))brief.panelSize=null;
   brief.version=previous.version+1;derive(brief);
-  return {brief,needsClarification:!sufficient(brief),question:!sufficient(brief)?'What clinical question, technology or assessment do you need help with? For example, the type of scan, device use or decision being assessed.':null,notices:[],mode:'deterministic'};
+  const result={brief,needsClarification:!!edits.question||!sufficient(brief),question:edits.question||(!sufficient(brief)?'What clinical question, technology or assessment do you need help with? For example, the type of scan, device use or decision being assessed.':null),notices:edits.question?['An instruction needs a specific active requirement before it can be applied.']:[],mode:'deterministic'};
+  interpretationMeta.set(result,edits);return result;
 }
 function createBriefInterpreter({client,model=process.env.OPENROUTER_QUERY_MODEL||'deepseek/deepseek-v3.2'}={}){
   if(client===undefined&&process.env.OPENROUTER_API_KEY){const OpenAI=require('openai');client=new OpenAI({apiKey:process.env.OPENROUTER_API_KEY,baseURL:'https://openrouter.ai/api/v1',timeout:6000,maxRetries:0});}
   const cache=new Map();
   const interpret=async input=>{
     const parsed=parseBrief(input);
-    if(!client||input?.removeRequirementId||input?.patch||!clean(input?.message)||input.message.length>4000)return parsed;
-    const cacheKey=createHash('sha256').update(JSON.stringify(['expert-brief-v8',model,input.previous||null,input.message])).digest('hex');
+    const edits=interpretationMeta.get(parsed);
+    if(!client||edits?.question||input?.removeRequirementId||input?.patch||!clean(input?.message)||input.message.length>4000)return parsed;
+    const cacheKey=createHash('sha256').update(JSON.stringify(['expert-brief-v9',model,input.previous||null,input.message])).digest('hex');
     if(cache.has(cacheKey))return clone(cache.get(cacheKey));
     // Interpret only the new message. Removed requirements are absent from the
     // current brief and cannot return through an old transcript.
@@ -221,14 +316,23 @@ function createBriefInterpreter({client,model=process.env.OPENROUTER_QUERY_MODEL
         // canonical equivalences were handled by the deterministic layer.
         const allowed=new Set(r.evidence.toLowerCase().match(/[a-z0-9]+/g)||[]);
         if((r.text.toLowerCase().match(/[a-z0-9]+/g)||[]).some(w=>!allowed.has(w)))continue;
+        const message=clean(input.message),quotedIndex=message.toLowerCase().indexOf(clean(r.evidence).toLowerCase()),textIndex=message.toLowerCase().indexOf(clean(r.text).toLowerCase());
+        if(edits?.blocked.some(([start,end])=>quotedIndex>=start&&quotedIndex+clean(r.evidence).length<=end||textIndex>=start&&textIndex+clean(r.text).length<=end))continue;
+        // If a model copied an entire priority sentence, retain only its noun
+        // phrase; the surrounding instruction remains an operation, not a label.
+        r.text=clean(r.text).replace(new RegExp('\\s+(?:(?:is|are|should be|would be|can be|must be|as)\\s+)?(?:(?:only|just)\\s+)?(?:'+priorityMarker+')$','i'),'').replace(/^(?:experience|expertise)\s+(?:in|with|of)\s+/i,'');
+        if(/^(?:(?:please|we|I)\s+)*(?:remove|drop|clear|delete|make|keep|retain|prefer|change|find|need|want)\b|\b(?:should|must|would|can)\s+be\b/i.test(r.text)||!r.text)continue;
         if(r.kind==='role'){
           // Geography is a separate requirement. Keep the quoted occupation
           // while rejecting generic labels which do not specify one.
           r.text=clean(r.text.replace(/^(?:UK|United Kingdom|British)\s+/i,''));
           if(allowsAnyRole(r.text)||clearsRoleScope(r.text))continue;
-          const roleNouns=r.text.split(/\b(?:who|with|that|able to|can)\b/i)[0].replace(/\b(?:clinical|medical|healthcare|health|clinicians?|experts?|expertise|perspectives?|contributions?|specialists?|professionals?|roles?|any|all|someone|person|with|experience|knowledge|skills?|in|of|and|or|a|an|the)\b/gi,'');
+          let roleNouns=comparable(r.text.split(/\b(?:who|with|that|able to|can)\b/i)[0]);
+          for(const [kind,,pattern] of CONCEPTS)if(['setting','modality','condition'].includes(kind))roleNouns=roleNouns.replace(new RegExp(pattern.source,pattern.flags+'g'),' ');
+          roleNouns=roleNouns.replace(/\b(?:clinical|medical|healthcare|health|clinicians?|experts?|expertise|perspectives?|contributions?|specialists?|professionals?|roles?|any|all|someone|person|with|experience|knowledge|skills?|in|of|and|or|a|an|the)\b/gi,'');
           if(!/[a-z0-9]/i.test(roleNouns)||researchActivityWithoutRole(r.text))continue;
         }
+        if(parsed.brief.requirements.some(old=>old.kind!==r.kind&&CONCEPTS.some(([kind,label])=>kind===old.kind&&canonicalKey(kind,r.text)===kind+':'+comparable(label)&&sameRequirement(kind,r.text,old))))continue;
         // Canonical concepts and their negative/importance history are owned
         // by the deterministic parser. A model patch cannot undo that result.
         if(CONCEPTS.some(([kind,,pattern])=>kind===r.kind&&pattern.test(r.text)))continue;
@@ -248,7 +352,7 @@ function createBriefInterpreter({client,model=process.env.OPENROUTER_QUERY_MODEL
         const quotedContext=parsed.brief.requirements.some(old=>['question','technology','workflow'].includes(old.kind)&&clean(old.text).toLowerCase().includes(clean(r.evidence).toLowerCase()));
         const explicitExperience=/\b(?:experience|expertise|background|training|skills?|track record|prior work)\b/i.test(r.evidence);
         if(quotedContext&&((r.kind==='research'&&!explicitExperience)||(r.kind==='role'&&/\b(?:help|examine|understand|how|what|why|whether|consequences|results|outputs|evidence)\b/i.test(r.text))))continue;
-        const prior=parsed.brief.requirements.find(old=>old.kind===r.kind&&[old.label,old.text].some(value=>clean(value).toLowerCase()===clean(r.text).toLowerCase()));
+        const prior=parsed.brief.requirements.find(old=>sameRequirement(r.kind,r.text,old));
         if(!prior&&parsed.brief.requirements.some(old=>old.kind===r.kind&&([old.label,old.text,old.evidence].some(value=>value&&r.evidence.toLowerCase().includes(value.toLowerCase()))||r.kind==='technology')))continue;
         if(role?.only){if(!onlyRolesScoped){parsed.brief.requirements=parsed.brief.requirements.filter(old=>old.kind!=='role'||old.polarity==='exclude');onlyRolesScoped=true;}parsed.brief.roleMode='only';}
         const explicitImportance=wordingImportance(input.message,evidenceMatch.index,evidenceMatch.index+evidenceMatch[0].length);
