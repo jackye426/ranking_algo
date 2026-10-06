@@ -9,7 +9,10 @@
     "test": "node --test demo/*.test.cjs",
     "verify:demo": "node demo/scripts/verify.cjs",
     "verify:refinements": "node demo/scripts/verify-refinements.cjs",
-    "verify:comparison": "node demo/scripts/verify-comparison.cjs"
+    "verify:comparison": "node demo/scripts/verify-comparison.cjs",
+    "start:expert": "node expert/server.cjs",
+    "test:expert": "node --test expert/*.test.cjs",
+    "evaluate:expert": "node expert/evaluation/evaluate.cjs"
   },
   "keywords": [],
   "author": "",

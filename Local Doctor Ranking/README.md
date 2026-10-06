@@ -1,5 +1,7 @@
 # Local Doctor Ranking Server
 
+The separate DocMap Expert Discovery preview is documented in [expert/README.md](expert/README.md), with a [three-pathway demonstration guide](expert/docs/DEMO_GUIDE.md). Its routes, project storage and deployment are independent of the patient demo.
+
 A local web server that provides doctor ranking functionality using the parallel ranking algorithm and your merged doctor data.
 
 ## Features

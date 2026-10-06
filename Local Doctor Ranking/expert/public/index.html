@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f6f8ff">
+  <title>DocMap — Expert Discovery</title>
+  <meta name="description" content="Turn a clinical assessment brief into an evidence-backed shortlist of experts, with clear questions before engagement.">
+  <link rel="stylesheet" href="/expert-assets/styles.css">
+  <script src="/expert-assets/projects.js" defer></script>
+  <script src="/expert-assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="atmosphere" aria-hidden="true"></div>
+  <header class="site-header">
+    <button class="brand" id="brand-home" aria-label="DocMap Expert Discovery home"><svg viewBox="0 0 32 40" aria-hidden="true"><path d="M16 27 3.9 14.9A8.1 8.1 0 0 1 16 4.1a8.1 8.1 0 0 1 12.1 10.8Z"/><circle cx="16" cy="35" r="3.6"/></svg><span>DocMap</span><span class="brand-product">Expert Discovery</span></button>
+    <div class="header-actions">
+      <label class="sr-only" for="project-select">Current assessment project</label><select id="project-select" class="project-select" aria-label="Current assessment project"></select>
+      <button id="new-project" class="icon-button" aria-label="Create project" title="Create project">＋</button>
+      <button id="open-project" class="subtle-button">Project <span id="saved-count" class="count">0</span></button>
+    </div>
+  </header>
+  <div id="storage-alert" class="storage-alert" role="alert" hidden><span id="storage-message"></span><button id="emergency-export" class="text-button">Export project now</button></div>
+  <main id="main">
+    <section id="home" class="home" aria-labelledby="home-title">
+      <div class="hero">
+        <p class="eyebrow">Evidence before engagement</p>
+        <h1 id="home-title">Find the expertise<br>your assessment needs.</h1>
+        <p class="hero-copy">Describe the device, its clinical use and the question<br class="desktop-break"> you need help answering.</p>
+        <form id="home-form" class="search-box home-search">
+          <label for="home-input" class="sr-only">Describe a clinical assessment brief</label>
+          <textarea id="home-input" rows="3" maxlength="4000" placeholder="We’re assessing software that analyses cardiac CT scans. We need experts who understand how its results would affect clinical decisions…"></textarea>
+          <div class="search-box-footer"><span>Start with what you need to understand.</span><button type="submit" id="home-submit" class="send-button" aria-label="Find relevant experts">↑</button></div>
+        </form>
+        <p class="privacy-hint">Public demonstration · use fictional, non-confidential briefs</p>
+        <div class="example-row" aria-label="Example assessment briefs">
+          <button class="example" data-example="cardiac"><span class="example-icon" aria-hidden="true">↗</span><span>Cardiac CT software<small>Clinical decisions &amp; diagnostic evidence</small></span></button>
+          <button class="example" data-example="skin"><span class="example-icon" aria-hidden="true">◉</span><span>Skin-lesion imaging<small>Expertise beyond a specialty title</small></span></button>
+          <button class="example" data-example="panel"><span class="example-icon" aria-hidden="true">⊞</span><span>A complementary panel<small>Clinical and research perspectives</small></span></button>
+        </div>
+        <p id="health-status" class="health-status" role="status">Checking the evidence index…</p>
+        <button id="resume-search" class="text-button" hidden>Resume your current search →</button>
+      </div>
+      <div class="home-story">
+        <div><span class="step-number">01</span><h2>Start with the question.</h2><p>Your clinical use, technology and requirements guide the search.</p></div>
+        <div><span class="step-number">02</span><h2>See the supporting evidence.</h2><p>Compare what each professional’s records document—and what they don’t.</p></div>
+        <div><span class="step-number">03</span><h2>Prepare the next conversation.</h2><p>Save a shortlist, qualification questions and sources in a review pack.</p></div>
+      </div>
+      <footer class="home-footer"><p>Professional evidence, organised around your assessment.</p><p>Discovery supports qualification; it does not establish assessor approval or independence.</p></footer>
+    </section>
+
+    <section id="workspace" class="workspace" hidden aria-label="Expert discovery workspace">
+      <div class="workspace-body">
+        <aside class="brief-sidebar" aria-label="Interpreted assessment brief">
+          <div class="sidebar-heading"><span class="eyebrow">Your assessment</span><button id="toggle-brief" class="text-button mobile-only" aria-expanded="false" aria-controls="brief-content">Show brief</button></div>
+          <div id="brief-content"><h2 id="brief-title">The expertise you need</h2><p class="sidebar-note">These are the details influencing this search.</p><div id="requirements" class="requirements"></div><div id="brief-facts" class="brief-facts"></div>
+            <div class="sidebar-filters"><label class="check-label"><input id="documented-only" type="checkbox"><span>Documented essentials only<small>Hide candidates with unconfirmed essential requirements.</small></span></label><label class="check-label"><input id="uncontacted-only" type="checkbox"><span>Not contacted in this project<small>Uses only contact events you recorded.</small></span></label></div>
+            <button id="sidebar-project" class="project-callout"><span>Project shortlist<small>Saved evidence, notes and next steps</small></span><span id="sidebar-saved-count" class="count">0</span></button>
+          </div>
+        </aside>
+        <div class="results-column">
+          <div class="results-heading"><div><p class="eyebrow">Evidence-backed discovery</p><h1 id="results-title">Candidates to consider</h1><p id="result-count" class="muted"></p></div><button id="home-return" class="subtle-button">← Home</button></div>
+          <div class="results-toolbar"><div class="segmented" role="group" aria-label="Results view"><button id="focused-view" aria-pressed="true">Focused view</button><button id="directory-view" aria-pressed="false">Directory</button></div><button id="view-updated" class="text-button" hidden>View updated matches ↑</button></div>
+          <div id="results-region" class="results-region" tabindex="-1" aria-label="Ranked candidates"><div id="search-error" role="alert"></div><div id="result-notices"></div><div id="clarification" class="empty-state" hidden></div><div id="candidate-list" class="candidate-list"></div><button id="load-more" class="load-more" hidden>Load more candidates</button><p id="ranking-note" class="ranking-note" hidden>Ordered by evidence relevant to this brief. Discovery does not establish qualification, availability or independence.</p></div>
+        </div>
+      </div>
+      <div class="composer-wrap"><div id="composer-status" class="composer-status" role="status"></div><div id="compare-tray" class="compare-tray" hidden><span id="compare-count">0 selected</span><button id="compare-clear" class="text-button">Clear</button><button id="compare-open" class="primary-button" disabled>Compare evidence</button></div><form id="followup-form" class="search-box followup-search"><label for="followup-input" class="sr-only">Refine the assessment brief</label><textarea id="followup-input" rows="1" maxlength="4000" placeholder="Refine the brief. What matters most for this assessment?"></textarea><button id="followup-submit" type="submit" class="send-button" aria-label="Update expert search">↑</button></form></div>
+    </section>
+
+    <section id="project-view" class="project-view" hidden aria-labelledby="project-title"><div class="project-heading"><div><p class="eyebrow">Recruitment preparation</p><h1 id="project-title">Your project</h1><p id="project-subtitle" class="muted"></p></div><button id="project-return" class="subtle-button">← Return to search</button></div><div class="project-actions"><button id="export-json" class="primary-button">Export project</button><button id="export-html" class="subtle-button">Download review pack</button><button id="copy-json" class="text-button">Copy backup</button><button id="import-project" class="text-button">Import project</button><input id="import-file" type="file" accept="application/json,.json" hidden></div><p class="storage-note">Saved in this browser on this device. Export to keep a copy or move your project. This is not shared team storage.</p><div id="project-brief" class="project-brief"></div><div id="project-candidates" class="project-candidates"></div><label for="project-notes" class="field-label">Project notes</label><textarea id="project-notes" class="notes-field" rows="4" placeholder="Record scope, open questions or next steps."></textarea><div class="notes-footer"><span id="project-save-status" class="muted" role="status"></span><button id="save-project-notes" class="subtle-button">Save project notes</button></div></section>
+  </main>
+
+  <dialog id="profile-dialog" class="profile-dialog" aria-labelledby="profile-name"><div class="panel-topbar"><span class="eyebrow">Expert profile</span><button id="profile-close" class="icon-button" aria-label="Close expert profile">×</button></div><div id="profile-scroll" class="profile-scroll"><div id="profile-identity"></div><div id="profile-content"></div></div></dialog>
+  <dialog id="compare-dialog" class="compare-dialog" aria-labelledby="compare-title"><div class="dialog-heading"><div><p class="eyebrow">The same brief. Different evidence.</p><h2 id="compare-title">Compare candidates</h2></div><button id="compare-close" class="icon-button" aria-label="Close comparison">×</button></div><p id="comparison-brief" class="muted"></p><div id="comparison-table" class="comparison-table"></div><div class="comparison-ai"><h3>What’s the difference?</h3><p>Explore documented distinctions without declaring a winner.</p><button id="comparison-explain" class="primary-button">Explain the differences</button><div id="comparison-answer" aria-live="polite"></div></div></dialog>
+  <dialog id="new-project-dialog" class="small-dialog" aria-labelledby="new-project-title"><form id="new-project-form"><div class="dialog-heading"><h2 id="new-project-title">Create an assessment project</h2><button type="button" id="new-project-close" class="icon-button" aria-label="Cancel new project">×</button></div><label class="field-label" for="new-project-name">Project name</label><input id="new-project-name" maxlength="120" required placeholder="For example, cardiac CT assessment"><p class="muted">Use a fictional, non-confidential name for this demonstration.</p><button type="submit" class="primary-button">Create project</button></form></dialog>
+  <dialog id="import-dialog" class="small-dialog" aria-labelledby="import-title"><div class="dialog-heading"><h2 id="import-title">Restore a project</h2><button id="import-close" class="icon-button" aria-label="Cancel import">×</button></div><p class="muted">Your existing projects stay unchanged. Choose a JSON backup, or paste one you copied.</p><button id="import-choose-file" class="subtle-button">Choose backup file</button><form id="import-backup-form"><label class="field-label" for="import-text">Or paste your JSON backup</label><textarea id="import-text" rows="5" maxlength="12000000" spellcheck="false" required placeholder="Paste a DocMap project backup here"></textarea><p id="import-error" class="notice" role="alert"></p><button type="submit" class="primary-button">Restore copied backup</button></form></dialog>
+  <dialog id="event-dialog" class="small-dialog" aria-labelledby="event-title"><form id="event-form"><div class="dialog-heading"><h2 id="event-title">Record recruitment activity</h2><button type="button" id="event-close" class="icon-button" aria-label="Cancel activity">×</button></div><p class="muted">Record something you have done outside this demo. This action does not send a message or confirm participation.</p><label class="field-label" for="event-type">Activity</label><select id="event-type"><option value="contact-recorded">Contact made</option><option value="reply-recorded">Reply received</option><option value="meeting-recorded">Meeting held</option><option value="engagement-recorded">Engagement recorded</option></select><label class="field-label" for="event-detail">What happened?</label><textarea id="event-detail" rows="4" required maxlength="2000"></textarea><button type="submit" class="primary-button">Record activity</button></form></dialog>
+  <div id="toast" class="toast" role="status" hidden></div><div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>
