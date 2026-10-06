@@ -1,5 +1,7 @@
 # DeepSeek verification
 
+For the subsequent approved provider diagnostic, structured explanation changes, calibrated checker and final hosted outcomes, see [Friendli verification](FRIENDLI_VERIFICATION.md). This document preserves the earlier attempts rather than replacing their results.
+
 Original round recorded 2026-10-06T16:17:33.804Z; later diagnostic and hosted observations are identified separately below. Model: `deepseek/deepseek-v3.2` through OpenRouter.
 
 **Release criterion: not met — 1/3 distinct briefs have a fully verified response within the 15-second pipeline deadline.**

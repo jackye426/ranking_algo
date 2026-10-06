@@ -2,7 +2,7 @@
 
 Preview: [DocMap Expert Discovery](https://docmap-expert-discovery-production.up.railway.app/expert-discovery).
 
-This is an independent Railway service. The patient demo was not redeployed or changed. The expert service uses a private evidence-cache volume, server-side credentials and a 19-file runtime allowlist. Raw database exports, source-review samples, model caches, project notes and environment files are absent from the uploaded application directory.
+This is an independent Railway service. The patient demo was not redeployed or changed. The expert service uses a private evidence-cache volume, server-side credentials and a twenty-file runtime allowlist after the explanation-transport follow-up (nineteen in the earlier releases). Raw database exports, source-review samples, model caches, project notes and environment files are absent from the uploaded application directory.
 
 ## Release observations — 6 October 2026
 
@@ -61,7 +61,25 @@ Hosted desktop and 390px project views were inspected. The copied-backup workflo
 ## Remaining release criteria
 
 - Three distinct, independently validated DeepSeek explanations have **not** been achieved; only one earlier public-only brief passed. Generation remains optional, deliberate and bounded, with explicit retry and sourced fallback.
-- A proposed Friendli-pinned diagnostic was rejected by automatic approval review because it treated that specifically selected hosting provider as an additional destination. It has not run with professional evidence. The request for permission remains pending; normal OpenRouter routing remains unchanged.
+- The earlier Friendli diagnostic restriction was resolved by explicit user authorization. The expert explanation/checking route now uses Friendli through OpenRouter, with provider fallback disabled and the existing privacy/price filters retained. The brief interpreter and patient service keep their existing configuration. Authorization is not a comprehensive provider privacy audit.
 - Responsive layouts, keyboard behavior, stable drafts and reduced-motion CSS were checked locally. Browser viewport checks are not physical-device keyboard testing. No clinical superiority, approval, availability, independence or time-saving claim follows from these checks.
 
 Runtime source and evidence are versioned; historical reports are preserved in the ignored private evaluation cache. See the [release audit](RELEASE_AUDIT.md), [data evaluation](DATA_AND_EVALUATION.md), [demonstration guide](DEMO_GUIDE.md) and [enrichment backlog](ENRICHMENT_BACKLOG.md) for scope and limitations.
+
+## Explanation follow-up deployment
+
+Deployment **`770eecc0-ab88-48d5-8802-f1650e12af2e`** reached Ready at **19:23:22 UTC**, subsequently reporting SUCCESS. It serves the same `expert-corpus-v1-fc67aacfcc3999fc230c` corpus. The staged twenty runtime files total 1,252,372 bytes; they include the new private stream adapter and exclude evaluation material and credentials. The expert-only variable `EXPERT_OPENROUTER_PROVIDER=friendli` was set without redeploying any other service, then applied with this deployment.
+
+The read-only hosted smoke check passed **11/11**: three direct routes, five public assets matching local hashes, and three denied paths. Health reported ready, the same 22,271 indexed candidates/273,108 passages, and configured DeepSeek v3.2. Source, ranking, brief interpretation and frontend code were unchanged, so the earlier twenty-case search percentile is retained as its original measurement rather than rerun or relabelled.
+
+One new hosted workflow run used the three fixed fictional demonstration briefs with the full professional index and server-owned candidate evidence:
+
+| Brief | Search | Interpretation | Explanation | Outcome |
+| --- | ---: | --- | ---: | --- |
+| Cardiac comparison | 6,056 ms | DeepSeek | 7,614 ms | Sourced fallback; support-validation rejected claims |
+| Dermoscopy / study evidence | 8,203 ms | Explicit deterministic fallback | 4,218 ms | Sourced fallback; support-validation rejected claims |
+| Outside specialist setting / relationship | 5,783 ms | DeepSeek | 8,250 ms | Sourced fallback; support-validation rejected claims |
+
+All three completed owned-citation, JSON roundtrip and HTML-pack checks. The cardiac workflow additionally verified active requirement removal, stale saved-review marking and an outreach draft without creating a recruitment event. The application exposed only bounded failure stage/reason metadata, not rejected prose or raw checker messages. These hosted rejections therefore cannot be independently classified as true or false positives from the public response alone.
+
+**Hosted validated AI explanations: 0/3.** These are safe fallbacks, not successful personalised model explanations. The final public-only run separately passed the cardiac brief in 6,340 ms; it does not override the hosted outcome. The three-brief AI reliability criterion remains unmet. No same-run retries or additional prompt tuning followed this acceptance round. All **476 expert/evaluation tests and 243 patient regressions** pass; model-service behavior remains a distinct limitation. Full diagnostic history is in [Friendli verification](FRIENDLI_VERIFICATION.md).

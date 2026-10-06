@@ -26,6 +26,7 @@ Copy `expert/.env.example` into the ignored `expert/.env.local` and configure se
 | `brief.cjs` | Versioned active requirements; essential/preferred distinctions and explicit removal semantics |
 | `search.cjs` | Actual BM25, MiniLM passage retrieval, candidate fusion and requirement–evidence matrix |
 | `ai.cjs` | Deliberate-action explanations, independent support validation, 15-second budget and retryable sourced fallback |
+| `transport.cjs` | Private stream buffering, completion checks and optional approved Friendli routing; no partial output or SDK content logging |
 | `extraction.cjs` | Offline-by-default, bounded source-extraction proposals and explicit review; separate from the live corpus |
 | `server.cjs` | Independent `/api/expert/*` contracts, bounded sessions/snapshots and source pages |
 | `public/projects.js` | Separate IndexedDB store, user-only decisions/events, JSON backups and printable HTML packs |
@@ -46,6 +47,8 @@ The same matrix and evidence identifiers drive cards, comparisons, qualification
 Start with the [three-pathway demonstration guide](docs/DEMO_GUIDE.md). It includes concrete briefs, sourced limitations, project/export steps and wording that avoids unproven ROI claims.
 
 See [data and evaluation](docs/DATA_AND_EVALUATION.md), the [bounded hybrid-language probe](docs/HYBRID_CONTRIBUTION.md), [model verification](docs/MODEL_VERIFICATION.md), and the [manual-workflow pilot protocol](docs/PILOT_MEASUREMENT.md).
+
+The [Friendli verification report](docs/FRIENDLI_VERIFICATION.md) records the subsequent routing, formatting and grounding investigation, including every failed round. Explanations use DeepSeek v3.2; `EXPERT_OPENROUTER_PROVIDER=friendli` pins only the expert explanation/checking path, with provider fallback disabled. The brief interpreter and patient application are unchanged. The model supplies a cited fact and a literal connection to the brief; the server supplies the neutral summary and essential qualification reminder. The independent checker validates the complete displayed wording. An AI fallback remains a visible, retryable outcome and is not counted as a verified explanation.
 
 The [release audit](docs/RELEASE_AUDIT.md) distinguishes verified functionality, incomplete scope and outstanding release checks. [Hosted verification](docs/DEPLOYMENT_VERIFICATION.md) links the preview and records actual search timings, persistence checks, AI fallbacks and the final deployment status. The [bounded extraction workflow](docs/EXTRACTION_WORKFLOW.md) explains source-content caching, exact-quote proposals and the review required before an accepted enrichment can enter the corpus.
 

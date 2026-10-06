@@ -10,7 +10,7 @@ async function main(){
   if(!base||!/^https:\/\/docmap-expert-discovery-production\.up\.railway\.app\/?$/.test(base)||!/^[a-z0-9-]+$/.test(round))throw Error('Select the authorised expert preview URL and a named verification round.');
   const file=path.join(root,`.cache/hosted-verification-${round}.json`);
   if(fs.existsSync(file))throw Error('This round already exists. Preserve its observations.');
-  const report={at:new Date().toISOString(),base,round,assets:[],searches:[],pending:true};
+  const report={at:new Date().toISOString(),base,round,assetsOnly:process.argv.includes('--assets-only'),assets:[],searches:[],pending:true};
   const save=()=>fs.writeFileSync(file,JSON.stringify(report,null,2));
   const health=await fetch(new URL('/api/expert/health',base),{signal:AbortSignal.timeout(15000)});
   if(!health.ok)throw Error('Expert index is not ready. No search requests made.');
@@ -22,6 +22,7 @@ async function main(){
     if(local){asset.sha256=createHash('sha256').update(bytes).digest('hex');asset.matchesRelease=asset.sha256===createHash('sha256').update(fs.readFileSync(path.join(root,local))).digest('hex');}
     report.assets.push(asset);save();
   }
+  if(report.assetsOnly){report.pending=false;report.completedAt=new Date().toISOString();report.summary={assetChecks:report.assets.length,allPassed:report.assets.every(a=>a.matchesRelease===undefined?a.status===404:a.status===200&&a.csp&&a.matchesRelease)};save();console.log(JSON.stringify({health:report.health,summary:report.summary}));return;}
   const cases=[...require('./scenarios.cjs').scenarios.filter(c=>c.split==='development'),...require('./holdout-final.cjs').scenarios].filter(c=>!c.family.includes('insufficient')).slice(0,20);
   for(const item of cases){
     const started=performance.now(),observation={id:item.id};report.searches.push(observation);save();

@@ -6,9 +6,12 @@ const {cases}=require('./verify-model.cjs'),P=require('../public/projects.js');
 const root=path.resolve(__dirname,'..');
 async function main(){
   if(!process.argv.includes('--live'))throw Error('Explicit --live required');
-  const base='https://docmap-expert-discovery-production.up.railway.app',file=path.join(root,'.cache/hosted-workflow.json');
+  const round=process.argv.find(a=>a.startsWith('--round='))?.slice(8)||'';
+  if(round&&!/^[a-z0-9-]{1,60}$/.test(round))throw Error('Invalid verification round name.');
+  const suffix=round?'-'+round:'';
+  const base='https://docmap-expert-discovery-production.up.railway.app',file=path.join(root,'.cache/hosted-workflow'+suffix+'.json');
   if(fs.existsSync(file))throw Error('Preserve the existing acceptance run.');
-  const report={at:new Date().toISOString(),base,attempts:[],pending:true};
+  const report={at:new Date().toISOString(),base,round:round||'original',attempts:[],pending:true};
   const save=()=>fs.writeFileSync(file,JSON.stringify(report,null,2));
   fs.writeFileSync(file,JSON.stringify(report,null,2),{flag:'wx'});
   async function post(route,body){const start=performance.now(),r=await fetch(base+'/api/expert/'+route,{method:'POST',headers:{'content-type':'application/json',origin:base},body:JSON.stringify(body),signal:AbortSignal.timeout(23000)}),data=await r.json();if(!r.ok)throw Error(route+': '+r.status+' '+data.error);return{data,durationMs:Math.round(performance.now()-start)};}
@@ -34,8 +37,8 @@ async function main(){
     const json=P.exportJSON(project),restored=P.importJSON(json),html=P.exportHTML(project);
     assert.deepEqual(restored.candidates,project.candidates);assert.equal(restored.events.length,0);
     assert.ok(project.candidates.every(c=>c.qualification==='not-reviewed'&&c.independence==='not-reviewed'));
-    fs.writeFileSync(path.join(root,'.cache/'+item.id+'-pack.html'),html);
-    fs.writeFileSync(path.join(root,'.cache/'+item.id+'-project.json'),json);
+    fs.writeFileSync(path.join(root,'.cache/'+item.id+suffix+'-pack.html'),html);
+    fs.writeFileSync(path.join(root,'.cache/'+item.id+suffix+'-project.json'),json);
     attempt.backupRoundTrip=true;attempt.htmlPack=true;
     if(index===0){
       const refined=(await post('search',{sessionId:snap.sessionId,message:'Remove regulatory experience but keep cardiac CT.'})).data;
@@ -46,7 +49,7 @@ async function main(){
       const draft=(await post('explain',{sessionId:snap.sessionId,searchId:snap.searchId,candidateIds:[chosen[0].id],kind:'outreach'})).data;
       assert.equal(draft.provider,'evidence');assert.ok(draft.draft?.body);assert.equal(project.events.length,0);attempt.outreachWithoutEvent=true;
     }
-    attempt.pending=false;save();console.log(JSON.stringify({id:attempt.id,explanationMs:attempt.explanationMs,provider:attempt.explanation.provider,ownedCitations:attempt.ownedCitations,backupRoundTrip:true}));
+    attempt.pending=false;save();console.log(JSON.stringify({id:attempt.id,explanationMs:attempt.explanationMs,provider:attempt.explanation.provider,failure:attempt.explanation.failure||null,ownedCitations:attempt.ownedCitations,backupRoundTrip:true}));
   }
   report.summary={distinctDeepSeekBriefs:report.attempts.filter(a=>a.explanation?.provider==='deepseek').length,completed:report.attempts.length};report.pending=false;report.completedAt=new Date().toISOString();save();console.log(JSON.stringify(report.summary));
 }
