@@ -20,3 +20,23 @@ test('failed retrieval keeps previous brief and allows retry',async t=>{const h=
 test('source pages escape HTML and do not expose raw cache',async t=>{const h=await harness(t);h.engine.corpus.passages[0]={...evidence,text:'<script>doBad()</script>',sourceUrl:'javascript:doBad()'};const r=await fetch(h.base+'/api/expert/sources/a'),text=await r.text();assert.ok(text.includes('&lt;script&gt;'));assert.ok(!text.includes('href="javascript:'));assert.equal((await fetch(h.base+'/expert-assets/../.cache/raw.json')).status,404);});
 
 test('source pages retain full escaped source-review limitations',async t=>{const h=await harness(t);const limitation='Historical coauthorship does not establish a specific investigator task. <script>no()</script>';h.engine.corpus.passages[0]={...evidence,review:{limitations:[limitation]}};const text=await(await fetch(h.base+'/api/expert/sources/a')).text();assert(text.includes('Historical coauthorship does not establish a specific investigator task. &lt;script&gt;no()&lt;/script&gt;'));assert(!text.includes('<script>no()'));});
+
+test('simple discovery reaches retrieval and a focus priority patch preserves interest intent',async t=>{
+  const h=await harness(t),first=await h.post('search',{message:'Cardiologists with radiology interests'});
+  assert.equal(first.status,200);assert.equal(first.body.needsClarification,false);assert.equal(h.counts().searches,1);
+  const imaging=first.body.brief.requirements.find(r=>r.label==='Medical imaging');
+  assert.equal(imaging.importance,'focus');assert.equal(imaging.matchIntent,'interest');
+  const required=await h.post('search',{sessionId:first.body.sessionId,patch:{requirementId:imaging.id,importance:'essential'}});
+  assert.equal(required.body.brief.requirements.find(r=>r.id===imaging.id).importance,'essential');
+  const focus=await h.post('search',{sessionId:first.body.sessionId,patch:{requirementId:imaging.id,importance:'focus'}});
+  assert.equal(focus.status,200);assert.equal(focus.body.brief.requirements.find(r=>r.id===imaging.id).importance,'focus');
+  assert.equal(focus.body.brief.requirements.find(r=>r.id===imaging.id).matchIntent,'interest');
+  assert.deepEqual(focus.body.brief.roles,['Cardiologist']);assert.equal(h.counts().searches,3);
+});
+
+test('API resumes short discovery with exact intent and rejects invented intent metadata',async t=>{
+  const h=await harness(t),brief=parseBrief({message:'Cardiologists with research interests in imaging. Research is helpful.'}).brief;
+  const resumed=await h.post('search',{resumeBrief:brief});assert.equal(resumed.status,200);assert.deepEqual(resumed.body.brief,brief);assert.equal(resumed.body.interpretationMode,'saved-brief');
+  const invalid=structuredClone(brief);invalid.requirements.find(r=>r.kind==='modality').matchIntent='approved';
+  assert.equal((await h.post('search',{resumeBrief:invalid})).status,400);assert.equal(h.counts().searches,1);
+});

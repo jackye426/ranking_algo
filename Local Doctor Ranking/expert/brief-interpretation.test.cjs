@@ -9,14 +9,14 @@ const mock=requirements=>createBriefInterpreter({client:{chat:{completions:{crea
 
 for(const phrase of ['would be helpful','is useful','should be optional','is not mandatory','is nice to have'])test('a supplied research preference does not weaken clinical reporting: '+phrase,()=>{
   const brief=parseBrief({message:'Find UK clinicians who personally report cardiac CT for coronary artery disease in adults. Experience evaluating diagnostic accuracy studies '+phrase+'.'}).brief;
-  assert.equal(req(brief,'Image interpretation').importance,'essential');assert.equal(req(brief,'Diagnostic study evaluation').importance,'preferred');assert.equal(brief.requirements.filter(r=>r.kind==='research').length,1);
+  assert.equal(req(brief,'Image interpretation').importance,'focus');assert.equal(req(brief,'Diagnostic study evaluation').importance,'preferred');assert.equal(brief.requirements.filter(r=>r.kind==='research').length,1);
 });
 
 for(const message of ['Research should be optional.','Make research optional.','Research experience would be helpful.','The research requirement is only helpful.','Change the research criterion to preferred.','Research is not mandatory.'])test('a generic research follow-up updates the active canonical criterion: '+message,async()=>{
   const previous=cardiac(),old=req(previous,'Diagnostic study evaluation'),copy=structuredClone(previous);
   const result=await mock([patch('research',message.replace(/\.$/,''))])({previous,message});
   assert.equal(result.needsClarification,false);assert.deepEqual(result.brief.requirements.filter(r=>r.kind==='research').map(r=>[r.id,r.label,r.importance]),[[old.id,old.label,'preferred']]);
-  assert.equal(req(result.brief,'Image interpretation').importance,'essential');assert.deepEqual(previous,copy);
+  assert.equal(req(result.brief,'Image interpretation').importance,'focus');assert.deepEqual(previous,copy);
 });
 
 test('a category-wide research priority preserves distinct specific activities and their IDs',()=>{
@@ -71,7 +71,7 @@ for(const phrase of ['Primary-care experience','primary care expertise','primary
 
 for(const phrase of ['primary-care clinicians','primary care specialists','primary–care healthcare professionals'])test('a setting plus generic search subject does not become a second professional role: '+phrase,async()=>{
   const previous=skin(),message='Find '+phrase+'.',next=(await mock([patch('role',phrase)])({previous,message})).brief;
-  assert.equal(next.requirements.filter(r=>r.kind==='setting').length,1);assert.equal(req(next,'Primary care').importance,'essential');assert.deepEqual(next.roles,[]);assert.equal(next.roleMode,null);
+  assert.equal(next.requirements.filter(r=>r.kind==='setting').length,1);assert.equal(req(next,'Primary care').importance,'focus');assert.deepEqual(next.roles,[]);assert.equal(next.roleMode,null);
 });
 
 test('specific primary-care professions and strict GP eligibility remain distinct from the setting',async()=>{

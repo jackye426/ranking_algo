@@ -26,6 +26,7 @@ test('a supplied technology retains clinical context without inventing its funct
   const technology=p.brief.requirements.find(r=>r.kind==='technology');
   assert.equal(technology.label,'Device context');assert.equal(technology.text,'software');
   assert(!/diagnos|monitor|detect/i.test(technology.text));
-  for(const message of ['We need a specialist.','We need someone for software.','Find a dermatologist.'])assert.equal(parseBrief({message}).needsClarification,true);
-  const removed=parseBrief({previous:p.brief,removeRequirementId:technology.id});assert.equal(removed.needsClarification,true);
+  for(const message of ['We need a specialist.','We need someone for software.'])assert.equal(parseBrief({message}).needsClarification,true);
+  assert.equal(parseBrief({message:'Find a dermatologist.'}).needsClarification,false);
+  const removed=parseBrief({previous:p.brief,removeRequirementId:technology.id});assert.equal(removed.needsClarification,false);assert.equal(removed.brief.requirements.length,1);assert.equal(removed.brief.requirements[0].label,'Heart failure');
 });

@@ -53,7 +53,7 @@ test('review packs use source-owned requirement spans and label historical revie
 test('negative source statements do not invert an exclusion into a recorded positive role',()=>{
   const assessment={...brief,requirements:[{id:'excluded',label:'Dermatologist',kind:'role',importance:'essential',polarity:'exclude'}]};
   for(const [status,expected]of [['documented','The excluded role is recorded'],['mismatch','negative role statement needs scope and date review'],['needs-review','negative role statement needs scope and date review'],['unknown','Incomplete role data does not prove absence']]){
-    const person={...candidate,requirementMatrix:[{requirementId:'excluded',label:'Dermatologist',status,importance:'essential',evidenceIds:[]}]},html=p.exportHTML(p.saveCandidate(p.createProject(),person,assessment,'corpus-v1'));assert.ok(html.includes(expected));assert.doesNotMatch(html,/recorded role conflicts with this exclusion/);
+    const person={...candidate,evidence:[{...candidate.evidence[0],text:status==='documented'?'I am a dermatologist.':'I am not a dermatologist.',type:'professional-background'}],requirementMatrix:[{requirementId:'excluded',label:'Dermatologist',status,importance:'essential',evidenceIds:status==='unknown'?[]:['e1']}]},html=p.exportHTML(p.saveCandidate(p.createProject(),person,assessment,'corpus-v1'));assert.ok(html.includes(expected));assert.doesNotMatch(html,/recorded role conflicts with this exclusion/);
   }
 });
 
@@ -75,5 +75,37 @@ test('review pack citations target exact owned evidence on the supplied origin a
 });
 
 test('review pack distinguishes listed interests, activities and complete essential/preferred gaps',()=>{
-  const person=structuredClone(candidate);person.evidence[0].type='clinical-interest';person.evidence[0].text='An interest in cardiac CT.';const scope={...brief,requirements:[...brief.requirements,{id:'current',label:'Current practice',kind:'currentPractice',importance:'essential'},{id:'setting',label:'Primary care',kind:'setting',importance:'essential'},{id:'research',label:'Diagnostic studies',kind:'research',importance:'preferred'}]};const html=p.exportHTML(p.saveCandidate(p.createProject(),person,scope,'corpus-v1'));assert.match(html,/Listed interest/);assert.match(html,/does not establish performed clinical work/);assert.match(html,/Essential to confirm/);assert.match(html,/Current practice/);assert.match(html,/Primary care/);assert.match(html,/Preferred evidence gaps/);assert.match(html,/Diagnostic studies/);assert.doesNotMatch(html,/<td>Supported<\/td>/);
+  const person=structuredClone(candidate);person.evidence[0].type='clinical-interest';person.evidence[0].text='An interest in cardiac CT.';const scope={...brief,requirements:[...brief.requirements,{id:'current',label:'Current practice',kind:'currentPractice',importance:'essential'},{id:'setting',label:'Primary care',kind:'setting',importance:'essential'},{id:'research',label:'Diagnostic studies',kind:'research',importance:'preferred'}]};const html=p.exportHTML(p.saveCandidate(p.createProject(),person,scope,'corpus-v1'));assert.match(html,/Listed interest/);assert.match(html,/does not establish performed clinical work/);assert.match(html,/Must-have evidence not established/);assert.match(html,/Current practice/);assert.match(html,/Primary care/);assert.match(html,/Nice-to-have evidence not established/);assert.match(html,/Diagnostic studies/);assert.doesNotMatch(html,/<td>Supported<\/td>/);
+});
+
+test('search intent survives backup and makes a material change stale without rewriting older decisions',()=>{
+  const scope={...brief,requirements:[{...brief.requirements[0],importance:'focus',matchIntent:'interest'}]},project=p.changeReview(p.saveCandidate(p.createProject(),candidate,scope,'corpus-v1'),candidate.id,'qualification','reviewed-by-team',{actor:'user'}),decision=structuredClone(project.candidates[0].decisions);
+  const changed={...scope,version:2,requirements:[{...scope.requirements[0],matchIntent:'activity'}]},next=p.setBrief(project,changed,'corpus-v1');
+  assert.equal(next.candidates[0].needsReview,true);assert.deepEqual(next.candidates[0].decisions,decision);assert.equal(next.candidates[0].brief.requirements[0].matchIntent,'interest');assert.equal(p.importJSON(p.exportJSON(project)).activeBrief.requirements[0].matchIntent,'interest');
+  assert.equal(p.scope({...brief,requirements:brief.requirements.map(r=>({...r,matchIntent:'topic'}))}),p.scope(brief),'Adding the default topic marker must not invalidate legacy decisions');
+});
+
+test('focus-only review pack shows relevance first and does not invent must-have gaps',()=>{
+  const scope={...brief,requirements:[{...brief.requirements[0],importance:'focus',matchIntent:'interest'},{id:'setting',label:'Primary care',kind:'setting',text:'Primary care',importance:'focus'}]},person=structuredClone(candidate);person.evidence[0].type='clinical-interest';person.evidence[0].text='An interest in cardiac CT.';
+  const html=p.exportHTML(p.saveCandidate(p.createProject(),person,scope,'corpus-v1'));
+  assert.ok(html.indexOf('Relevance to your search')<html.indexOf('Saved rationale and search evidence'));assert.match(html,/Search focus/);assert.match(html,/Not found for this search focus/);assert.doesNotMatch(html,/Must-have evidence not established|Essential to confirm|Preferred evidence gaps/);assert.match(html,/These checks are separate from discovery and are not additional search requirements/);
+});
+
+test('related research export preserves exact source attribution and dates without creating a requirement',()=>{
+  const person=structuredClone(candidate),scope={...brief,requirements:brief.requirements.map(r=>({...r,importance:'focus'}))},research={id:'research',candidateId:person.id,sourceRecordId:'study-record',field:'reviewed-study',type:'research',text:'Coauthored a 2010 cardiac imaging protocol.',reviewedParaphrase:true,sourceQuote:'A. Author',sourceUrl:'https://publisher.example/protocol',dates:{sourceDate:'2010-05-11'},review:{limitations:['Historical coauthorship only.']}};person.evidence.push(research);person.relatedEvidence=[{evidenceId:research.id,text:research.text,kind:'reviewed-summary',evidenceType:'research',sourceDate:'2010-05-11',limits:research.review.limitations,relatedToRequirementIds:['ct']}];
+  const project=p.saveCandidate(p.createProject(),person,scope,'corpus-v1'),html=p.exportHTML(project,{baseUrl:'https://preview.example'}),intro=html.slice(html.indexOf('Relevance to your search'),html.indexOf('Saved rationale and search evidence'));
+  assert.match(intro,/Related research/);assert.match(intro,/Reviewed source summary/);assert.match(intro,/2010-05-11/);assert.match(intro,/api\/expert\/sources\/expert-a\?evidence=research#evidence-research/);assert.match(intro,/publisher\.example\/protocol/);assert.equal(project.activeBrief.requirements.length,1);assert.deepEqual(p.importJSON(p.exportJSON(project)).candidates[0].candidate.relatedEvidence,person.relatedEvidence);
+});
+
+test('a failed focus-priority edit can be restored without altering saved evidence',()=>{
+  const project=saved();project.failedSearch={id:'focus-edit',status:'failed',submittedAt:'2026-10-07',payload:{patch:{requirementId:'ct',importance:'focus'}},baseBrief:brief,filters:{documentedOnly:false,uncontactedOnly:false}};const restored=p.importJSON(p.exportJSON(project));assert.equal(restored.failedSearch.payload.patch.importance,'focus');assert.deepEqual(restored.candidates,project.candidates);
+});
+
+test('review pack disclosures are readable on first print without running scripts',()=>{
+  const html=p.exportHTML(saved());assert.match(html,/<details open><summary>Saved rationale and search evidence/);assert.match(html,/<details open><summary>Optional engagement preparation/);assert.doesNotMatch(html,/<details>|<script/);
+});
+
+test('imported dangling matrix references export as unavailable evidence without rewriting saved review history',()=>{
+  let project=p.changeReview(saved(),candidate.id,'qualification','reviewed-by-team',{actor:'user'});project.candidates[0].candidate.requirementMatrix[0].evidenceIds=['no-longer-in-this-backup'];const restored=p.importJSON(p.exportJSON(project)),before=structuredClone(restored),html=p.exportHTML(restored);
+  assert.match(html,/Not found in sources/);assert.match(html,/Supporting text is unavailable/);assert.match(html,/Must-have evidence not established/);assert.doesNotMatch(html,/<td>Recorded activity<\/td>/);assert.deepEqual(restored,before);assert.equal(restored.candidates[0].qualification,'reviewed-by-team');assert.equal(restored.candidates[0].candidate.requirementMatrix[0].status,'documented');
 });

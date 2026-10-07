@@ -54,5 +54,5 @@ test('a coordinated removal still removes both named requirements',()=>{
  const old=parseBrief({message:'Cardiac CT and MRI for coronary artery disease. Regulatory experience is essential.'}).brief;const b=parseBrief({previous:old,message:'Remove regulatory experience and MRI, but keep cardiac CT.'}).brief;assert.equal(b.requirements.some(r=>r.kind==='regulatory'),false);assert.equal(b.requirements.some(r=>r.label==='MRI'),false);assert.ok(b.requirements.some(r=>r.label==='Cardiac CT'));
 });
 test('preference wording does not cross into a following keep clause',()=>{
- const b=parseBrief({previous:brief(),message:'Prefer research experience but keep cardiac CT.'}).brief;assert.equal(b.requirements.find(r=>r.label==='Cardiac CT').importance,'essential');assert.equal(b.requirements.find(r=>r.label==='Clinical research').importance,'preferred');
+ const b=parseBrief({previous:brief(),message:'Prefer research experience but keep cardiac CT.'}).brief;assert.equal(b.requirements.find(r=>r.label==='Cardiac CT').importance,'focus');assert.equal(b.requirements.find(r=>r.label==='Clinical research').importance,'preferred');
 });

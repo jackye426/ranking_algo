@@ -28,14 +28,38 @@ class BM25Index{
 }
 function requirementQuery(r){
   const alternatives={'Cardiac CT':'cardiac CT coronary computed tomography CCTA','Skin-lesion imaging':'skin lesions dermoscopy dermatoscopy image','Diagnostic study evaluation':'diagnostic accuracy clinical performance validation study evaluation','Clinical research':'clinical research trials investigator','Medical-device assessment experience':'medical device assessment clinical evaluation regulatory MDR'};
+  if(r.kind==='role')return {Cardiologist:'cardiologist cardiology',Radiologist:'radiologist radiology',Dermatologist:'dermatologist dermatology','General practitioner':'general practitioner family medicine GP'}[r.label]||r.text||r.label;
   return alternatives[r.label]||r.text||r.label;
+}
+// Broad discovery uses related modalities as alternatives, not as additional
+// qualifications. These are retrieval aids only; the active brief stays intact.
+const IMAGING_EXPANSIONS={
+  'Medical imaging':['radiology','diagnostic imaging','CT computed tomography','MRI magnetic resonance imaging','echocardiography echocardiogram ultrasound','nuclear imaging PET SPECT','dermoscopy'],
+  'Cardiovascular imaging':['cardiac imaging','cardiac CT coronary computed tomography CCTA','cardiac MRI magnetic resonance CMR','echocardiography echocardiogram stress echo','cardiac nuclear imaging myocardial perfusion']
+};
+function requirementQueries(r){
+  const primary=clean(requirementQuery(r)),terms=r.kind==='modality'?IMAGING_EXPANSIONS[r.label]:null;
+  return [{query:primary,expanded:false},...(terms?[{query:terms.join(' '),expanded:true,terms}]:[])];
 }
 // Exact metadata still participates in BM25 and structured requirement checks.
 // It should not spend vector capacity on registration/address/degree strings.
 function semanticEligible(p){if(p.type==='location'||p.qualifiers?.includes('publication-listing-link-not-authorship'))return false;if(p.type!=='professional-background')return true;if(/^(?:qualifications|detailed_qualifications)$/.test(p.field))return p.text.length>=100||Object.values(p.attributes||{}).some(values=>values.length>0);return !/^(?:specialty|specialty_alternatives|specialties|professional_memberships|nhs_posts|nhs_base|registration|locations)$/.test(p.field);}
 function negative(text){return /\b(?:does not|do not|doesn['’]t|don['’]t|not currently|no longer|no experience|without experience|never)\b/i.test(text);}
-const segments=activityClauses;
+// Imported biographies sometimes lose sentence spaces and bullet separators.
+// Recover only literal boundaries before deciding which activity a topic
+// belongs to; otherwise CT training can borrow an unrelated research verb.
+const segments=text=>activityClauses(text).flatMap(part=>part.split(/[•●]|(?<=[.!?])(?=(?:I|He|She|His|Her|My|Our|The|Their|Research|Whether|Clinical|Professional|In|After|Since|This|Dr|Mr|Professor)\b)/)).map(part=>part.trim()).filter(Boolean);
 const evidenceStrength=p=>({'clinical-practice':6,research:5,trial:5,publication:4,'clinical-interest':3,procedure:2,training:1})[p.type]||0;
+const researchAttributed=p=>!p.qualifiers?.some(q=>/publication-listing-link-not-authorship|bibliographic-reference-not-training-or-authorship/i.test(q))&&classifyPassage(p.text,'about')==='research';
+const explicitResearchDescription=text=>!negative(text)&&/\b(?:my|his|her|our)\s+(?:field|area|focus|topic)\s+of\s+research\s+(?:was|is|has been)\s+(?:the\s+)?(?:investigation|investigating|evaluation|evaluating|examination|examining|study|studying)\b/i.test(text);
+// This exception is for optional source presentation only. Do not feed it into
+// matrix qualification or ranking: imported interests keep their original type.
+const optionalResearchAttributed=p=>!negative(p.text)&&!/\b(?:did not|was not|were not)\s+(?:participat|contribut|author|research)\w*/i.test(p.text)&&(researchAttributed(p)||(p.type==='clinical-interest'&&explicitResearchDescription(p.text)));
+function intentEvidenceStrength(requirement,p){
+  if(requirement.matchIntent==='interest')return ({'clinical-interest':6,'clinical-practice':5.8,research:5.2,trial:5.2,publication:4.8,procedure:3,training:1})[p.type]||0;
+  if(requirement.matchIntent==='research')return ({research:6,trial:6,publication:5.8,'clinical-interest':/\bresearch|stud(?:y|ies)|trials?\b/i.test(p.text)?4:1,'clinical-practice':1,training:.5})[p.type]||0;
+  return evidenceStrength(p);
+}
 // Source-only analysis is reused across requirements and refinements. Keep
 // just compact clause descriptors, never query-specific support decisions or
 // copied evidence objects. Weak keys release old corpora, and relevant source
@@ -49,7 +73,8 @@ function baseScopes(passage,source=passage.text){
   }
   const slot=source===passage.text?'main':source===passage.sourceQuote?'literal':null;
   if(slot&&cached[slot])return cached[slot];
-  const clauses=segments(source);
+  const reviewedResearch=passage.attribution==='verified-source'&&passage.reviewedParaphrase&&['research','trial','publication'].includes(passage.type)&&source===passage.text;
+  const clauses=reviewedResearch?[source]:segments(source);
   const descriptors=clauses.map(text=>{
     let type=passage.type;
     if(type==='clinical-practice'){
@@ -60,6 +85,7 @@ function baseScopes(passage,source=passage.text){
       // matching clause explicitly describes training or interest.
       if(['training','clinical-interest'].includes(localType)||(clauses.length>1&&passage.attribution!=='verified-source'))type=localType;
     }
+    if(['research','trial','publication'].includes(type)&&clauses.length>1&&passage.attribution!=='verified-source')type=classifyPassage(text,'about');
     return {text,type};
   });
   if(slot)cached[slot]=descriptors;
@@ -73,7 +99,7 @@ function requirementScopes(requirement,passage,source=passage.text){
     return {...passage,text,type,attributes:{}};
   }).filter(p=>directMatch(requirement,p));
 }
-function effectiveEvidenceType(requirement,passage){return requirementScopes(requirement,passage).sort((a,b)=>evidenceStrength(b)-evidenceStrength(a))[0]?.type||passage.type;}
+function effectiveEvidenceType(requirement,passage){return requirementScopes(requirement,passage).sort((a,b)=>intentEvidenceStrength(requirement,b)-intentEvidenceStrength(requirement,a))[0]?.type||passage.type;}
 // An explicit adult/paediatric clinical role can scope a separately recorded
 // modality in the SAME source. This relates two positive professional claims;
 // it never derives a population from a specialty alone or unrelated practice.
@@ -142,7 +168,7 @@ function activityRelevant(requirement,scope,brief){
 }
 function supportingSpan(requirement,passage,status,brief={requirements:[]}){
   const literal=passage.sourceQuote||passage.text;
-  const literalSupports=!!passage.sourceQuote&&directMatch(requirement,{...passage,text:passage.sourceQuote,attributes:{}});
+  const literalSupports=!!passage.sourceQuote&&directMatch(requirement,{...passage,text:passage.sourceQuote,attributes:{}})&&(!(passage.reviewedParaphrase&&['interest','research'].includes(requirement.matchIntent)&&['research','trial','publication'].includes(passage.type))||researchAttributed({...passage,text:passage.sourceQuote}));
   const reviewedSummary=!!passage.reviewedParaphrase&&!literalSupports;
   const source=reviewedSummary?passage.text:literal;
   // Some imported biographies concatenate list tails with a new first-person
@@ -150,22 +176,38 @@ function supportingSpan(requirement,passage,status,brief={requirements:[]}){
   // at an explicit pronoun + clinical verb, or a punctuated pronoun start.
   // This is excerpt selection only: no stored text or ranking scope changes.
   const joinedStart=/(?<=[a-z0-9)])(?=(?:He|She|I)\s+(?:(?:also|currently|routinely|regularly|personally|now)\s+)*(?:(?:can|does not|do not|doesn['’]t|don['’]t)\s+)?(?:offers?|performs?|reports?|interprets?|treats?|manages?|provides?|runs?)\b)|(?<=[.!?])(?=(?:He|She|I|His|Her|My)\s)/g;
-  const sourceSegments=baseScopes(passage,source).flatMap(({text})=>text.split(joinedStart).map(part=>part.trim()).filter(Boolean));
+  const sourceSegments=baseScopes(passage,source).flatMap(({text})=>text.split(joinedStart).flatMap(part=>{
+    // Imported interest fields often contain one long semicolon list. Selecting
+    // the matching list entry keeps the relevant modality visible on a card.
+    // Preserve qualified/negative clauses whole so a shortened quote cannot
+    // lose the scope of "does not" or turn an interest into an activity.
+    const listField=passage.type==='clinical-interest'||/clinical_interests|areas_of_interest|procedures/i.test(passage.field||'');
+    return listField&&!negative(part)&&['modality','condition','procedure'].includes(requirement.kind)?part.split(/;|\n|(?<=[a-z0-9)])(?=(?:Cardiac|Coronary|Cardiovascular|Echocardiogra\w*|Dermoscopy|MRI|CT)\b)/):[part];
+  }).map(part=>part.trim()).filter(Boolean));
   const matches=sourceSegments.filter(text=>directMatch(requirement,{...passage,text,attributes:{}})&&(!(status==='documented'&&requirement.kind==='activity')||activityRelevant(requirement,{...passage,text},brief)));
   const sourceScopes=requirementScopes(requirement,passage,source);
   matches.sort((a,b)=>{
-    const localStrength=text=>{const original=sourceScopes.filter(p=>p.text===text);return original.length?Math.max(0,...original.map(evidenceStrength)):evidenceStrength({type:classifyPassage(text,passage.field||'about')});};
-    return localStrength(b)-localStrength(a);
+    const localStrength=text=>{const original=sourceScopes.filter(p=>p.text===text);return original.length?Math.max(0,...original.map(p=>intentEvidenceStrength(requirement,p))):intentEvidenceStrength(requirement,{text,type:classifyPassage(text,passage.field||'about')});};
+    const incomplete=text=>/\b(?:including|such as|with|and)\s*:?[\s]*$/i.test(text);
+    return Number(incomplete(a))-Number(incomplete(b))||localStrength(b)-localStrength(a)||(passage.type==='clinical-interest'?Number(a.length>230)-Number(b.length>230):0);
   });
   const matching=reviewedSummary?source:matches.find(text=>status==='mismatch'?negative(text):!negative(text))||matches[0]||source;
   // Clauses are selected, never rewritten. If segmentation ever normalizes a
   // source in a way that is not a literal substring, retain the complete text.
   const text=source.includes(matching)?matching:source;
-  return {evidenceId:passage.id,text,kind:reviewedSummary?'reviewed-summary':'source-quote',evidenceType:effectiveEvidenceType(requirement,passage),sourceQuote:passage.sourceQuote||null,sourceQuoteSupportsRequirement:literalSupports,limits:[...(passage.review?.limitations||[])],sourceDate:passage.dates?.sourceDate||null};
+  // Some historical research is imported under an interests field. This exact
+  // self-attributed investigation wording warrants a research display label;
+  // retain the original passage type and ranking so this is not a new claim of
+  // current activity, a particular investigator role, or clinical practice.
+  const scopedType=effectiveEvidenceType(requirement,passage),describedResearch=scopedType==='clinical-interest'&&explicitResearchDescription(text);
+  const evidenceType=describedResearch?'research':scopedType,researchContext=['research','trial','publication'].includes(evidenceType)&&!describedResearch&&!researchAttributed({...passage,text});
+  return {evidenceId:passage.id,text,kind:reviewedSummary?'reviewed-summary':'source-quote',evidenceType,...(researchContext?{evidenceScope:'research-context'}:{}),sourceQuote:passage.sourceQuote||null,sourceQuoteSupportsRequirement:literalSupports,limits:[...(passage.review?.limitations||[])],sourceDate:passage.dates?.sourceDate||null};
 }
 function deviceAssessment(text){return /\b(?:medical[- ]device|notified body|technical documentation|clinical evaluation reports?|\bMDR\b)\b/i.test(text)&&/\b(?:assess(?:ed|es|ing)|evaluat(?:ed|es|ing)|review(?:ed|s|ing)|(?:clinical|regulatory)\s+(?:assessor|evaluator|reviewer))\b/i.test(text);}
 function directMatch(requirement,passage){
   const text=passage.text||'',label=requirement.label||requirement.text;
+  if(requirement.kind==='modality'&&label==='Medical imaging')return /\b(?:radiolog\w*|(?:medical|diagnostic|cardiac|cardiovascular|coronary|heart|non[- ]invasive|cross[- ]sectional) imag(?:ing|es?)|CT|CCTA|computed tomography|MRI|CMR|magnetic resonance|echocardiogra(?:ph|m)\w*|(?:stress|transoesophageal|transthoracic) echo|ultrasound|nuclear (?:medicine|imaging)|PET|SPECT|dermoscop\w*|mammograph\w*)\b/i.test(text.replace(/\bultrasound\s+phacoemulsification\b|\bhigh[- ]intensity focused ultrasound\b|\btherapeutic ultrasound\b|\bHIFU\b/gi,''));
+  if(requirement.kind==='modality'&&label==='Cardiovascular imaging')return /\b(?:(?:cardiac|cardiovascular|heart|coronary)\s+(?:imag\w*|CT|MRI|magnetic resonance|computed tomography|nuclear|ultrasound)|CCTA|CMR|echocardiogra(?:ph|m)\w*|(?:stress|transoesophageal|transthoracic) echo|myocardial perfusion)\b/i.test(text)||!!CONCEPTS.find(([kind,name])=>kind==='modality'&&name==='Cardiac CT')?.[2].test(text);
   if(requirement.kind==='modality'&&label==='Ultrasound'){
     // Ultrasound energy used for treatment is not diagnostic imaging expertise.
     // Keep the full source in retrieval; scope only this requirement assertion.
@@ -200,7 +242,7 @@ function questionFor(requirement){
 function matrixFor(candidate,passages,brief){
   passages=passages.filter(p=>p.candidateId===candidate.id);
   return brief.requirements.map(requirement=>{
-    const base={requirementId:requirement.id,label:requirement.label,kind:requirement.kind,importance:requirement.importance,...(requirement.polarity?{polarity:requirement.polarity}:{}),...(requirement.strictRole?{strictRole:true}:{}),evidenceIds:[]};
+    const base={requirementId:requirement.id,label:requirement.label,kind:requirement.kind,importance:requirement.importance,...(requirement.matchIntent?{matchIntent:requirement.matchIntent}:{}),...(requirement.polarity?{polarity:requirement.polarity}:{}),...(requirement.strictRole?{strictRole:true}:{}),evidenceIds:[]};
     if(['question','technology','workflow'].includes(requirement.kind))return {...base,status:'context',note:'This describes the engagement. Clinical applicability must be discussed with the expert.'};
     if(requirement.kind==='geography'){
       const location=brief.geography==='UK'?UKLocation(candidate):null;
@@ -211,7 +253,7 @@ function matrixFor(candidate,passages,brief){
     if(requirement.kind==='currentPractice')return {...base,status:'unknown',note:'A professional profile does not verify current activity for this engagement.'};
     if(requirement.kind==='role'&&requirement.label==='Practising clinician')return {...base,status:'unknown',note:'The panel needs a practising clinical perspective; current activity must be confirmed directly.'};
     const scoped=new Map(),scopes=p=>{if(!scoped.has(p))scoped.set(p,requirementScopes(requirement,p));return scoped.get(p);};
-    const strength=p=>Math.max(0,...scopes(p).map(evidenceStrength));
+    const strength=p=>Math.max(0,...scopes(p).map(scope=>intentEvidenceStrength(requirement,scope)));
     const matched=passages.filter(p=>p.type!=='location'&&directMatch(requirement,p)).sort((a,b)=>strength(b)-strength(a));
     const negativeFor=p=>{const related=scopes(p);return related.length>0&&related.every(s=>negative(s.text));};
     const positive=matched.filter(p=>!negativeFor(p)&&!(p.qualifiers||[]).some(q=>/colleague|uncertain-identity/i.test(q)));
@@ -232,6 +274,9 @@ function matrixFor(candidate,passages,brief){
         if(!activityRelevant(requirement,p,brief))return false;
         return p.type==='clinical-practice'&&!p.qualifiers?.includes('historical')&&!p.qualifiers?.includes('stated-interest');
       }
+      if(requirement.matchIntent==='activity')return p.type==='clinical-practice'&&!p.qualifiers?.includes('historical')&&!p.qualifiers?.includes('stated-interest');
+      if(requirement.matchIntent==='research')return (['research','trial','publication'].includes(p.type)&&researchAttributed(p))||(p.type==='clinical-interest'&&/\b(?:research|stud(?:y|ies)|trials?)\b/i.test(p.text));
+      if(requirement.matchIntent==='interest')return ['clinical-practice','clinical-interest','procedure'].includes(p.type)||(['research','trial','publication'].includes(p.type)&&researchAttributed(p));
       return ['clinical-practice','clinical-interest','procedure'].includes(p.type);
     }));
     if(direct.length)return {...base,status:'documented',evidenceIds:direct.slice(0,3).map(p=>p.id),note:'Supported by the recorded text; scope and current activity require qualification.'};
@@ -289,14 +334,20 @@ class ExpertSearchEngine{
     const anchorIds=new Set(anchorRequirements.map(r=>r.id)),contextKinds=new Set(['question','technology','workflow']);
     const plans=new Map();
     for(const requirement of brief.requirements){
-      if(['geography','currentPractice','role'].includes(requirement.kind))continue;
-      let query=clean(requirementQuery(requirement));
-      if(contextKinds.has(requirement.kind))for(const excluded of brief.requirements.filter(r=>r.kind==='role'&&r.polarity==='exclude')){const pattern=rolePattern(excluded.label);if(pattern)query=query.replace(new RegExp(pattern.source,'gi'),' ');}
-      query=clean(query);if(!query||!tokens(query).length)continue;
-      const channel=contextKinds.has(requirement.kind)?'context':anchorIds.has(requirement.id)?'anchor':'supporting';
-      const key=channel+'\0'+query;
-      if(!plans.has(key))plans.set(key,{query,channel,requirementIds:[],weight:channel==='context'?.25:1});
-      plans.get(key).requirementIds.push(requirement.id);
+      if(['geography','currentPractice'].includes(requirement.kind)||requirement.polarity==='exclude')continue;
+      // Role text adds a useful retrieval path only when it is the search's
+      // population. Broad generic role hits cannot swamp a clinical query.
+      if(requirement.kind==='role'&&anchorRequirements.length)continue;
+      const variants=requirementQueries(requirement);
+      for(const variant of variants){
+        let query=variant.query;
+        if(contextKinds.has(requirement.kind))for(const excluded of brief.requirements.filter(r=>r.kind==='role'&&r.polarity==='exclude')){const pattern=rolePattern(excluded.label);if(pattern)query=query.replace(new RegExp(pattern.source,'gi'),' ');}
+        query=clean(query);if(!query||!tokens(query).length)continue;
+        const channel=contextKinds.has(requirement.kind)?'context':anchorIds.has(requirement.id)?'anchor':requirement.kind==='role'?'role':'supporting';
+        const key=channel+'\0'+query;
+        if(!plans.has(key))plans.set(key,{query,channel,requirementIds:[],weight:(channel==='context'?.25:1)/variants.length,...(variant.expanded?{expanded:true,terms:variant.terms}: {})});
+        plans.get(key).requirementIds.push(requirement.id);
+      }
     }
     const queryPlans=[...plans.values()],queries=[...new Set(queryPlans.map(p=>p.query))];
     this.queryVectorCache||=new Map();
@@ -359,7 +410,20 @@ class ExpertSearchEngine{
       const permittedRoles=matrix.filter(r=>r.kind==='role'&&r.polarity!=='exclude');
       const strictRoles=permittedRoles.some(r=>r.strictRole)?permittedRoles.filter(r=>r.strictRole):permittedRoles;
       if(brief.roleMode==='only'&&strictRoles.length&&!strictRoles.some(r=>r.status==='documented'))continue;
+      // A stronger role priority cannot widen the requested profession. Broad
+      // complementary panel perspectives remain inclusive: "a practising
+      // clinician and a researcher" is not one mandatory job-title filter.
+      const perspectiveRole=r=>['Practising clinician','Clinical researcher'].includes(r.label);
+      const complementaryPanel=permittedRoles.length>1&&permittedRoles.some(perspectiveRole);
+      const discoveryRoles=complementaryPanel?[]:permittedRoles.filter(r=>['focus','essential'].includes(r.importance)&&!perspectiveRole(r));
+      if(discoveryRoles.length&&!discoveryRoles.some(r=>r.status==='documented'))continue;
       const anchorMatches=matrix.filter(m=>anchorRequirements.some(r=>r.id===m.requirementId)&&['documented','potential'].includes(m.status));
+      // Expanded broad-imaging queries are deliberately generous for recall.
+      // A general cardiology biography can be semantically close to all of
+      // them; that alone must not become a radiology-interest match. The owned
+      // source must mention at least one requested imaging family or modality.
+      const broadDiscovery=anchorRequirements.filter(r=>r.importance!=='preferred'&&IMAGING_EXPANSIONS[r.label]);
+      if(broadDiscovery.length&&!anchorMatches.some(m=>broadDiscovery.some(r=>r.id===m.requirementId)))continue;
       // A generic research/AI passage alone cannot qualify a clinician for a
       // device-specific clinical use. Strong semantic-only evidence remains a
       // possible lead and is labelled, never claimed as documented expertise.
@@ -377,6 +441,27 @@ class ExpertSearchEngine{
       }
       const selectedIds=new Set(matrix.flatMap(m=>m.evidenceIds));
       const evidence=passages.filter(p=>selectedIds.has(p.id)).sort((a,b)=>(evidenceScore.get(b.id)||0)-(evidenceScore.get(a.id)||0));
+      // Useful adjacent research is optional context from the same person's
+      // evidence, never an inferred criterion or an unrequested gap. Require
+      // the clinical subject in the research passage itself: a generic research
+      // biography next to a CT interest is not necessarily research about CT.
+      const primaryEvidenceIds=new Set(matrix.map(m=>m.evidenceIds[0]).filter(Boolean));
+      const requiredResearchIds=new Set(matrix.filter(m=>m.kind==='research'||m.matchIntent==='research').flatMap(m=>m.evidenceIds));
+      const relatedEvidence=[],relatedTexts=new Set();
+      for(const p of [...passages].sort((a,b)=>Number(b.attribution==='verified-source')-Number(a.attribution==='verified-source')||evidenceStrength(b)-evidenceStrength(a))){
+        if(relatedEvidence.length>=2)break;
+        if(!['research','trial','publication','clinical-interest'].includes(p.type)||primaryEvidenceIds.has(p.id)||requiredResearchIds.has(p.id)||p.qualifiers?.some(q=>/publication-listing-link-not-authorship|bibliographic-reference-not-training-or-authorship|colleague|uncertain-identity/i.test(q)))continue;
+        // The containing profile's owner is not automatically a participant in
+        // every study it describes. Recheck contribution wording independent of
+        // an imported type/field label before adding a research badge.
+        if(!optionalResearchAttributed(p))continue;
+        const related=anchorRequirements.filter(r=>directMatch(r,p)&&requirementScopes(r,p).some(scope=>!negative(scope.text)&&optionalResearchAttributed(scope)));
+        if(!related.length)continue;
+        const support=supportingSpan({...related[0],matchIntent:'research'},p,'potential',brief),key=clean(support.text).toLowerCase();
+        if(relatedTexts.has(key))continue;relatedTexts.add(key);
+        relatedEvidence.push({...support,relatedToRequirementIds:related.map(r=>r.id)});
+        if(!selectedIds.has(p.id)){evidence.push(p);selectedIds.add(p.id);}
+      }
       // Keep contextual proof within the explanation's bounded evidence window
       // without replacing the strongest clinical support.
       const contextualIds=new Set(contextualEvidence.map(hit=>hit.passageId));
@@ -396,11 +481,11 @@ class ExpertSearchEngine{
       })||[];
       const reasons=support.filter(m=>!['geography','role'].includes(m.kind)).slice(0,3).map(m=>{
         const requirement=brief.requirements.find(r=>r.id===m.requirementId);
-        const owned=passages.filter(p=>m.evidenceIds.includes(p.id)).sort((a,b)=>Number(b.attribution==='verified-source')-Number(a.attribution==='verified-source')||Number(b.type==='clinical-practice')-Number(a.type==='clinical-practice'));
+        const owned=passages.filter(p=>m.evidenceIds.includes(p.id)).sort((a,b)=>requirement.matchIntent?m.evidenceIds.indexOf(a.id)-m.evidenceIds.indexOf(b.id):Number(b.attribution==='verified-source')-Number(a.attribution==='verified-source')||Number(b.type==='clinical-practice')-Number(a.type==='clinical-practice'));
         const fact=owned[0],proof=fact?supportingSpan(requirement,fact,m.status,brief):null;
         const reviewedSummary=proof?.kind==='reviewed-summary';
         const statement=proof?.text||m.note;
-        const scopedType=fact?effectiveEvidenceType(requirement,fact):null;
+        const scopedType=proof?.evidenceType||(fact?effectiveEvidenceType(requirement,fact):null);
         const label={'clinical-practice':'Recorded practice','clinical-interest':'Listed interest',research:'Recorded research',trial:'Recorded study contribution',procedure:'Listed procedure','professional-background':'Recorded background'}[scopedType]||'Source evidence';
         const quote=statement.length>230?statement.slice(0,230).replace(/\s+\S*$/,'')+'…':statement;
         return {text:reviewedSummary?`Reviewed source summary: ${quote}`:`${label}: “${quote}”`,requirementId:m.requirementId,evidenceIds:fact?[fact.id]:m.evidenceIds,status:'documented'};
@@ -420,6 +505,7 @@ class ExpertSearchEngine{
         for(const p of matching){
           const related=anchors.some(a=>directMatch(a,p));
           let value=({'clinical-practice':1,'clinical-interest':.38,procedure:.3,research:.7,trial:.7,publication:.55,training:.12,'professional-background':.15})[effectiveEvidenceType(requirement,p)]||.1;
+          if(requirement.matchIntent==='interest'||requirement.matchIntent==='research')value=intentEvidenceStrength(requirement,{...p,type:effectiveEvidenceType(requirement,p)})/6;
           if(['research','population','setting'].includes(m.kind)&&!related)value*=.2;
           if(m.status==='potential')value*=.4;
           strength=Math.max(strength,value);
@@ -436,11 +522,11 @@ class ExpertSearchEngine{
       }
       const contextFit=Math.min(.75,contextualEvidence.reduce((sum,hit)=>sum+hit.score*hit.weight,0));
       const relevance=evidenceFit+rrf*4+contextFit;
-      results.push({...candidate,requirementMatrix:matrix,evidence,reasons,gaps,questions,relationships,roleMatches,qualificationStatus:'not-reviewed',relationshipStatus:'not-reviewed',coverage:{documented:support.length,essentialDocumented:essentialSupport,essentialTotal:essential.length},relevance,clinicalRelevance:clinicalFit,contextRelevance:contextFit});
+      results.push({...candidate,requirementMatrix:matrix,evidence,relatedEvidence,reasons,gaps,questions,relationships,roleMatches,qualificationStatus:'not-reviewed',relationshipStatus:'not-reviewed',coverage:{documented:support.length,essentialDocumented:essentialSupport,essentialTotal:essential.length},relevance,clinicalRelevance:clinicalFit,contextRelevance:contextFit});
     }
     results.sort((a,b)=>b.clinicalRelevance-a.clinicalRelevance||b.relevance-a.relevance||a.name.localeCompare(b.name));
     results.forEach((r,index)=>r.rank=index+1);
-    return {results,brief,corpusVersion:this.corpus.version,diagnostics:{keywordMethod:'BM25 (k1=1.5, b=0.75)',embeddingModel:EMBEDDING_MODEL,fusion:'RRF (k=60) with capped context contribution',retrievalMode,bm25Candidates:lexicalIds.size,semanticCandidates:semanticIds.size,bm25CandidateIds:[...lexicalIds],semanticCandidateIds:[...semanticIds],ranking:results.map(r=>({id:r.id,rank:r.rank,relevance:r.relevance,clinicalRelevance:r.clinicalRelevance,contextRelevance:r.contextRelevance})),mergedCandidates:fused.size,queryCount:queries.length,queryChannels:queryPlans.map(({query,channel,weight,requirementIds})=>({query,channel,weight,requirementIds})),documentedOnly},panel:{requested:brief.panelSize||null,roles:brief.roles||[],note:'Panel size is a recruitment goal; no candidates are added merely to fill it.'}};
+    return {results,brief,corpusVersion:this.corpus.version,diagnostics:{keywordMethod:'BM25 (k1=1.5, b=0.75)',embeddingModel:EMBEDDING_MODEL,fusion:'RRF (k=60) with capped context contribution',retrievalMode,bm25Candidates:lexicalIds.size,semanticCandidates:semanticIds.size,bm25CandidateIds:[...lexicalIds],semanticCandidateIds:[...semanticIds],ranking:results.map(r=>({id:r.id,rank:r.rank,relevance:r.relevance,clinicalRelevance:r.clinicalRelevance,contextRelevance:r.contextRelevance})),mergedCandidates:fused.size,queryCount:queries.length,queryChannels:queryPlans.map(({query,channel,weight,requirementIds,expanded})=>({query,channel,weight,requirementIds,...(expanded?{expanded:true}:{})})),retrievalExpansions:queryPlans.filter(p=>p.expanded).map(({requirementIds,terms})=>({requirementIds,terms})),documentedOnly},panel:{requested:brief.panelSize||null,roles:brief.roles||[],note:'Panel size is a recruitment goal; no candidates are added merely to fill it.'}};
   }
 }
-module.exports={ExpertSearchEngine,SearchEngine:ExpertSearchEngine,BM25Index,tokens,directMatch,matrixFor,requirementQuery,questionFor,semanticEligible};
+module.exports={ExpertSearchEngine,SearchEngine:ExpertSearchEngine,BM25Index,tokens,directMatch,matrixFor,requirementQuery,requirementQueries,questionFor,semanticEligible};

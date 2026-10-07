@@ -14,6 +14,12 @@ async function main(){
   const paths=['development','holdout'].map(split=>path.join(__dirname,`../.cache/discovery-evaluation-${round}-${split}.json`));
   if(paths.some(p=>fs.existsSync(p)))throw Error('Preserve existing round observations.');
   const {engine}=await start();if(!engine.ready)throw Error('Index preparation failed.');
+  if(process.argv.includes('--discovery-focus')){
+    const report=await require('./discovery-focus.cjs').evaluateFocus({engine});
+    const file=path.join(__dirname,`../.cache/discovery-focus-${round}.json`);
+    fs.writeFileSync(file,JSON.stringify(report,null,2),{flag:'wx'});
+    console.log('[discovery focus]',JSON.stringify({passed:report.passed,summary:report.summary}));
+  }
   for(const [i,split]of (process.argv.includes('--skip-evaluation')?[]:['development','holdout']).entries()){
     const report=await evaluate({corpus:engine.corpus,engine,split,...(split==='holdout'?{scenarioPack:require('./holdout-final.cjs')}:{}),evaluationRound:round,onCase:result=>console.log('[case]',result.id,Object.values(result.byMode).every(mode=>mode.checks.every(check=>check.pass))?'checks pass':'CHECK FAILED')});
     fs.writeFileSync(paths[i],JSON.stringify(report,null,2),{flag:'wx'});

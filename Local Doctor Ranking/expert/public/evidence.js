@@ -1,16 +1,19 @@
 (function(root){
   'use strict';
-  // Shared presentation only. These helpers never change matrix outcomes,
+  // Shared presentation only. These helpers never mutate stored matrix outcomes,
   // retrieval scores, qualification decisions or the source text.
   const list=value=>Array.isArray(value)?value:[];
   const normal=value=>String(value||'').replace(/\s+/g,' ').trim();
   const contextKinds=new Set(['question','technology','workflow','manufacturer','independence','timing','availability']);
-  const typeNames={'clinical-practice':'Recorded activity','clinical-interest':'Listed interest',procedure:'Listed procedure',research:'Recorded research',trial:'Recorded study contribution',publication:'Recorded publication',training:'Recorded training',relationship:'Recorded relationship','professional-background':'Recorded background',location:'Recorded location',registration:'Recorded identifier'};
+  const typeNames={'clinical-practice':'Recorded activity','clinical-interest':'Listed interest',procedure:'Listed procedure',research:'Recorded research',trial:'Recorded study contribution',publication:'Recorded publication','research-context':'Research context',training:'Recorded training',relationship:'Recorded relationship','professional-background':'Recorded background',location:'Recorded location',registration:'Recorded identifier'};
   const typeStrength={'clinical-practice':6,research:5,trial:5,publication:4,'clinical-interest':3,procedure:2,training:1,'professional-background':0,location:0,registration:0,relationship:0};
   const typeOf=value=>typeof value==='string'?value:value?.evidenceType||value?.type||'';
   const typeLabel=value=>typeNames[typeOf(value)]||'Recorded evidence';
   const requirementLabel=requirement=>(requirement?.polarity==='exclude'?'Exclude: ':requirement?.strictRole?'Allowed role: ':'')+(requirement?.label||'Requirement');
   const sourceType=item=>typeOf(item.support)||typeOf(item.evidence);
+  const sourceIsListing=evidence=>list(evidence?.qualifiers).some(q=>/publication-listing-link-not-authorship|bibliographic-reference-not-training-or-authorship/i.test(q));
+  const sourceClaimStatuses=new Set(['documented','potential','mismatch','needs-review']);
+  const unavailableNote='Supporting text is unavailable in this saved evidence. Run discovery again to refresh the source evidence.';
   const activeRequirement=(row,brief)=>list(brief?.requirements).find(r=>r.id===row?.requirementId)||row||{};
   function safeUrl(value){try{const u=new URL(value);return /^https?:$/.test(u.protocol)&&!u.username&&!u.password?u.href:null;}catch{return null;}}
   const evidenceAnchor=id=>typeof id==='string'&&id?'evidence-'+id:null;
@@ -36,12 +39,17 @@
     const supports=Array.isArray(row.supportingEvidence)?row.supportingEvidence:list(row.evidenceIds).map(id=>{
       const e=evidence.find(p=>p.id===id);return e?{evidenceId:id,text:e.text,kind:e.reviewedParaphrase?'reviewed-summary':'source-quote',evidenceType:e.type,sourceQuote:e.sourceQuote||null,sourceDate:e.dates?.sourceDate||null,limits:list(e.review?.limitations)}:null;
     }).filter(Boolean);
-    return supports.map(support=>({support,evidence:evidence.find(e=>e.id===support.evidenceId)})).filter(({support,evidence:e})=>{
+    return supports.filter(support=>support&&typeof support==='object'&&!Array.isArray(support)).map(support=>({support,evidence:evidence.find(e=>e.id===support.evidenceId)})).filter(({support,evidence:e})=>{
       if(!e||!list(row.evidenceIds).includes(e.id)||typeof support.text!=='string'||!support.text.trim())return false;
       // A selected span must remain owned by the retained source or its literal
       // excerpt. Never create a new quotation from a detached display string.
       return e.text.includes(support.text)||(typeof e.sourceQuote==='string'&&e.sourceQuote.includes(support.text));
-    }).map(item=>({...item,match:row}));
+    }).map(item=>({...item,support:item.support.evidenceScope==='research-context'||sourceIsListing(item.evidence)&&['research','trial','publication'].includes(typeOf(item.support)||typeOf(item.evidence))?{...item.support,evidenceType:'research-context'}:item.support,match:row}));
+  }
+  function presentedStatus(candidate,row,proof=ownedSupport(candidate,row)){
+    if(sourceClaimStatuses.has(row?.status)&&!proof.length)return 'unknown';
+    if(row?.status==='documented'&&proof.length&&proof.every(item=>sourceType(item)==='research-context'))return 'potential';
+    return row?.status||'unknown';
   }
   function scopeWeight(item,candidate,brief){
     const quote=normal(item.support.text),seen=new Set();let weight=0;
@@ -57,29 +65,37 @@
   // This is an excerpt-detail tie-breaker, not evidence extraction: only an
   // already scoped, matrix-owned claim can receive a presentation preference.
   function actionDetail(item){return /\b(?:report(?:s|ed|ing)?|interpret(?:s|ed|ing)?|supervis(?:e|es|ed|ing)|perform(?:s|ed|ing)?|treat(?:s|ed|ing)?|manag(?:e|es|ed|ing)|evaluat(?:e|es|ed|ing)|led|coauthor(?:ed)?|authored)\b/i.test(item.support.text)?1:0;}
+  function intentWeight(item){
+    const intent=item.requirement?.matchIntent,type=sourceType(item);
+    // The wording of the request determines which sort of source is useful.
+    // Listing an interest is direct evidence for an interest search; it is not
+    // promoted into performed activity when the request asks for practice.
+    const strength={interest:{'clinical-interest':3,'clinical-practice':2,procedure:1},research:{research:3,trial:3,publication:3},activity:{'clinical-practice':3,procedure:1}}[intent]?.[type]||0;
+    return strength*20-(item.requirement?.importance==='preferred'?100:0);
+  }
   function compareProofs(a,b,candidate,brief){
-    return (typeStrength[sourceType(b)]??0)-(typeStrength[sourceType(a)]??0)||scopeWeight(b,candidate,brief)-scopeWeight(a,candidate,brief)||actionDetail(b)-actionDetail(a)||Math.min(160,b.support.text.length)-Math.min(160,a.support.text.length);
+    return intentWeight(b)-intentWeight(a)||(typeStrength[sourceType(b)]??0)-(typeStrength[sourceType(a)]??0)||scopeWeight(b,candidate,brief)-scopeWeight(a,candidate,brief)||actionDetail(b)-actionDetail(a)||Math.min(160,b.support.text.length)-Math.min(160,a.support.text.length);
   }
   function supportFor(candidate,row,brief){
     const requirement=activeRequirement(row,brief);
     return ownedSupport(candidate,row).map(item=>({...item,requirement})).sort((a,b)=>compareProofs(a,b,candidate,brief));
   }
   function outcome(row,candidate,requirement){
-    const r=requirement||row||{},status=row?.status||'unknown';
+    const r=requirement||row||{},proof=supportFor(candidate,row,{requirements:[{...r,id:r.id||row?.requirementId}]}),status=presentedStatus(candidate,row,proof),unavailable=sourceClaimStatuses.has(row?.status)&&!proof.length;
     if(r.polarity==='exclude')return {label:'Role exclusion filter',status,evidenceType:null,meaning:'An explicit role restriction, not a positive qualification.',note:status==='documented'?'The excluded role is recorded; review this candidate against your restriction.':['mismatch','needs-review'].includes(status)?'A source qualification or negative role statement needs scope and date review. This is not a positive role claim.':'No excluded role is established in the retained records. Incomplete role data does not prove absence; confirm directly.'};
-    const proof=supportFor(candidate,row,{requirements:[{...r,id:r.id||row?.requirementId}]}),evidenceType=proof[0]?sourceType(proof[0]):null;
-    const meanings={'clinical-practice':'The source records clinical activity. Its scope and current relevance still need confirmation.','clinical-interest':'The source lists an interest in this area; this does not establish performed clinical work.',procedure:'A procedure listing does not by itself establish personal performance or current practice.',research:'The recorded research role and dates define this evidence; specific assessment tasks still need qualification.',trial:'The recorded study contribution does not by itself establish appraisal or regulatory assessment competence.',publication:'A publication or authorship record does not by itself establish appraisal or regulatory assessment competence.',training:'Training does not establish current or independent practice.',location:'A recorded practice location does not establish residence, current practice or availability.',registration:'A recorded identifier is not a live registration check.',relationship:'A recorded relationship requires scope and date review; it is not a conflict determination.'};
-    const meaning=meanings[evidenceType]||'Review the recorded scope and confirm its relevance to this engagement.';
-    const labels={potential:'Potential relevance',unknown:'Confirmation required','needs-review':'Source qualification to review',mismatch:'Recorded limitation',context:'Engagement context'};
-    const label=status==='documented'?(r.kind==='role'?'Recorded role':typeLabel(evidenceType)):labels[status]||'Confirmation required';
-    return {label,status,evidenceType,meaning,note:status==='documented'?meaning:row?.note||'Not established by the available records; this is not evidence of absence.'};
+    const evidenceType=proof[0]?sourceType(proof[0]):null;
+    const meanings={'clinical-practice':'The source records clinical activity. Its scope and current relevance still need confirmation.','clinical-interest':'The source lists an interest in this area; this does not establish performed clinical work.',procedure:'A procedure listing does not by itself establish personal performance or current practice.',research:'The source records research involvement; its stated contribution and date define the evidence.',trial:'The source records a study contribution. The stated role and date should be retained.',publication:'The source records a publication or authorship contribution. It is distinct from clinical activity.',training:'Training does not establish current or independent practice.',location:'A recorded practice location does not establish residence, current practice or availability.',registration:'A recorded identifier is not a live registration check.',relationship:'A recorded relationship requires scope and date review; it is not a conflict determination.'};
+    const meaning=status==='unknown'?'The available sources do not establish this search detail; this is not evidence that the person lacks it.':evidenceType==='research-context'?'This source discusses research; it does not establish this person\'s contribution.':meanings[evidenceType]||'The recorded scope describes what this source establishes.';
+    const labels={potential:'Potential relevance',unknown:'Not found in sources','needs-review':'Source qualification to review',mismatch:'Recorded limitation',context:'Engagement context'};
+    const label=status==='documented'?(r.kind==='role'?'Recorded role':typeLabel(evidenceType)):labels[status]||'Not found in sources';
+    return {label,status,evidenceType,meaning,note:unavailable?unavailableNote:status==='documented'||evidenceType==='research-context'?meaning:row?.note||'Not established by the available records; this is not evidence of absence.'};
   }
   function cardProofs(candidate,brief,{limit=2}={}){
     const all=[];
     for(const row of list(candidate?.requirementMatrix)){
       const requirement=activeRequirement(row,brief),kind=requirement.kind||row.kind;
       if(!['documented','potential'].includes(row.status)||requirement.polarity==='exclude'||contextKinds.has(kind)||['geography','location','role','currentPractice'].includes(kind))continue;
-      all.push(...supportFor(candidate,row,brief));
+      all.push(...supportFor(candidate,row,brief).filter(item=>sourceType(item)!=='research-context'&&!sourceIsListing(item.evidence)));
     }
     // Choose a task-specific occurrence before deduplicating its repeated quote
     // across modality, activity and population requirements.
@@ -87,7 +103,8 @@
     all.sort((a,b)=>compareProofs(a,b,candidate,brief)||taskOrder(b)-taskOrder(a));
     const unique=[],seen=new Set();
     for(const item of all){const key=normal(item.support.text);if(seen.has(key))continue;seen.add(key);const coveredRequirementIds=[...new Set(all.filter(other=>normal(other.support.text)===key).map(other=>other.match.requirementId))];unique.push({...item,coveredRequirementIds});}
-    const first=unique.find(item=>['clinical-practice','clinical-interest','procedure'].includes(sourceType(item)))||unique[0];
+    const intentional=unique.some(item=>intentWeight(item)>0);
+    const first=(intentional?unique[0]:unique.find(item=>item.requirement.importance!=='preferred'&&['clinical-practice','clinical-interest','procedure'].includes(sourceType(item))))||unique[0];
     if(!first||limit<=0)return [];
     const selected=[first],covered=new Set(first.coveredRequirementIds),remaining=unique.filter(item=>item!==first);
     while(selected.length<Math.min(6,limit)){
@@ -104,16 +121,41 @@
     return selected;
   }
   function gaps(candidate,brief){
-    const result={essential:[],preferred:[]},requirements=list(brief?.requirements).length?brief.requirements:list(candidate?.requirementMatrix).map(row=>({...row,id:row.requirementId}));
+    const result={essential:[],preferred:[],focus:[]},requirements=list(brief?.requirements).length?brief.requirements:list(candidate?.requirementMatrix).map(row=>({...row,id:row.requirementId}));
     for(const requirement of requirements){
       if(requirement.polarity==='exclude'||contextKinds.has(requirement.kind))continue;
-      const row=list(candidate?.requirementMatrix).find(r=>r.requirementId===requirement.id),existing=list(candidate?.gaps).find(g=>g.requirementId===requirement.id),status=row?.status||existing?.status||'unknown';
+      const row=list(candidate?.requirementMatrix).find(r=>r.requirementId===requirement.id),existing=list(candidate?.gaps).find(g=>g.requirementId===requirement.id),proof=ownedSupport(candidate,row),status=row?presentedStatus(candidate,row,proof):existing?.status||'unknown',unavailable=sourceClaimStatuses.has(row?.status)&&!proof.length;
       if(['documented','context'].includes(status))continue;
-      const importance=requirement.importance==='preferred'?'preferred':'essential';
-      result[importance].push({...requirement,requirementId:requirement.id,label:requirementLabel(requirement),importance,status,note:row?.note||existing?.note||'Not established by the available records; this is not evidence of absence.',evidenceIds:[...list(row?.evidenceIds)]});
+      const importance=['focus','preferred'].includes(requirement.importance)?requirement.importance:'essential';
+      result[importance].push({...requirement,requirementId:requirement.id,label:requirementLabel(requirement),importance,status,note:unavailable?unavailableNote:row?.status==='documented'&&status==='potential'?'This source discusses research; it does not establish this person\'s contribution.':row?.note||existing?.note||'Not established by the available records; this is not evidence of absence.',evidenceIds:proof.map(item=>item.evidence.id)});
     }
     return result;
   }
-  const api={typeLabel,requirementLabel,outcome,supportFor,cardProofs,gaps,safeUrl,sourceLinks,recordUrl,evidenceAnchor};
+  function relatedProofs(candidate,brief){
+    const activeIds=new Set(list(brief?.requirements).map(r=>r.id));
+    return list(candidate?.relatedEvidence).flatMap(support=>{
+      if(!support||!list(support.relatedToRequirementIds).some(id=>activeIds.has(id)))return [];
+      const row={requirementId:null,status:'related',evidenceIds:[support.evidenceId],supportingEvidence:[support]};
+      return ownedSupport(candidate,row).filter(item=>['research','trial','publication'].includes(sourceType(item))).map(item=>({...item,related:true,label:'Related research',requirement:null,relatedToRequirementIds:list(support.relatedToRequirementIds).filter(id=>activeIds.has(id))}));
+    });
+  }
+  function cardRelevance(candidate,brief,{secondaryLimit=2}={}){
+    const proofs=cardProofs(candidate,brief,{limit:3}).map(item=>({...item,related:false,label:requirementLabel(item.requirement)}));
+    // A broad role search has no clinical-topic proof. Keep its direct recorded
+    // role visible rather than inventing a medical focus to fill the card.
+    if(!proofs.length){
+      for(const row of list(candidate?.requirementMatrix)){
+        const requirement=activeRequirement(row,brief);
+        if(requirement.kind!=='role'||requirement.polarity==='exclude'||row.status!=='documented')continue;
+        const item=supportFor(candidate,row,brief)[0];if(item){proofs.push({...item,related:false,label:requirementLabel(requirement)});break;}
+      }
+    }
+    const lead=proofs[0]||null,secondary=[],seen=new Set(lead?[normal(lead.support.text)]:[]);
+    for(const item of [...proofs.slice(1),...relatedProofs(candidate,brief)]){
+      const key=normal(item.support.text);if(seen.has(key))continue;seen.add(key);secondary.push(item);if(secondary.length>=Math.max(0,Math.min(2,secondaryLimit)))break;
+    }
+    return {lead,secondary:secondaryLimit<=0?[]:secondary,gaps:gaps(candidate,brief)};
+  }
+  const api={typeLabel,requirementLabel,outcome,supportFor,cardProofs,cardRelevance,relatedProofs,gaps,safeUrl,sourceLinks,recordUrl,evidenceAnchor};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.DocMapEvidence=api;
 })(globalThis);

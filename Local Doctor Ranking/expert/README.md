@@ -44,7 +44,9 @@ The same matrix and evidence identifiers drive cards, comparisons, qualification
 - When **Not contacted in this project** is enabled, the browser sends the contacted candidate IDs to the search server solely to exclude them from that project's result snapshot and pagination. Those IDs are not included in the DeepSeek request; contact dates, event details and review decisions remain local.
 - Current practice, commercial terms, willingness and independence generally require direct qualification. Missing evidence is not a negative credential finding.
 
-Start with the [three-pathway demonstration guide](docs/DEMO_GUIDE.md). It includes concrete briefs, sourced limitations, project/export steps and wording that avoids unproven ROI claims.
+Start with the [simple-discovery release guide](docs/DISCOVERY_RELEVANCE_RELEASE.md) for specialty and interest searches, optional refinement, the evidence hierarchy and current verification. The [implementation plan](docs/DISCOVERY_RELEVANCE_PLAN.md) explains why search focus is distinct from explicit must-haves. Existing saved priorities are preserved.
+
+The [three-pathway demonstration guide](docs/DEMO_GUIDE.md) covers detailed assessments, sourced limitations, project/export steps and wording that avoids unproven ROI claims.
 
 See [data and evaluation](docs/DATA_AND_EVALUATION.md), the [bounded hybrid-language probe](docs/HYBRID_CONTRIBUTION.md), [model verification](docs/MODEL_VERIFICATION.md), and the [manual-workflow pilot protocol](docs/PILOT_MEASUREMENT.md).
 

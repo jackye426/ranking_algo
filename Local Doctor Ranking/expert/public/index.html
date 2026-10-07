@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f6f8ff">
   <title>DocMap — Expert Discovery</title>
-  <meta name="description" content="Turn a clinical assessment brief into an evidence-backed shortlist of experts, with clear questions before engagement.">
+  <meta name="description" content="Find clinical experts by the work and interests behind their title. Search simply, explore relevant evidence, and refine your shortlist.">
   <link rel="stylesheet" href="/expert-assets/styles.css">
   <script src="/expert-assets/evidence.js" defer></script>
   <script src="/expert-assets/projects.js" defer></script>
@@ -26,17 +26,17 @@
   <main id="main">
     <section id="home" class="home" aria-labelledby="home-title">
       <div class="hero">
-        <p class="eyebrow">Evidence before engagement</p>
-        <h1 id="home-title">Find the expertise<br>your assessment needs.</h1>
-        <p class="hero-copy">Describe the device, its clinical use and the question<br class="desktop-break"> you need help answering.</p>
+        <p class="eyebrow">Expertise beyond the title</p>
+        <h1 id="home-title">Find the expertise<br>you’re looking for.</h1>
+        <p class="hero-copy">Start with a specialty or an area of interest.<br class="desktop-break"> See the work behind each match, then get more specific.</p>
         <form id="home-form" class="search-box home-search">
-          <label for="home-input" class="sr-only">Describe a clinical assessment brief</label>
-          <textarea id="home-input" rows="3" maxlength="4000" placeholder="We’re assessing software that analyses cardiac CT scans. We need experts who understand how its results would affect clinical decisions…"></textarea>
+          <label for="home-input" class="sr-only">Describe the expertise you’re looking for</label>
+          <textarea id="home-input" rows="3" maxlength="4000" placeholder="Cardiologists with radiology interests…"></textarea>
           <div class="search-box-footer"><span id="home-intent">Start with what you need to understand.</span><button type="submit" id="home-submit" class="send-button" aria-label="Find relevant experts">↑</button></div>
         </form>
         <p class="privacy-hint">Public demonstration · use fictional, non-confidential briefs</p>
-        <div class="example-row" aria-label="Example assessment briefs">
-          <button class="example" data-example="cardiac"><span class="example-icon" aria-hidden="true">↗</span><span>Cardiac CT software<small>Clinical decisions &amp; diagnostic evidence</small></span></button>
+        <div class="example-row" aria-label="Example expert searches">
+          <button class="example" data-example="imaging"><span class="example-icon" aria-hidden="true">↗</span><span>Cardiology &amp; imaging<small>A simple search. More useful detail.</small></span></button>
           <button class="example" data-example="skin"><span class="example-icon" aria-hidden="true">◉</span><span>Skin-lesion imaging<small>Expertise beyond a specialty title</small></span></button>
           <button class="example" data-example="panel"><span class="example-icon" aria-hidden="true">⊞</span><span>A complementary panel<small>Clinical and research perspectives</small></span></button>
         </div>
@@ -45,18 +45,18 @@
         <div id="home-recovery" class="recovery-host" role="status"></div>
       </div>
       <div class="home-story">
-        <div><span class="step-number">01</span><h2>Start with the question.</h2><p>Your clinical use, technology and requirements guide the search.</p></div>
-        <div><span class="step-number">02</span><h2>See the supporting evidence.</h2><p>Compare what each professional’s records document—and what they don’t.</p></div>
-        <div><span class="step-number">03</span><h2>Prepare the next conversation.</h2><p>Save a shortlist, qualification questions and sources in a review pack.</p></div>
+        <div><span class="step-number">01</span><h2>Start simply.</h2><p>A specialty, a clinical interest, or a detailed assessment question. Add more whenever you’re ready.</p></div>
+        <div><span class="step-number">02</span><h2>Understand the match.</h2><p>See relevant clinical work and interests, with related research that helps distinguish candidates.</p></div>
+        <div><span class="step-number">03</span><h2>Build your shortlist.</h2><p>Compare the evidence, save promising experts and take the sources into your next conversation.</p></div>
       </div>
       <footer class="home-footer"><p>Professional evidence, organised around your assessment.</p><p>Discovery supports qualification; it does not establish assessor approval or independence.</p></footer>
     </section>
 
     <section id="workspace" class="workspace" hidden aria-label="Expert discovery workspace">
       <div class="workspace-body">
-        <aside class="brief-sidebar" aria-label="Interpreted assessment brief">
-          <div class="sidebar-heading"><span class="eyebrow">Your assessment</span><button id="toggle-brief" class="text-button mobile-only" aria-expanded="false" aria-controls="brief-content">Show brief</button></div>
-          <div id="brief-slot"><div id="brief-content"><h2 id="brief-title">The expertise you need</h2><p class="sidebar-note">These are the details influencing this search.</p><details id="original-brief" class="original-brief"><summary>Original request</summary><p id="original-brief-text"></p></details><div id="requirements" class="requirements"></div><div id="brief-facts" class="brief-facts"></div>
+        <aside class="brief-sidebar" aria-label="Interpreted search">
+          <div class="sidebar-heading"><span class="eyebrow">Your search</span><button id="toggle-brief" class="text-button mobile-only" aria-expanded="false" aria-controls="brief-content">Show brief</button></div>
+          <div id="brief-slot"><div id="brief-content"><h2 id="brief-title">The expertise you need</h2><p class="sidebar-note">Search focus guides relevance. Make a criterion a must-have only if you need it.</p><details id="original-brief" class="original-brief"><summary>Original request</summary><p id="original-brief-text"></p></details><div id="requirements" class="requirements"></div><div id="brief-facts" class="brief-facts"></div>
             <div class="sidebar-filters"><label class="check-label"><input id="documented-only" type="checkbox"><span>Documented essentials only<small>Hide candidates with unconfirmed essential requirements.</small></span></label><label class="check-label"><input id="uncontacted-only" type="checkbox"><span>Not contacted in this project<small>Uses only contact events you recorded.</small></span></label></div>
             <button id="sidebar-project" class="project-callout"><span>Project shortlist<small>Saved evidence, notes and next steps</small></span><span id="sidebar-saved-count" class="count">0</span></button>
           </div></div>
@@ -67,7 +67,7 @@
           <div id="results-region" class="results-region" tabindex="-1" aria-label="Ranked candidates"><div id="search-error" role="alert"></div><div id="result-notices"></div><div id="search-loading" class="search-loading" aria-hidden="true" hidden><span class="search-orbit"><i></i><i></i><i></i><i></i></span><h2 id="search-loading-phrase"></h2><p id="search-loading-detail">Matching your brief to professional evidence.</p></div><div id="clarification" class="empty-state" hidden></div><div id="candidate-list" class="candidate-list"></div><button id="load-more" class="load-more" hidden>Load more candidates</button><p id="ranking-note" class="ranking-note" hidden>Ordered by evidence relevant to this brief. Discovery does not establish qualification, availability or independence.</p></div>
         </div>
       </div>
-      <div class="composer-wrap"><div class="composer-feedback"><div id="composer-status" class="composer-status" role="status"></div><div id="composer-progress" class="composer-progress" aria-hidden="true" hidden><span class="search-orbit"><i></i><i></i><i></i><i></i></span><span id="composer-progress-phrase"></span></div></div><div id="compare-tray" class="compare-tray" hidden><span id="compare-count">0 selected</span><button id="compare-clear" class="text-button">Clear</button><button id="compare-open" class="primary-button" disabled>Compare evidence</button></div><form id="followup-form" class="search-box followup-search"><label for="followup-input" class="sr-only">Refine the assessment brief</label><textarea id="followup-input" rows="1" maxlength="4000" placeholder="Refine this assessment…"></textarea><button id="followup-submit" type="submit" class="send-button" aria-label="Update expert search">↑</button></form></div>
+      <div class="composer-wrap"><div class="composer-feedback"><div id="composer-status" class="composer-status" role="status"></div><div id="composer-progress" class="composer-progress" aria-hidden="true" hidden><span class="search-orbit"><i></i><i></i><i></i><i></i></span><span id="composer-progress-phrase"></span></div></div><div id="compare-tray" class="compare-tray" hidden><span id="compare-count">0 selected</span><button id="compare-clear" class="text-button">Clear</button><button id="compare-open" class="primary-button" disabled>Compare evidence</button></div><form id="followup-form" class="search-box followup-search"><label for="followup-input" class="sr-only">Refine your search</label><textarea id="followup-input" rows="1" maxlength="4000" placeholder="Get more specific, or add another interest…"></textarea><button id="followup-submit" type="submit" class="send-button" aria-label="Update expert search">↑</button></form></div>
     </section>
 
     <section id="project-view" class="project-view" hidden aria-labelledby="project-title">

@@ -111,19 +111,19 @@ const assessmentMessage='We are assessing software that analyses cardiac CT scan
 const discussionText='explain how false positives and false negatives could affect patient management';
 for(const kind of ['activity','research','role'])test('an engagement question cannot become a credential through model kind '+kind,async()=>{
   const result=await mocked([patch(kind,discussionText)])({message:assessmentMessage}),brief=result.brief;
-  assert.equal(result.mode,'deepseek');assert.equal(req(brief,'Image interpretation').importance,'essential');assert.equal(req(brief,'Diagnostic study evaluation').importance,'preferred');
+  assert.equal(result.mode,'deepseek');assert.equal(req(brief,'Image interpretation').importance,'focus');assert.equal(req(brief,'Diagnostic study evaluation').importance,'preferred');
   assert.equal(brief.requirements.find(r=>r.kind==='question').text,discussionText);assert.ok(!brief.requirements.some(r=>!['question','technology'].includes(r.kind)&&r.text.includes('false positives')));
   const {matrixFor}=require('./search.cjs'),candidate={id:'fixture'},passage={id:'p',candidateId:'fixture',text:'He reports cardiac CT scans for coronary artery disease in adult patients.',field:'about',type:'clinical-practice',attributes:{},qualifiers:[]};
   const matrix=matrixFor(candidate,[passage],brief);assert.equal(matrix.find(m=>m.label==='Assessment question').status,'context');assert.equal(matrix.find(m=>m.label==='Image interpretation').status,'documented');
 });
 for(const phrase of ['explain why missed findings could change patient management','discuss how incorrect results could affect referral decisions','discuss the clinical implications of false negative results','explain the impact on treatment decisions of incorrect results'])test('nearby discussion phrasing remains context: '+phrase,async()=>{
   const result=await mocked([patch('activity',phrase)])({message:'Find clinicians who personally report cardiac CT and can '+phrase+'.'});
-  assert.equal(result.brief.requirements.find(r=>r.kind==='question').text,phrase);assert.equal(req(result.brief,'Image interpretation').importance,'essential');assert.ok(!result.brief.requirements.some(r=>r.kind==='activity'&&r.text===phrase));
+  assert.equal(result.brief.requirements.find(r=>r.kind==='question').text,phrase);assert.equal(req(result.brief,'Image interpretation').importance,'focus');assert.ok(!result.brief.requirements.some(r=>r.kind==='activity'&&r.text===phrase));
 });
 test('a clinical requirement after the question is not swallowed by discussion context',async()=>{
   const message='Find clinicians who can explain how false results affect treatment and personally report cardiac CT. Diagnostic study evaluation experience is preferred.';
   const brief=(await mocked([patch('activity','personally report cardiac CT')])({message})).brief;
-  assert.equal(req(brief,'Image interpretation').importance,'essential');assert.doesNotMatch(brief.requirements.find(r=>r.kind==='question').text,/personally report/);assert.equal(req(brief,'Diagnostic study evaluation').importance,'preferred');
+  assert.equal(req(brief,'Image interpretation').importance,'focus');assert.doesNotMatch(brief.requirements.find(r=>r.kind==='question').text,/personally report/);assert.equal(req(brief,'Diagnostic study evaluation').importance,'preferred');
 });
 test('a research term inside a discussion question does not silently become essential expertise',()=>{
   const brief=parseBrief({message:'Find clinicians who report cardiac CT and can discuss how diagnostic accuracy affects patient management. Diagnostic study evaluation experience is preferred.'}).brief;
@@ -136,7 +136,7 @@ test('explicit prior communication experience is preserved instead of becoming e
 });
 for(const role of ['clinician','clinicians','UK clinicians','clinical experts','healthcare clinicians'])test('generic search subject does not become an essential occupation: '+role,async()=>{
   const message='Find '+role+' who report cardiac CT for coronary artery disease in adults. Diagnostic study evaluation experience is preferred.';
-  const result=await mocked([patch('role',role)])({message});assert.equal(result.mode,'deepseek');assert.ok(!result.brief.requirements.some(r=>r.kind==='role'));assert.equal(req(result.brief,'Image interpretation').importance,'essential');assert.equal(req(result.brief,'Diagnostic study evaluation').importance,'preferred');
+  const result=await mocked([patch('role',role)])({message});assert.equal(result.mode,'deepseek');assert.ok(!result.brief.requirements.some(r=>r.kind==='role'));assert.equal(req(result.brief,'Image interpretation').importance,'focus');assert.equal(req(result.brief,'Diagnostic study evaluation').importance,'preferred');
 });
 test('generic clinician guard retains explicit clinical/research panel and specific non-doctor professions',async()=>{
   const panel=parseBrief({message:'Cardiac CT assessment: one practising clinician and one clinical researcher.'}).brief;
@@ -146,13 +146,13 @@ test('generic clinician guard retains explicit clinical/research panel and speci
 test('a generic search subject followed by a real clinical activity does not create a composite role',async()=>{
   const text='clinicians who personally report cardiac CT',message='Find UK '+text+' for coronary artery disease in adults.';
   const brief=(await mocked([patch('role',text)])({message})).brief;
-  assert.equal(brief.roles.length,0);assert.equal(req(brief,'Image interpretation').importance,'essential');assert.equal(brief.geography,'UK');
+  assert.equal(brief.roles.length,0);assert.equal(req(brief,'Image interpretation').importance,'focus');assert.equal(brief.geography,'UK');
 });
 for(const modelText of [discussionText,discussionText.toUpperCase(),discussionText.replace(/ /g,'  ')])test('a normalized duplicate model question keeps the deterministic ID and removes once: '+modelText,async()=>{
   const canonical=parseBrief({message:assessmentMessage}).brief.requirements.find(r=>r.kind==='question');
   const brief=(await mocked([patch('question',modelText,'essential','add',discussionText)])({message:assessmentMessage})).brief;
   const questions=brief.requirements.filter(r=>r.kind==='question');assert.equal(questions.length,1);assert.equal(questions[0].id,canonical.id);assert.equal(questions[0].label,'Assessment question');assert.equal(questions[0].text,canonical.text);
-  const removed=parseBrief({previous:brief,removeRequirementId:canonical.id}).brief;assert.ok(!removed.requirements.some(r=>r.kind==='question'));assert.ok(!removed.requirements.some(r=>/false positives/i.test(r.text)));assert.equal(req(removed,'Image interpretation').importance,'essential');
+  const removed=parseBrief({previous:brief,removeRequirementId:canonical.id}).brief;assert.ok(!removed.requirements.some(r=>r.kind==='question'));assert.ok(!removed.requirements.some(r=>/false positives/i.test(r.text)));assert.equal(req(removed,'Image interpretation').importance,'focus');
 });
 test('deduplication retains distinct quoted questions and independent removal',async()=>{
   const second='discuss how missed findings could alter referral decisions',message=assessmentMessage+' We also need to '+second+'.';
