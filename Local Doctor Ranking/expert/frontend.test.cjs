@@ -11,9 +11,11 @@ const vm=require('node:vm');
 const P=require('./public/projects.js');
 const Evidence=require('./public/evidence.js');
 const crypto=require('node:crypto').webcrypto;
-function harness({pathname='/expert-discovery',initialProjects=[],storageError=false,healthCorpusVersion=null,rememberedProjectId=null,initialSessionValues=[]}={}) {
+function harness({pathname='/expert-discovery',initialProjects=[],storageError=false,healthCorpusVersion=null,rememberedProjectId=null,initialSessionValues=[],reducedMotion=true}={}) {
   const ids=new Map(),timers=new Map(),styleWrites=[];let timerId=0,layoutEnabled=false,failStorage=storageError;const savedProjects=new Map(initialProjects.map(p=>[p.id,structuredClone(p)]));const downloads=[];
-  const schedule=(callback,delay=0)=>{const id=++timerId;timers.set(id,{callback,delay});return id;};
+  let now=Date.now();const mediaQueries=new Map();
+  class HarnessDate extends Date {constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
+  const schedule=(callback,delay=0)=>{const id=++timerId;timers.set(id,{callback,delay,due:now+delay});return id;};
   const cancel=id=>timers.delete(id);
   const events=target=>Object.assign(target,{events:{},addEventListener(name,callback){(this.events[name]||=[]).push(callback);},
     removeEventListener(name,callback){this.events[name]=(this.events[name]||[]).filter(fn=>fn!==callback);},
@@ -66,7 +68,7 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
   document.documentElement=new E('html');document.documentElement.clientHeight=800;
   const html=fs.readFileSync(path.join(__dirname,'public/index.html'),'utf8');
   for(const match of html.matchAll(/<([a-z][a-z0-9]*)\b([^>]*\bid="([^"]+)"[^>]*)>/g)){
-    const node=new E(match[1]);node.setAttribute('id',match[3]);node.className=match[2].match(/class="([^"]+)"/)?.[1]||'';node.placeholder=match[2].match(/placeholder="([^"]+)"/)?.[1]||'';node.hidden=/\bhidden\b/.test(match[2]);document.body.append(node);
+    const node=new E(match[1]);node.setAttribute('id',match[3]);node.className=match[2].match(/class="([^"]+)"/)?.[1]||'';node.placeholder=match[2].match(/placeholder="([^"]+)"/)?.[1]||'';node.hidden=/\bhidden\b/.test(match[2]);for(const attribute of match[2].matchAll(/\b(aria-[\w-]+|role)="([^"]*)"/g))node.setAttribute(attribute[1],attribute[2]);document.body.append(node);
   }
   const $=id=>{const element=ids.get(id);assert.ok(element,`Required current UI element #${id}`);return element;};
   const move=(parent,names)=>names.forEach(name=>ids.has(name)&&$(parent).append($(name)));
@@ -75,6 +77,7 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
   move('brief-content',['requirements','brief-facts','documented-only','uncontacted-only','sidebar-project']);
   const sidebar=new E();sidebar.className='brief-sidebar';$('workspace').append(sidebar);sidebar.append($('brief-slot'));$('brief-slot').append($('brief-content'));move('brief-content',['original-brief']);move('original-brief',['original-brief-text']);move('brief-dialog',['brief-close','brief-done','brief-dialog-content']);move('recovery-dialog',['recovery-form','recovery-close']);move('recovery-form',['recovery-input']);move('home',['home-recovery']);move('project-view',['project-recovery']);
   move('results-region',['search-error','result-notices','clarification','candidate-list','load-more','ranking-note']);
+  move('results-region',['search-loading']);move('search-loading',['search-loading-phrase','search-loading-detail']);move('workspace',['composer-progress']);move('composer-progress',['composer-progress-phrase']);
   move('followup-form',['followup-input','followup-submit']);move('compare-tray',['compare-count','compare-clear','compare-open']);
   move('project-view',['project-title','project-subtitle','project-return','export-json','export-html','import-project','import-file','project-brief','project-candidates','project-notes','project-save-status','save-project-notes']);
   move('profile-dialog',['profile-close','profile-scroll']);move('profile-scroll',['profile-identity','profile-content']);
@@ -84,7 +87,7 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
   for(const id of ['home-input','followup-input'])$(id).form=$(id==='home-input'?'home-form':'followup-form');
   for(const value of ['cardiac','skin','panel']){const example=new E('button');example.dataset.example=value;$('home').append(example);}
   const window=events({scrollX:0,scrollY:0,innerHeight:800,innerWidth:1280,location:{origin:'http://localhost:3100',pathname,search:'',hash:''},navigator:{},getSelection:()=>({toString:()=>''}),getComputedStyle:()=>({font:'16px sans-serif',fontSize:'16px',lineHeight:'24px',paddingTop:'0px',paddingBottom:'0px',borderTopWidth:'0px',borderBottomWidth:'0px',boxSizing:'border-box',getPropertyValue:()=>''}),
-    matchMedia:query=>events({matches:query.includes('prefers-reduced-motion')}),setTimeout:schedule,clearTimeout:cancel,
+    matchMedia:query=>{if(!mediaQueries.has(query))mediaQueries.set(query,events({matches:query.includes('prefers-reduced-motion')&&reducedMotion}));return mediaQueries.get(query);},setTimeout:schedule,clearTimeout:cancel,
     requestAnimationFrame:callback=>schedule(callback),cancelAnimationFrame:cancel,
     scrollTo(first,second){if(typeof first==='object'){this.scrollX=first.left??this.scrollX;this.scrollY=first.top??this.scrollY;}else{this.scrollX=first;this.scrollY=second;}}});
   const stack=[null],urls=[pathname];let position=0;
@@ -105,12 +108,14 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
   window.DocMapProjects={...P,storage:{list:async()=>[...savedProjects.values()],save:async p=>{if(failStorage)throw new Error('Browser storage is unavailable. Export your work before closing this page.');savedProjects.set(p.id,structuredClone(P.validateProject(p)));}}};
   const localValues=new Map(rememberedProjectId?[['docmap-expert-project-id',rememberedProjectId]]:[]),localStorage={getItem:key=>localValues.get(key)||null,setItem:(key,value)=>localValues.set(key,value)};
   const sessionValues=new Map(initialSessionValues),sessionStorage={getItem:key=>sessionValues.get(key)||null,setItem:(key,value)=>sessionValues.set(key,value),removeItem:key=>sessionValues.delete(key)};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'public/app.js'),'utf8'),{document,window,navigator:window.navigator,history,location:window.location,localStorage,sessionStorage,fetch,URL,Blob,AbortController,structuredClone,crypto,console,getComputedStyle:window.getComputedStyle,requestAnimationFrame:window.requestAnimationFrame,setTimeout:schedule,clearTimeout:cancel});
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'public/app.js'),'utf8'),{document,window,navigator:window.navigator,history,location:window.location,localStorage,sessionStorage,fetch,URL,Blob,AbortController,structuredClone,crypto,console,Date:HarnessDate,getComputedStyle:window.getComputedStyle,requestAnimationFrame:window.requestAnimationFrame,setTimeout:schedule,clearTimeout:cancel});
   async function flush(){for(let round=0;round<12;round++){await new Promise(resolve=>setImmediate(resolve));const pending=[...timers].filter(([,timer])=>timer.delay<1000);if(!pending.length){await Promise.resolve();return;}for(const [id,timer] of pending){if(timers.delete(id))timer.callback();}}throw new Error('Short UI task queue did not settle');}
   const start=message=>{$('home-input').value=message;$('home-input').emit('input');$('home-input').focus();$('home-form').requestSubmit();return requests.at(-1);};
   const refine=message=>{$('followup-input').value=message;$('followup-input').emit('input');$('followup-input').focus();$('followup-form').requestSubmit();return requests.at(-1);};
   const draft=(value,id='followup-input')=>{$(id).value=value;$(id).emit('input');};
-  return {$,document,window,history,requests,flush,start,refine,draft,savedProjects,downloads,styleWrites,localValues,sessionValues,setStorageError:value=>{failStorage=value;},enableLayout:()=>{layoutEnabled=true;},dispose:()=>timers.clear()};
+  async function advance(ms){now+=ms;for(const [id,timer]of [...timers].filter(([,timer])=>timer.due<=now))if(timers.delete(id))timer.callback();await flush();}
+  function setReducedMotion(value){reducedMotion=value;for(const [query,media]of mediaQueries)if(query.includes('prefers-reduced-motion')){media.matches=value;media.emit('change',{matches:value});}}
+  return {$,document,window,history,requests,flush,start,refine,draft,savedProjects,downloads,styleWrites,localValues,sessionValues,advance,setReducedMotion,pendingTimers:delay=>[...timers.values()].filter(timer=>timer.delay===delay).length,setStorageError:value=>{failStorage=value;},enableLayout:()=>{layoutEnabled=true;},dispose:()=>timers.clear()};
 }
 const brief={version:1,summary:'Cardiac CT for coronary artery disease',requirements:[{id:'ct',kind:'modality',label:'Cardiac CT',text:'Cardiac CT',importance:'essential'},{id:'practice',kind:'currentPractice',label:'Current practice',text:'Current practice',importance:'essential'}],manufacturer:null,panelSize:null,roles:[],geography:null};
 function person(id='expert-one',rank=1){const e={id:'e-'+id,candidateId:id,text:'Has a specialist interest in cardiac CT and coronary artery disease.',type:'clinical-interest',field:'biography',sourceRecordId:'source-'+id,sourceUrl:'https://example.com/'+id,sourceLabel:'Professional profile',dates:{sourceDate:null,observedAt:'2026-10-01'},qualifiers:['stated-interest'],attribution:'source-record'};return{id,name:'Dr '+id.replace(/-/g,' '),rank,role:'Consultant Cardiologist',specialty:'Cardiology',organisations:['Example hospital'],locations:[{name:'Example hospital',city:'London'}],registrations:[],evidence:[e],requirementMatrix:[{requirementId:'ct',label:'Cardiac CT',importance:'essential',status:'potential',evidenceIds:[e.id],note:'Stated interest; current activity requires confirmation.'},{requirementId:'practice',label:'Current practice',importance:'essential',status:'unknown',evidenceIds:[],note:'Current practice needs confirmation.'}],reasons:[{text:'Recorded interest in cardiac CT is relevant to the clinical scope.',status:'potential',evidenceIds:[e.id]}],gaps:[{requirementId:'practice',label:'Current practice',importance:'essential',status:'unknown'}],questions:[{kind:'qualification',text:'What is your current cardiac CT practice?'}],relationships:[]};}
@@ -168,6 +173,85 @@ test('submission clears immediately and a late response preserves the next draft
   h.draft('Include research experience\nBut regulatory experience is optional');const focused=h.document.activeElement;
   pending.resolve(result('first'));await h.flush();
   assert.equal(h.$('followup-input').value,'Include research experience\nBut regulatory experience is optional');assert.equal(h.document.activeElement,focused);assert.equal(cards(h).length,1);
+});
+
+test('first search immediately shows a single processing view without delaying retrieval or repeating announcements',async t=>{
+  const h=await setup(t,{reducedMotion:false}),pending=h.start('Find clinicians who report cardiac CT');
+  assert.equal(h.requests.length,1,'The cosmetic sequence must not gate the search request');
+  assert.equal(h.$('home-input').value,'');assert.equal(h.$('search-loading').hidden,false);assert.equal(h.$('composer-progress').hidden,true);
+  assert.equal(h.$('search-loading').getAttribute('aria-hidden'),'true');assert.equal(h.$('results-region').getAttribute('aria-busy'),'true');
+  assert.match(h.$('search-loading-phrase').textContent,/Connecting the dots/);assert.equal(h.$('clarification').hidden,true);
+  const announcement=h.$('announcer').textContent;h.draft('Research can be optional\nKeep clinical reporting essential');
+  await h.advance(2800);assert.notEqual(h.$('search-loading-phrase').textContent,'Connecting the dots…');
+  assert.equal(h.$('announcer').textContent,announcement,'Decorative copy should not be announced every few seconds');
+  assert.equal(h.$('followup-input').value,'Research can be optional\nKeep clinical reporting essential');assert.equal(h.document.activeElement,h.$('followup-input'));
+  assert.equal(h.requests.length,1);assert.equal(h.pendingTimers(2800),1);
+  pending.resolve(result('loaded'));await h.flush();assert.equal(h.$('search-loading').hidden,true);assert.equal(h.$('results-region').getAttribute('aria-busy'),'false');assert.equal(h.pendingTimers(2800),0);
+});
+
+test('refinement rotates compact processing copy without replacing cards or moving the draft and reading position',async t=>{
+  const h=await setup(t,{reducedMotion:false});await ready(h);const card=cards(h)[0],count=h.$('result-count').textContent,requirements=h.$('requirements').textContent;
+  h.$('results-region').scrollTop=180;const pending=h.refine('Diagnostic research is helpful');h.draft('Another detail\nStill being written');
+  assert.equal(h.$('search-loading').hidden,true);assert.equal(h.$('composer-progress').hidden,false);assert.equal(h.$('composer-progress').getAttribute('aria-hidden'),'true');
+  const firstPhrase=h.$('composer-progress-phrase').textContent;await h.advance(2800);
+  assert.notEqual(h.$('composer-progress-phrase').textContent,firstPhrase);assert.equal(cards(h)[0],card);assert.equal(h.$('result-count').textContent,count);assert.equal(h.$('requirements').textContent,requirements);
+  assert.equal(h.$('results-region').scrollTop,180);assert.equal(h.$('followup-input').value,'Another detail\nStill being written');assert.equal(h.document.activeElement,h.$('followup-input'));assert.equal(h.requests.length,2);
+  pending.resolve(result('refined'));await h.flush();assert.equal(h.$('composer-progress').hidden,true);assert.equal(h.pendingTimers(2800),0);assert.equal(h.$('followup-input').value,'Another detail\nStill being written');
+});
+
+test('search completion, clarification, empty results and failure all stop processing without a minimum display time',async t=>{
+  for(const outcome of ['success','clarification','empty','failure']){
+    const h=await setup(t,{reducedMotion:false});await ready(h);const pending=h.refine('Refine this fictional assessment');h.draft('Keep my newer draft');
+    if(outcome==='failure')pending.reject(new Error('Offline loading fixture'));
+    else pending.resolve(result('done-'+outcome,outcome==='empty'?[]:[person()],outcome==='clarification'?{needsClarification:true,question:'Which clinical question matters most?'}:{}));
+    await h.flush();assert.equal(h.$('search-loading').hidden,true,outcome);assert.equal(h.$('composer-progress').hidden,true,outcome);assert.equal(h.pendingTimers(2800),0,outcome);assert.equal(h.$('results-region').getAttribute('aria-busy'),'false',outcome);
+    assert.equal(h.$('followup-input').value,'Keep my newer draft',outcome);assert.equal(h.$('followup-submit').disabled,false,outcome);
+    if(outcome==='failure')assert.ok(action(h.$('search-error'),'Retry'));
+  }
+});
+
+test('hidden pages and navigation pause cosmetic work and returning to pending results starts only one timer',async t=>{
+  const h=await setup(t,{reducedMotion:false});await ready(h);const pending=h.refine('Consider diagnostic evaluation experience');
+  h.document.visibilityState='hidden';h.document.emit('visibilitychange');const paused=h.$('composer-progress-phrase').textContent;assert.equal(h.pendingTimers(2800),0);
+  await h.advance(2800);assert.equal(h.$('composer-progress-phrase').textContent,paused);assert.equal(h.requests.length,2);
+  h.document.visibilityState='visible';h.document.emit('visibilitychange');assert.equal(h.pendingTimers(2800),1);
+  h.$('brand-home').click();assert.equal(h.$('search-loading').hidden,true);assert.equal(h.$('composer-progress').hidden,true);assert.equal(h.pendingTimers(2800),0);
+  h.$('resume-search').click();assert.equal(h.$('composer-progress').hidden,false);assert.equal(h.pendingTimers(2800),1);
+  h.$('directory-view').click();h.$('focused-view').click();assert.equal(h.pendingTimers(2800),1,'Repeated routes must not multiply the cosmetic timers');assert.equal(h.requests.length,2);
+  h.window.emit('pagehide');assert.equal(h.pendingTimers(2800),0);pending.resolve(result('hidden-completion'));await h.flush();assert.equal(h.pendingTimers(2800),0);
+});
+
+test('one project completing in the background cannot stop another project’s processing indication',async t=>{
+  const h=await setup(t,{reducedMotion:false}),old=h.start('First fictional cardiac assessment');const firstId=h.$('project-select').value;
+  h.$('brand-home').click();const current=h.start('Second fictional skin assessment');assert.notEqual(h.$('project-select').value,firstId);assert.equal(h.pendingTimers(2800),1);
+  old.resolve(result('old-project'));await h.flush();assert.equal(h.$('search-loading').hidden,false);assert.equal(h.$('composer-progress').hidden,true);assert.equal(h.pendingTimers(2800),1);assert.equal(cards(h).length,0);
+  h.$('open-project').click();assert.equal(h.$('search-loading').hidden,true);assert.equal(h.$('composer-progress').hidden,true);assert.equal(h.pendingTimers(2800),0);
+  current.resolve(result('current-project'));await h.flush();assert.equal(h.$('project-view').hidden,false);assert.equal(h.$('search-loading').hidden,true);assert.equal(h.pendingTimers(2800),0);assert.equal(h.requests.length,2);
+});
+
+test('historical results do not show a current refinement as processing against the earlier brief',async t=>{
+  const h=await setup(t,{reducedMotion:false});await ready(h,'older');h.$('directory-view').click();h.refine('Research is preferred').resolve(result('current'));await h.flush();
+  const pending=h.refine('Add adult population evidence');assert.equal(h.$('composer-progress').hidden,false);h.history.back();await h.flush();
+  assert.equal(h.history.state.searchId,'older');assert.equal(h.$('search-loading').hidden,true);assert.equal(h.$('composer-progress').hidden,true);assert.equal(h.pendingTimers(2800),0);assert.equal(h.$('results-region').getAttribute('aria-busy'),'false');
+  h.$('view-updated').click();assert.equal(h.history.state.searchId,'current');assert.equal(h.$('composer-progress').hidden,false);assert.equal(h.pendingTimers(2800),1);
+  pending.resolve(result('latest'));await h.flush();assert.equal(h.$('composer-progress').hidden,true);assert.equal(h.pendingTimers(2800),0);
+});
+
+test('reduced motion keeps a clear static status and preference changes cancel or resume cosmetic work',async t=>{
+  const h=await setup(t,{reducedMotion:true}),pending=h.start('Find source-backed expertise');
+  assert.equal(h.$('search-loading').hidden,false);assert.equal(h.$('search-loading-phrase').textContent,'Searching professional evidence…');assert.equal(h.pendingTimers(2800),0);
+  await h.advance(2800);assert.equal(h.$('search-loading-phrase').textContent,'Searching professional evidence…');
+  h.setReducedMotion(false);assert.equal(h.pendingTimers(2800),1);await h.advance(2800);assert.notEqual(h.$('search-loading-phrase').textContent,'Searching professional evidence…');
+  h.setReducedMotion(true);assert.equal(h.pendingTimers(2800),0);assert.equal(h.$('search-loading-phrase').textContent,'Searching professional evidence…');assert.equal(h.requests.length,1);
+  pending.resolve(result('motion-complete'));await h.flush();assert.equal(h.$('search-loading').hidden,true);
+});
+
+test('a longer request honestly settles on waiting copy without inventing progress or issuing another request',async t=>{
+  const h=await setup(t,{reducedMotion:false}),pending=h.start('Find evidence for a fictional assessment');
+  for(let step=0;step<5;step++)await h.advance(2800);
+  assert.equal(h.$('search-loading-phrase').textContent,'Still working on your brief…');assert.equal(h.pendingTimers(2800),0);assert.equal(h.requests.length,1);assert.equal(h.$('search-loading').hidden,false);
+  await h.advance(2800);assert.equal(h.$('search-loading-phrase').textContent,'Still working on your brief…');assert.equal(h.requests.length,1);
+  pending.resolve(result('long-complete'));await h.flush();assert.equal(h.$('search-loading').hidden,true);assert.equal(h.pendingTimers(2800),0);
 });
 
 test('retry reuses the failed message without clearing a fresh draft',async t=>{

@@ -4,6 +4,24 @@
   const $=id=>document.getElementById(id), P=window.DocMapProjects, E=window.DocMapEvidence;
   const state={projects:new Map(),projectId:null,conversations:new Map(),snapshots:new Map(),answers:new Map(),profileViews:new Map(),pendingAI:new Map(),projectEdits:new Map(),nav:{view:'home',mode:'focused',searchId:null},profile:null,comparison:null,storageFailed:false,draftMirrorFailed:false,saving:Promise.resolve(),ready:false,corpusVersion:null};
   let toastTimer,draftTimer,dialogClosing=false,eventOrigin=null,focusReturn=null,focusCandidateId=null,briefReturnFocus=true,recoveryEdit=null;
+  const searchMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+  const searchPhrases=['Connecting the dots…','Looking beyond the job title…','Getting into the specifics…','Putting expertise in context…','Following the evidence…'];
+  let searchProgressTimer=null;
+  function stopSearchProgress(){clearTimeout(searchProgressTimer);searchProgressTimer=null;}
+  function syncSearchProgress(){
+    stopSearchProgress();
+    const conv=conversation(),active=conv.busy&&state.nav.view==='results'&&!historicalView();
+    const first=active&&!currentData(),visible=active&&document.visibilityState!=='hidden'&&!state.nav.profileId&&!state.nav.compareIds;
+    $('search-loading').hidden=!first;$('composer-progress').hidden=!active||first;$('composer-status').hidden=active&&!first;
+    $('results-region').setAttribute('aria-busy',String(active));
+    $('workspace').classList.toggle('search-motion-paused',!visible||searchMotion.matches);
+    if(!active)return;
+    const elapsed=Date.now()-(conv.progressStartedAt||Date.now());
+    const phrase=searchMotion.matches?'Searching professional evidence…':elapsed>=14000?'Still working on your brief…':searchPhrases[(conv.progressStep||0)%searchPhrases.length];
+    for(const id of ['search-loading-phrase','composer-progress-phrase'])if($(id).textContent!==phrase)$(id).replaceChildren(node('span','progress-phrase',phrase));
+    $('search-loading-detail').textContent=elapsed>=14000?'You can keep writing while we search.':'Matching your brief to professional evidence.';
+    if(visible&&!searchMotion.matches&&elapsed<14000)searchProgressTimer=setTimeout(()=>{searchProgressTimer=null;conv.progressStep=(conv.progressStep||0)+1;syncSearchProgress();},2800);
+  }
   const examples={
     cardiac:'We are assessing software that analyses cardiac CT scans to support assessment of coronary artery disease in adults. Find UK clinical experts who can help us examine the clinical relevance of its outputs and the consequences of incorrect results. Current clinical practice is essential; regulatory experience is optional.',
     skin:'We are assessing software that evaluates skin-lesion images in primary care. Find UK experts with dermoscopy or skin-lesion imaging experience who can help examine how non-specialist users would interpret its results. Diagnostic study evaluation experience is preferred.',
@@ -60,6 +78,7 @@
     renderRecovery();
     if(state.nav.profileId){const data=state.snapshots.get(state.nav.searchId),candidate=findCandidate(data,state.nav.profileId);if(candidate)showProfile(candidate,data,{record:false});}
     if(state.nav.compareIds?.length){const data=state.snapshots.get(state.nav.searchId);if(data)showComparison(data,state.nav.compareIds,{record:false});}
+    syncSearchProgress();
   }
   function home(){route({view:'home',profileId:null,compareIds:null});}
   function resume(){const conv=conversation(),data=conv.latest;if(data||conv.busy)route({view:'results',searchId:data?.searchId||null,profileId:null,compareIds:null});else if(project()?.activeBrief)search({resumeBrief:clone(project().activeBrief)},{fromHome:true,preserveDraft:true});else if(conv.failed)route({view:'results',searchId:null,profileId:null,compareIds:null});else home();}
@@ -96,13 +115,13 @@
   function openBrief(){if($('brief-dialog').open)return;briefReturnFocus=true;$('brief-dialog-content').append($('brief-content'));$('toggle-brief').setAttribute('aria-expanded','true');$('brief-dialog').showModal();$('brief-close').focus({preventScroll:true});}
   function closeBrief(returnFocus=true){if(!$('brief-dialog').open&&$('brief-content').parentNode===$('brief-slot'))return;briefReturnFocus=returnFocus;$('brief-slot').append($('brief-content'));$('toggle-brief').setAttribute('aria-expanded','false');if($('brief-dialog').open)$('brief-dialog').close();}
   function historicalView(){const latest=conversation().latest;return state.nav.view==='results'&&!!latest&&state.nav.searchId!==latest.searchId;}
-  function setBusy(busy){const historical=historicalView();$('home-submit').disabled=!state.ready;$('followup-submit').disabled=busy||!state.ready||historical;$('followup-input').readOnly=historical;document.querySelectorAll('.importance-select,.remove-requirement,#documented-only,#uncontacted-only').forEach(el=>el.disabled=busy||historical);$('composer-status').classList.toggle('pending',busy);if(historical){$('composer-status').textContent='Earlier results · return to the current brief to refine.';$('view-updated').hidden=false;}else if(!busy&&$('composer-status').textContent==='Earlier results · return to the current brief to refine.')$('composer-status').textContent='Current brief · ready to refine.';}
+  function setBusy(busy){const historical=historicalView();$('home-submit').disabled=!state.ready;$('followup-submit').disabled=busy||!state.ready||historical;$('followup-input').readOnly=historical;document.querySelectorAll('.importance-select,.remove-requirement,#documented-only,#uncontacted-only').forEach(el=>el.disabled=busy||historical);$('composer-status').classList.toggle('pending',busy);if(historical){$('composer-status').textContent='Earlier results · return to the current brief to refine.';$('view-updated').hidden=false;}else if(!busy&&$('composer-status').textContent==='Earlier results · return to the current brief to refine.')$('composer-status').textContent='Current brief · ready to refine.';syncSearchProgress();}
   async function search(payload,{fromHome=false,preserveDraft=false}={}){
     const projectId=state.projectId,conv=conversation(projectId);if(conv.busy)return;if(historicalView()&&!fromHome){toast('Return to the current brief to refine these requirements.');return;}
     const message=payload.message;
     if(message!==undefined&&!message.trim())return;
     if(message&&!preserveDraft){clearTimeout(draftTimer);conv.draft='';if(fromHome){conv.homeDraft='';$('home-input').value='';} $('followup-input').value='';growTextarea($('followup-input'));conv.failedAutoDraft=null;writeDraftMirror(projectId);mutateProject(projectId,p=>{p.draft='';if(fromHome)p.newAssessmentDraft='';return p;});}
-    const previous=conv.latest,selectedBefore=new Set(conv.selected),previousFilters=previous?.filters||{documentedOnly:false,uncontactedOnly:false},position=state.nav.view==='results'?viewportPosition():null;conv.busy=true;conv.started=true;
+    const previous=conv.latest,selectedBefore=new Set(conv.selected),previousFilters=previous?.filters||{documentedOnly:false,uncontactedOnly:false},position=state.nav.view==='results'?viewportPosition():null;conv.busy=true;conv.started=true;conv.progressStartedAt=Date.now();conv.progressStep=0;
     if(payload.resumeBrief)conv.sessionId=null;
     if(fromHome)route({view:'results',searchId:previous?.searchId||null,profileId:null,compareIds:null});
     const originatingSearchId=state.nav.searchId;
@@ -193,7 +212,7 @@
     $('view-updated').hidden=!historicalView();
     renderBrief(data?.brief||project()?.activeBrief);$('focused-view').setAttribute('aria-pressed',String(state.nav.mode!=='directory'));$('directory-view').setAttribute('aria-pressed',String(state.nav.mode==='directory'));
     $('results-title').textContent=state.nav.mode==='directory'?'Candidate directory':'Candidates to consider';$('candidate-list').replaceChildren();$('clarification').replaceChildren();$('clarification').hidden=true;$('result-notices').replaceChildren();$('load-more').hidden=true;$('ranking-note').hidden=true;
-    if(!data){$('result-count').textContent='Your evidence-backed shortlist will appear here.';if(conversation().busy){$('clarification').hidden=false;$('clarification').append(node('h2','','Reading your brief'),node('p','','We’re connecting the assessment question to documented professional experience.'));}syncCompare();setBusy(conversation().busy);return;}
+    if(!data){$('result-count').textContent='Your evidence-backed shortlist will appear here.';syncCompare();setBusy(conversation().busy);return;}
     $('result-notices').replaceChildren(...list(data.notices).map(note=>node('p','notice',note)));
     if(data.needsClarification){$('result-count').textContent='A little more detail will make this useful.';$('clarification').hidden=false;$('clarification').append(node('h2','','What do you need to understand?'),node('p','',data.question));syncCompare();setBusy(conversation().busy);return;}
     const shown=state.nav.mode==='directory'?data.results:data.results.slice(0,6),partial=shown.filter(c=>E.gaps(c,data.brief).essential.length).length;$('result-count').textContent=`${shown.length} ${shown.length===1?'candidate':'candidates'} to review`+(partial?` · ${partial} ${partial===1?'has':'have'} essential gaps`:'');$('ranking-note').textContent=`${Number(data.total).toLocaleString()} evidence leads in the wider pool. Ordered by evidence relevant to this brief. Discovery does not establish qualification, availability or independence.`;
@@ -304,7 +323,7 @@
     $('save-project-notes').addEventListener('click',async()=>{const id=state.projectId,value=$('project-notes').value,ok=await mutateProject(id,p=>{p.notes=value;return p;});if(ok&&state.projectEdits.get(id+'|notes')===value)state.projectEdits.delete(id+'|notes');if(state.projectId===id)$('project-save-status').textContent=ok?(state.projectEdits.has(id+'|notes')?'Submitted notes saved. Your newer edits are not saved yet.':'Project notes saved.'):'Not saved to storage. Export your project now.';});
     $('event-close').addEventListener('click',()=>{eventOrigin=null;$('event-dialog').close();});$('event-dialog').addEventListener('close',()=>{if(!$('event-dialog').open)eventOrigin=null;});$('event-form').addEventListener('submit',async e=>{e.preventDefault();const origin=eventOrigin;if(!origin||origin.projectId!==state.projectId||!$('event-dialog').open||origin.pending)return;const type=$('event-type').value,detail=$('event-detail').value;origin.pending=true;try{const ok=await mutateProject(origin.projectId,p=>P.recordEvent(p,origin.candidateId,type,detail,{actor:'user'}));if(eventOrigin===origin&&state.projectId===origin.projectId){eventOrigin=null;$('event-dialog').close();renderProject();toast(ok?'Activity recorded from your input. No messages were sent.':'Activity held in memory. Export your project now.');}}catch(error){if(eventOrigin===origin&&state.projectId===origin.projectId){origin.pending=false;toast(error.message);}}});
     window.addEventListener('popstate',event=>{flushDraft();const target=event.state;if(!target?.docmapExpert)return;if(target.projectId&&state.projects.has(target.projectId))state.projectId=target.projectId;route({view:target.view,mode:target.mode||'focused',searchId:target.searchId||null,profileId:target.profileId||null,compareIds:target.compareIds||null},{restore:true});refreshProjectControls();if(!target.profileId&&!target.compareIds)restoreFocus();});
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushDraft();});window.addEventListener('pagehide',()=>flushDraft());window.addEventListener('resize',updateViewport);window.visualViewport?.addEventListener('resize',updateViewport);updateViewport();
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushDraft();syncSearchProgress();});window.addEventListener('pagehide',()=>{flushDraft();stopSearchProgress();});searchMotion.addEventListener('change',syncSearchProgress);window.addEventListener('pageshow',syncSearchProgress);window.addEventListener('resize',updateViewport);window.visualViewport?.addEventListener('resize',updateViewport);updateViewport();
   }
   async function checkHealth(){try{const response=await fetch('/api/expert/health'),health=await response.json();state.ready=health.ready===true;if(state.ready&&typeof health.corpusVersion==='string'){await observeCorpusVersion(health.corpusVersion);if(state.nav.view==='project'){const saved=project()?.candidates||[];document.querySelectorAll('.saved-card').forEach((card,i)=>{if(saved[i]?.needsReview&&!card.querySelector('.stale-warning'))card.append(node('p','stale-warning','The brief or evidence has changed. Review this saved candidate again before relying on the earlier decision.'));});}}$('health-status').textContent=state.ready?'Connected professional evidence · source links on every candidate':health.status||'The evidence index is preparing.';setBusy(conversation().busy);if(!state.ready)setTimeout(checkHealth,15000);}catch{$('health-status').textContent='The preview is not connected yet. Your saved projects remain available.';setTimeout(checkHealth,20000);}}
   async function start(){
