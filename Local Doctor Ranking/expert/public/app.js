@@ -5,6 +5,15 @@
   const state={projects:new Map(),projectId:null,conversations:new Map(),snapshots:new Map(),answers:new Map(),profileViews:new Map(),profileCache:new Map(),pendingProfiles:new Map(),pendingAI:new Map(),projectEdits:new Map(),nav:{view:'home',mode:'focused',searchId:null},profile:null,comparison:null,storageFailed:false,draftMirrorFailed:false,saving:Promise.resolve(),ready:false,corpusVersion:null};
   let toastTimer,draftTimer,dialogClosing=false,eventOrigin=null,focusReturn=null,focusCandidateId=null,briefReturnFocus=true,recoveryEdit=null;
   const searchMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+  const homeExamples=['MDR MDA0315 — software for cardiac CT…','Cardiologists with radiology interests…','MDA0315 + MDS1009 — cardiac CT software…','Dermatologists with skin-lesion imaging interests…'];
+  let homeExampleIndex=0,homeExampleTimer=null;
+  function stopHomeExamples(){clearTimeout(homeExampleTimer);homeExampleTimer=null;$('home-input').classList.remove('example-changing');}
+  function syncHomeExamples(){
+    stopHomeExamples();const input=$('home-input');
+    if(searchMotion.matches){input.placeholder=homeExamples[0];return;}
+    if($('home').hidden||input.value||document.activeElement===input||document.visibilityState==='hidden')return;
+    homeExampleTimer=setTimeout(()=>{input.classList.add('example-changing');homeExampleTimer=setTimeout(()=>{homeExampleIndex=(homeExampleIndex+1)%homeExamples.length;input.placeholder=homeExamples[homeExampleIndex];syncHomeExamples();},220);},4800);
+  }
   const searchPhrases=['Connecting the dots…','Looking beyond the job title…','Getting into the specifics…','Putting expertise in context…','Following the evidence…'];
   let searchProgressTimer=null;
   function stopSearchProgress(){clearTimeout(searchProgressTimer);searchProgressTimer=null;}
@@ -81,7 +90,7 @@
     renderRecovery();
     if(state.nav.profileId){const data=state.snapshots.get(state.nav.searchId),candidate=findCandidate(data,state.nav.profileId);if(candidate)showProfile(candidate,data,{record:false});}
     if(state.nav.compareIds?.length){const data=state.snapshots.get(state.nav.searchId);if(data)showComparison(data,state.nav.compareIds,{record:false});}
-    syncSearchProgress();
+    syncSearchProgress();syncHomeExamples();
   }
   function home(){route({view:'home',profileId:null,compareIds:null});}
   function resume(){const conv=conversation(),data=conv.latest;if(data||conv.busy||pendingQuestion())route({view:'results',searchId:data?.searchId||null,profileId:null,compareIds:null});else if(project()?.activeBrief)search({resumeBrief:clone(project().activeBrief)},{fromHome:true,preserveDraft:true});else if(conv.failed)route({view:'results',searchId:null,profileId:null,compareIds:null});else home();}
@@ -556,6 +565,8 @@
     $('other-home-draft').addEventListener('click',()=>{const conv=conversation();if(state.nav.view!=='home'||hasAssessment()||!conv.homeDraft.trim()||conv.homeDraft===conv.draft)return;[conv.draft,conv.homeDraft]=[conv.homeDraft,conv.draft];flushDraft();syncDraft();refreshHomeIntent();$('home-input').focus({preventScroll:true});});
     $('home-form').addEventListener('submit',e=>{e.preventDefault();startAssessment($('home-input').value);});$('followup-form').addEventListener('submit',e=>{e.preventDefault();const message=$('followup-input').value.trim(),geo=locationPayload('followup');if(!message&&pendingQuestion()){toast('Add your answer or choose a reply. Your location will apply when you send it.');return;}const clinical=message?followupRequest(message):{};if(clinical&&(message||Object.hasOwn(geo,'locationFilter')))search({...clinical,...geo});});
     for(const id of ['home-input','followup-input']){$(id).addEventListener('input',onDraft);$(id).addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$(id).form.requestSubmit();}});}
+    for(const event of ['focus','blur','input'])$('home-input').addEventListener(event,syncHomeExamples);
+    document.addEventListener('visibilitychange',syncHomeExamples);window.addEventListener('pagehide',stopHomeExamples);window.addEventListener('pageshow',syncHomeExamples);searchMotion.addEventListener('change',syncHomeExamples);
     document.querySelectorAll('[data-example]').forEach(b=>b.addEventListener('click',()=>{$('home-input').value=examples[b.dataset.example];onDraft({target:$('home-input')});$('home-input').focus({preventScroll:true});}));
     $('focused-view').addEventListener('click',()=>setMode('focused'));$('directory-view').addEventListener('click',()=>setMode('directory'));$('load-more').addEventListener('click',loadMore);$('view-updated').addEventListener('click',()=>{$('view-updated').hidden=true;conversation().positions={};resume();$('results-region').scrollTop=0;});
     $('documented-only').addEventListener('change',e=>{conversation().documentedOnly=e.target.checked;refreshSearch();});$('uncontacted-only').addEventListener('change',e=>{conversation().uncontactedOnly=e.target.checked;refreshSearch();});
