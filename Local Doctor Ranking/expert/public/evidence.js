@@ -33,6 +33,28 @@
     }
     return [...links.values()];
   }
+  function displayBlocks(value,_field){
+    // Layout only: preserve every non-empty source entry, including CT, MR and
+    // No. Field names never turn unmarked prose into inferred clinical lists.
+    if(typeof value!=='string')return [];
+    const result=[],push=(kind,text)=>{text=text.trim();if(text)result.push({kind,text});};
+    for(const raw of value.replace(/\r\n?/g,'\n').split('\n')){
+      const line=raw.trim();if(!line)continue;
+      if(/[•●▪‣]/u.test(line)){
+        const parts=line.split(/[•●▪‣]/u);push('paragraph',parts[0]);for(const item of parts.slice(1))push('list-item',item);continue;
+      }
+      // Some imported biographies flatten an explicit list into one line.
+      // Require its introductory colon and at least two single-star markers;
+      // footnote markers, multiplication and markdown emphasis remain literal.
+      const stars=line.split('*');
+      if(stars.length>=3&&stars[0].trim().endsWith(':')&&stars.slice(1).every(item=>item.trim())){
+        push('paragraph',stars[0]);for(const item of stars.slice(1))push('list-item',item);continue;
+      }
+      const bullet=line.match(/^(?:[-–—]|\*(?!\*))\s+(.+)$/u);
+      push(bullet?'list-item':'paragraph',bullet?bullet[1]:line);
+    }
+    return result;
+  }
   function ownedSupport(candidate,row){
     if(!row)return [];
     const evidence=list(candidate?.evidence).filter(e=>e?.candidateId===candidate.id&&typeof e.text==='string');
@@ -156,6 +178,6 @@
     }
     return {lead,secondary:secondaryLimit<=0?[]:secondary,gaps:gaps(candidate,brief)};
   }
-  const api={typeLabel,requirementLabel,outcome,supportFor,cardProofs,cardRelevance,relatedProofs,gaps,safeUrl,sourceLinks,recordUrl,evidenceAnchor};
+  const api={typeLabel,requirementLabel,outcome,supportFor,cardProofs,cardRelevance,relatedProofs,gaps,safeUrl,sourceLinks,recordUrl,evidenceAnchor,displayBlocks};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.DocMapEvidence=api;
 })(globalThis);

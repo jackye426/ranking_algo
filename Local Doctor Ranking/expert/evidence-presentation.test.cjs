@@ -154,3 +154,44 @@ test('malformed imported support entries are unavailable evidence rather than an
   const requirement=r('ct','modality','Cardiac CT'),q={requirementId:'ct',status:'documented',evidenceIds:['source'],supportingEvidence:[null,'text',4,[],{}]},c={id:'candidate',evidence:[evidence('source','Cardiac CT.')],requirementMatrix:[q]};
   assert.deepEqual(E.supportFor(c,q,{requirements:[requirement]}),[]);assert.equal(E.outcome(q,c,requirement).status,'unknown');assert.equal(E.gaps(c,{requirements:[requirement]}).essential[0].status,'unknown');
 });
+
+test('display blocks preserve short modalities, negatives and source order across explicit line breaks',()=>{
+  assert.deepEqual(E.displayBlocks('Recorded modalities:\r\nCT\r\nMR\nNo\n\nNo radioactive implants reported.','clinical_interests'),[
+    {kind:'paragraph',text:'Recorded modalities:'},{kind:'paragraph',text:'CT'},{kind:'paragraph',text:'MR'},{kind:'paragraph',text:'No'},{kind:'paragraph',text:'No radioactive implants reported.'}
+  ]);
+});
+
+test('display blocks preserve interleaved explicit lists and paragraphs without collecting or reordering them',()=>{
+  const source='Clinical interests:\n• CT\n• MR\nThe following remain unconfirmed.\n- No current implant activity\n* Previous training only\nFinal source qualification.';
+  assert.deepEqual(E.displayBlocks(source,'about').map(b=>[b.kind,b.text]),[
+    ['paragraph','Clinical interests:'],['list-item','CT'],['list-item','MR'],['paragraph','The following remain unconfirmed.'],['list-item','No current implant activity'],['list-item','Previous training only'],['paragraph','Final source qualification.']
+  ]);
+  assert.deepEqual(E.displayBlocks('Procedures:•CT•MR\nNo','procedures').map(b=>b.text),['Procedures:','CT','MR','No']);
+});
+
+test('flattened Hyam-style stars become a list only with a colon introduction and multiple nonempty entries',()=>{
+  const source='His specialist expertise includes:* Tumours such as meningioma* Gamma knife stereotactic radiosurgery* Deep brain stimulation implants';
+  assert.deepEqual(E.displayBlocks(source,'about').map(b=>[b.kind,b.text]),[['paragraph','His specialist expertise includes:'],['list-item','Tumours such as meningioma'],['list-item','Gamma knife stereotactic radiosurgery'],['list-item','Deep brain stimulation implants']]);
+  for(const literal of ['Brain implants* require confirmation*','Expertise: * CT','Expertise: **CT** and **MR**','Dose: 2 * 3 * 4','Procedures include CT, MR; Gamma Knife. 1–28 days; 1-56 days.'])assert.deepEqual(E.displayBlocks(literal,'procedures'),[{kind:'paragraph',text:literal}],literal);
+});
+
+test('list presentation preserves case, negative statements and activity ranges without interpreting them',()=>{
+  const source='Recorded procedures:\n- Chemotherapy 1–28 days, 1–56 days\n- CT; MR; No radioactive implants\n- No\n- CT\n- MR';
+  assert.deepEqual(E.displayBlocks(source,'procedures').map(b=>b.text),['Recorded procedures:','Chemotherapy 1–28 days, 1–56 days','CT; MR; No radioactive implants','No','CT','MR']);
+  assert.deepEqual(E.displayBlocks('Radiotherapy Gamma Knife SRT/SBRT CT MR No','clinical_interests'),[{kind:'paragraph',text:'Radiotherapy Gamma Knife SRT/SBRT CT MR No'}]);
+});
+
+test('display formatting is deterministic, has no minimum text length and leaves canonical evidence untouched',()=>{
+  const evidence={text:'Interests:\n• CT\n• No',field:'about',blocks:[{kind:'paragraph',text:'A stale display projection'}]},before=structuredClone(evidence);
+  assert.deepEqual(E.displayBlocks(evidence.text,evidence.field),E.displayBlocks(evidence.text,evidence.field));assert.deepEqual(evidence,before);assert.deepEqual(E.displayBlocks(null,'about'),[]);assert.deepEqual(E.displayBlocks(' \n ','about'),[]);assert.deepEqual(E.displayBlocks('X','about'),[{kind:'paragraph',text:'X'}]);
+});
+
+test('Herbert-style procedure line breaks remain paragraphs rather than inferred procedure items or activity counts',()=>{
+  const source='Clinical supervision and planning for systemic anti-cancer therapy for 1–28 days\nClinical supervision and planning for systemic anti-cancer therapy for 1–56 days\nClinical supervision of stereotactic radiosurgery planning, e.g.\nSRT/SBRT and Gamma Knife\nStereotactic radiotherapy using Gamma Knife or similar technology';
+  const blocks=E.displayBlocks(source,'procedures');assert.ok(blocks.every(b=>b.kind==='paragraph'));assert.deepEqual(blocks.map(b=>b.text),source.split('\n'));assert.equal(blocks[2].text.endsWith('e.g.'),true);assert.equal(blocks[3].text,'SRT/SBRT and Gamma Knife');
+});
+
+test('Hyam-style malformed terminal joins stay visible rather than being silently repaired at a capital letter',()=>{
+  const source='His specialist expertise includes:* Tumours such as meningioma* Robot-assisted deep brain stimulation implants for Parkinson’s disease, tremor, facial pain and dystoniaMr.';
+  const blocks=E.displayBlocks(source,'about');assert.equal(blocks.length,3);assert.equal(blocks[2].kind,'list-item');assert.equal(blocks[2].text,'Robot-assisted deep brain stimulation implants for Parkinson’s disease, tremor, facial pain and dystoniaMr.');assert.equal(blocks.filter(b=>b.text==='Mr.').length,0);
+});

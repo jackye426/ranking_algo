@@ -15,7 +15,7 @@ async function main(){
   const health=await fetch(new URL('/api/expert/health',base),{signal:AbortSignal.timeout(15000)});
   if(!health.ok)throw Error('Expert index is not ready. No search requests made.');
   report.health=await health.json();fs.writeFileSync(file,JSON.stringify(report,null,2),{flag:'wx'});
-  for(const route of ['/expert-discovery','/expert-discovery/directory','/expert-discovery/project','/expert-assets/app.js','/expert-assets/projects.js','/expert-assets/evidence.js','/expert-assets/styles.css','/fonts/inter-variable.ttf','/brand/docmap-logo.jpg','/expert-assets/.env.local','/expert-assets/.cache/raw.json','/api/chat']){
+  for(const route of ['/expert-discovery','/expert-discovery/directory','/expert-discovery/project','/expert-assets/app.js','/expert-assets/projects.js','/expert-assets/evidence.js','/expert-assets/source-reader.js','/expert-assets/styles.css','/fonts/inter-variable.ttf','/brand/docmap-logo.jpg','/expert-assets/.env.local','/expert-assets/.cache/raw.json','/api/chat']){
     const response=await fetch(new URL(route,base),{signal:AbortSignal.timeout(15000)}),bytes=Buffer.from(await response.arrayBuffer());
     const local=route.startsWith('/expert-discovery')?'public/index.html':route.startsWith('/expert-assets/')&&!route.includes('/.')?'public/'+route.slice('/expert-assets/'.length):route.startsWith('/fonts/')||route.startsWith('/brand/')?'../public'+route:null;
     const asset={route,status:response.status,type:response.headers.get('content-type'),csp:!!response.headers.get('content-security-policy')};
