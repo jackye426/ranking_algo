@@ -317,7 +317,8 @@
     const block=node('div',lead?'relevance-lead':'relevance-detail'),type=E.typeLabel(scopedProofType(item)),label=item.related?'Related research':item.requirement?.label||item.match?.label||'Professional evidence';
     const heading=node('p','relevance-label');heading.append(node('span','',label),node('span','relevance-type',type));block.append(heading);
     const text=item.support.text,max=lead?210:155,excerpt=text.length>max?text.slice(0,max).replace(/\s+\S*$/,'')+'…':text;
-    const copy=node(item.support.kind==='reviewed-summary'?'p':'blockquote','relevance-copy'+(item.support.kind==='reviewed-summary'?' reviewed-source-summary':''),excerpt);copy.title=text;block.append(copy);
+    const reviewed=item.support.kind==='reviewed-summary';
+    const copy=node(reviewed?'p':'blockquote','relevance-copy'+(reviewed?' reviewed-source-summary':''),reviewed?excerpt:'“'+excerpt+'”');copy.title=text;block.append(copy);
     const meta=node('p','relevance-provenance'),date=item.support.sourceDate||item.evidence.dates?.sourceDate;
     if(item.support.kind==='reviewed-summary')meta.append(node('span','','Reviewed source summary'));
     if(item.match?.status==='potential')meta.append(node('span','','Partial evidence'));
