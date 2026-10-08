@@ -10,8 +10,10 @@ const {createExpertAI}=require('./ai.cjs');
 const {restoreBrief}=require('./resume.cjs');
 const {createExpertGeoService,filterCandidates,splitLocationInstruction}=require('./geo.cjs');
 const {buildProfile,profilePreview}=require('./profile.cjs');
-function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),generate=createExpertAI(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),geo=createExpertGeoService(),clock=Date.now,limits={},publicOrigin=process.env.PUBLIC_ORIGIN}={}){
+const {createDeviceInterpreter}=require('./device-context.cjs');
+function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),generate=createExpertAI(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),geo=createExpertGeoService(),taxonomy,clock=Date.now,limits={},publicOrigin=process.env.PUBLIC_ORIGIN}={}){
   const app=express(),sessions=new Map(),rates=new Map();
+  const interpretDevice=createDeviceInterpreter({interpret,taxonomy});
   const limit={sessions:60,retainedCandidateRows:30000,concurrentSearches:2,concurrentAI:2,searchesPerHour:120,aiPerHour:40,globalAI:300,globalInterpretations:500,...limits};
   let activeSearches=0,activeAI=0,global={at:clock(),ai:0,interpretations:0};
   const origins=new Set([publicOrigin,...String(process.env.PUBLIC_ORIGINS||'').split(',')].filter(Boolean).map(v=>new URL(v).origin));
@@ -67,7 +69,7 @@ function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_O
     const prep=prepare(req,res,'search');if(!prep)return;
     const body=req.body||{};
     const operations=['message','removeRequirementId','patch'].filter(key=>body[key]!==undefined);
-    if(!fields(body,['sessionId','resumeBrief','message','removeRequirementId','patch','documentedOnly','excludeContactedIds','locationFilter']) || operations.length>1 || (body.resumeBrief!==undefined&&body.sessionId!==undefined) || (body.sessionId!==undefined&&!identifier(body.sessionId)) || (body.message!==undefined&&(typeof body.message!=='string'||!body.message.trim()||body.message.length>4000)) || (body.removeRequirementId!==undefined&&!identifier(body.removeRequirementId)) || (body.patch!==undefined&&(!fields(body.patch,['requirementId','importance'])||!identifier(body.patch.requirementId)||!['focus','essential','preferred'].includes(body.patch.importance))) || (body.documentedOnly!==undefined&&typeof body.documentedOnly!=='boolean') || (body.locationFilter!==undefined&&body.locationFilter!==null&&(!fields(body.locationFilter,['query','radiusMiles'])||typeof body.locationFilter.query!=='string'||body.locationFilter.query.length>120||body.locationFilter.radiusMiles!==undefined&&![10,25,50].includes(body.locationFilter.radiusMiles))) || (!operations.length&&body.resumeBrief===undefined&&body.locationFilter===undefined)){return res.status(400).json({error:'Describe the expertise you need in up to 4,000 characters, update one search criterion or location, or resume a saved search.'});}
+    if(!fields(body,['sessionId','resumeBrief','message','removeRequirementId','patch','documentedOnly','excludeContactedIds','locationFilter','deviceCode']) || operations.length>1 || (body.resumeBrief!==undefined&&body.sessionId!==undefined) || (body.sessionId!==undefined&&!identifier(body.sessionId)) || (body.message!==undefined&&(typeof body.message!=='string'||!body.message.trim()||body.message.length>4000)) || (body.removeRequirementId!==undefined&&!identifier(body.removeRequirementId)) || (body.patch!==undefined&&(!fields(body.patch,['requirementId','importance'])||!identifier(body.patch.requirementId)||!['focus','essential','preferred'].includes(body.patch.importance))) || (body.documentedOnly!==undefined&&typeof body.documentedOnly!=='boolean') || (body.locationFilter!==undefined&&body.locationFilter!==null&&(!fields(body.locationFilter,['query','radiusMiles'])||typeof body.locationFilter.query!=='string'||body.locationFilter.query.length>120||body.locationFilter.radiusMiles!==undefined&&![10,25,50].includes(body.locationFilter.radiusMiles))) || (body.deviceCode!==undefined&&body.deviceCode!==null&&(typeof body.deviceCode!=='string'||!body.deviceCode.trim()||body.deviceCode.length>32)) || (!operations.length&&body.resumeBrief===undefined&&body.locationFilter===undefined&&body.deviceCode===undefined)){return res.status(400).json({error:'Describe the expertise you need in up to 4,000 characters, update one search criterion or location, or resume a saved search.'});}
     let resumed=null;try{if(body.resumeBrief!==undefined)resumed=restoreBrief(body.resumeBrief);}catch(error){return res.status(400).json({error:error.message});}
     if(body.sessionId&&!sessions.has(body.sessionId))return res.status(410).json({error:'This search expired. Start a new live search; saved projects are unchanged.'});
     if(!body.sessionId&&sessions.size>=limit.sessions)return res.status(503).json({error:'The preview is busy. Retry shortly.'});
@@ -83,7 +85,8 @@ function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_O
       const base=resumed?.brief||s.brief;
       const locationInstruction=splitLocationInstruction(body.message||''),inferred=locationInstruction.location;
       const locationOnly=inferred!==undefined&&!locationInstruction.clinicalMessage;
-      const parsed=(!operations.length||locationOnly)&&base?{brief:structuredClone(base),needsClarification:!sufficient(base),question:sufficient(base)?null:discoveryQuestion,notices:[],mode:locationOnly?'location-update':'saved-brief'}:await interpret({previous:base,message:locationInstruction.clinicalMessage,removeRequirementId:body.removeRequirementId,patch:body.patch});
+      const parsed=await interpretDevice({previous:base,message:locationInstruction.clinicalMessage,removeRequirementId:body.removeRequirementId,patch:body.patch,...(body.deviceCode!==undefined?{deviceCode:body.deviceCode}:{})});
+      if(parsed.deviceError){if(!body.sessionId)sessions.delete(id);return res.status(422).json(parsed.deviceError);}
       if(parsed.interpretationIncomplete)return res.status(422).json({error:parsed.unresolvedInstructions?.join(' ')||parsed.question||'Your instruction could not be applied. Please retry or edit it.',code:'interpretation-incomplete',retryable:true});
       const legacy=parsed.brief?.geography||base?.geography;
       const removingPlace=body.removeRequirementId&&base?.requirements?.some(r=>r.id===body.removeRequirementId&&r.kind==='geography');
@@ -94,7 +97,7 @@ function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_O
       for(const criterion of [...parsed.brief.requirements])if(criterion.kind==='geography')removeRequirement(parsed.brief,criterion.id);parsed.brief.geography=null;
       if((!operations.length&&body.locationFilter!==undefined)||locationOnly)parsed.brief.version++;
       if(body.locationFilter!==undefined&&inferred!==undefined&&JSON.stringify(inferred)!==JSON.stringify(body.locationFilter))parsed.notices.push('Using the location selected in the location field.');
-      if(resumed?.needsClarification&&!operations.length)parsed.needsClarification=true;
+      if(resumed?.needsClarification&&!operations.length&&body.deviceCode===undefined)parsed.needsClarification=true;
       if(parsed.needsClarification){s.brief=parsed.brief||s.brief;s.updated=clock();return res.json({sessionId:id,brief:s.brief,needsClarification:true,question:parsed.question,notices:parsed.notices||[],results:[],total:0});}
       const found=await engine.search(parsed.brief,{documentedOnly:body.documentedOnly===true});
       const excluded=new Set(body.excludeContactedIds||[]);

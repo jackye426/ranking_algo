@@ -206,6 +206,12 @@ function supportingSpan(requirement,passage,status,brief={requirements:[]}){
 function deviceAssessment(text){return /\b(?:medical[- ]device|notified body|technical documentation|clinical evaluation reports?|\bMDR\b)\b/i.test(text)&&/\b(?:assess(?:ed|es|ing)|evaluat(?:ed|es|ing)|review(?:ed|s|ing)|(?:clinical|regulatory)\s+(?:assessor|evaluator|reviewer))\b/i.test(text);}
 function directMatch(requirement,passage){
   const text=passage.text||'',label=requirement.label||requirement.text;
+  if(requirement.kind==='activity'&&label==='Implanted cardiac device monitoring'){
+    const pattern=CONCEPTS.find(([kind,name])=>kind==='activity'&&name===label)[2];
+    // Monitoring one condition cannot borrow an unrelated implant procedure
+    // from a second predicate in the same biography.
+    return activityClauses(text).flatMap(clause=>clause.split(/\band\s+(?=(?:(?:I|we|he|she|they)\s+)?(?:(?:also|currently)\s+)?(?:implant\w*|perform\w*|offer\w*|provid\w*|treat\w*|ha(?:s|ve)|(?:am|is|are)\s+interested)\b)/i)).some(clause=>pattern.test(clause));
+  }
   if(requirement.kind==='modality'&&label==='Medical imaging')return /\b(?:radiolog\w*|(?:medical|diagnostic|cardiac|cardiovascular|coronary|heart|non[- ]invasive|cross[- ]sectional) imag(?:ing|es?)|CT|CCTA|computed tomography|MRI|CMR|magnetic resonance|echocardiogra(?:ph|m)\w*|(?:stress|transoesophageal|transthoracic) echo|ultrasound|nuclear (?:medicine|imaging)|PET|SPECT|dermoscop\w*|mammograph\w*)\b/i.test(text.replace(/\bultrasound\s+phacoemulsification\b|\bhigh[- ]intensity focused ultrasound\b|\btherapeutic ultrasound\b|\bHIFU\b/gi,''));
   if(requirement.kind==='modality'&&label==='Cardiovascular imaging')return /\b(?:(?:cardiac|cardiovascular|heart|coronary)\s+(?:imag\w*|CT|MRI|magnetic resonance|computed tomography|nuclear|ultrasound)|CCTA|CMR|echocardiogra(?:ph|m)\w*|(?:stress|transoesophageal|transthoracic) echo|myocardial perfusion)\b/i.test(text)||!!CONCEPTS.find(([kind,name])=>kind==='modality'&&name==='Cardiac CT')?.[2].test(text);
   if(requirement.kind==='modality'&&label==='Ultrasound'){

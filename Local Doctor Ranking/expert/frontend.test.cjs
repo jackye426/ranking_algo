@@ -78,8 +78,8 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
   move('home',['home-form','resume-search','home-title','health-status']);move('home-form',['home-input','home-submit']);
   move('workspace',['brief-content','results-region','followup-form','composer-status','compare-tray','results-title','result-count','home-return','focused-view','directory-view','view-updated','toggle-brief']);
   move('brief-content',['requirements','brief-facts','documented-only','uncontacted-only','sidebar-project']);
-  const sidebar=new E();sidebar.className='brief-sidebar';$('workspace').append(sidebar);sidebar.append($('brief-slot'));$('brief-slot').append($('brief-content'));move('brief-content',['original-brief']);move('original-brief',['original-brief-text']);move('brief-dialog',['brief-close','brief-done','brief-dialog-content']);move('recovery-dialog',['recovery-form','recovery-close']);move('recovery-form',['recovery-input']);move('home',['home-recovery']);move('project-view',['project-recovery']);
-  move('results-region',['search-error','result-notices','clarification','candidate-list','load-more','ranking-note']);
+  const sidebar=new E();sidebar.className='brief-sidebar';$('workspace').append(sidebar);sidebar.append($('brief-slot'));$('brief-slot').append($('brief-content'));move('brief-content',['original-brief']);move('original-brief',['original-brief-text']);move('brief-dialog',['brief-close','brief-done','brief-dialog-content']);move('recovery-dialog',['recovery-form','recovery-close']);move('recovery-form',['recovery-title','recovery-help','recovery-input-label','recovery-input','recovery-submit']);move('home',['home-recovery']);move('project-view',['project-recovery']);
+  move('results-region',['results-title','result-count','search-error','result-notices','clarification','candidate-list','load-more','ranking-note']);
   move('results-region',['search-loading']);move('search-loading',['search-loading-phrase','search-loading-detail']);move('workspace',['composer-progress']);move('composer-progress',['composer-progress-phrase']);
   move('followup-form',['followup-input','followup-submit']);move('compare-tray',['compare-count','compare-clear','compare-open']);
   move('project-view',['project-title','project-subtitle','project-return','export-json','export-html','import-project','import-file','project-brief','project-candidates','project-notes','project-save-status','save-project-notes']);
@@ -130,6 +130,145 @@ const action=(host,label)=>host.querySelectorAll('button').find(b=>b.textContent
 const requestsFor=(h,path)=>h.requests.filter(r=>r.url==='/api/expert/'+path);
 const section=(host,label)=>host.querySelectorAll('details').find(d=>d.dataset.section===label);
 const background=(c=person(),version='corpus-test')=>({candidateId:c.id,corpusVersion:version,profileVersion:'expert-profile-v1',qualifications:[],about:[{...c.evidence[0],id:'bio-'+c.id,text:'Recorded training in brain-tumour radiotherapy.',type:'training'}],clinicalInterests:c.evidence,procedures:[],research:[],practiceLocations:c.locations.map(l=>({...l,address:l.address||'',provenance:{sourceRecordId:'source-'+c.id}})),profileUrls:[],registrations:[]});
+
+test('refinement completion preserves the current reading position after scrolling during the request',async t=>{
+  const h=await setup(t),people=['alpha','beta','gamma','delta'].map((id,i)=>person(id,i+1));await ready(h,'initial',people);h.enableLayout();
+  const region=h.$('results-region');region.scrollTop=100;const pending=h.refine('Research is helpful');region.scrollTop=550;h.draft('A newer unsent detail');const before=cards(h)[1].getBoundingClientRect().top;
+  pending.resolve(result('updated',people));await h.flush();
+  assert.equal(region.scrollTop,550);assert.equal(cards(h)[1].getBoundingClientRect().top,before);assert.equal(h.$('followup-input').value,'A newer unsent detail');assert.equal(h.document.activeElement,h.$('followup-input'));
+});
+
+const taxonomy=require('./emdn-taxonomy.cjs'),deviceNode=taxonomy.lookup('Z11030692'),taxonomyMetadata=taxonomy.getMetadata();
+const deviceMetadata={system:'EMDN',code:deviceNode.code,officialTerm:deviceNode.term,release:deviceNode.release,taxonomyVersion:deviceNode.taxonomyVersion,taxonomyDigest:taxonomyMetadata.workbookSha256,mappingVersion:taxonomyMetadata.mappingVersion,sourceUrl:taxonomyMetadata.sourceUrl,hierarchy:deviceNode.path.map(({code,term})=>({code,term}))};
+const actualDeviceInterpreter=()=>require('./device-context.cjs').createDeviceInterpreter({taxonomy,interpret:require('./brief.cjs').createBriefInterpreter({client:null})});
+const deviceScope=()=>({...structuredClone(deviceMetadata),interpretation:'Clinical expertise in cardiac CT, based on the stated coronary-disease application.',concepts:[{key:'cardiac-ct',requirementId:'ct',state:'active',sharedWithUser:false}],derivedRequirementIds:['ct']});
+const deviceDraft=()=>({...structuredClone(deviceMetadata),question:'What clinical task and patient group will this CT system be used for?'});
+const deviceFailure=()=>({code:'device-clarification',error:'The device category needs clinical context.',question:deviceDraft().question,deviceDraft:deviceDraft()});
+
+test('results heading shares the scrolling region while view controls and composer remain separate',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'public/index.html'),'utf8'),region=html.indexOf('id="results-region"'),heading=html.indexOf('class="results-heading"'),composer=html.indexOf('class="composer-wrap"');
+  assert(region<heading);assert(heading<html.indexOf('id="candidate-list"'));assert(html.indexOf('id="focused-view"')<region);assert(html.indexOf('id="home-return"')<region);assert(composer>html.indexOf('id="ranking-note"'));
+});
+
+test('official EMDN metadata and DocMap interpretation are visibly separate from candidate proof',async t=>{
+  const h=await setup(t);h.start('Z11030692 for coronary-disease assessment').resolve(result('device',[person()],{brief:{...brief,deviceContext:deviceScope()}}));await h.flush();
+  const context=h.$('result-notices').querySelector('.device-context');assert(context);assert.match(context.textContent,/Official EMDN category/);assert(context.textContent.includes(deviceMetadata.code+' · '+deviceMetadata.officialTerm));assert.match(context.textContent,/Taxonomy release: 2026/);assert.match(context.textContent,/DocMap search interpretation/);assert.match(context.textContent,/Clinical expertise in cardiac CT/);
+  assert.equal(context.querySelector('details').open,false);assert.equal(context.querySelector('ol').children.length,5);assert.equal(context.querySelector('a').href,deviceMetadata.sourceUrl);assert.match(h.$('requirements').textContent,/DocMap interpretation of EMDN Z11030692/);assert.doesNotMatch(cards(h)[0].textContent,/COMPUTED TOMOGRAPHS (CT) - MEDICAL DEVICE SOFTWARE/);assert.equal(requestsFor(h,'explain').length,0);
+});
+
+test('accepted device context keeps full classification and general qualifications in optional depth',async t=>{
+  const h=await setup(t);await ready(h,'compact-device',[person()],{brief:{...brief,deviceContext:deviceScope()}});
+  const block=h.$('result-notices').querySelector('.device-context'),details=block.querySelector('details'),interpretation=block.querySelector('.device-interpretation');
+  assert(block.classList.contains('device-context-accepted'));assert.equal(details.open,false);assert.equal(details.querySelector('.device-official-term').textContent,deviceMetadata.code+' · '+deviceMetadata.officialTerm);assert(details.contains(block.querySelector('.device-context-note')));assert(!details.contains(interpretation));assert(block.children.indexOf(interpretation)<block.children.indexOf(details));assert.match(cards(h)[0].textContent,/Current practice/);
+});
+
+test('only the exact duplicated device notice is removed from accepted results',async t=>{
+  const duplicate='The EMDN category guides related expertise discovery; it does not establish experience with this device.',other='Clinical reporting needs confirmation for these candidates.',h=await setup(t);
+  await ready(h,'device-notices',[person()],{brief:{...brief,deviceContext:deviceScope()},notices:[duplicate,other]});assert(!h.$('result-notices').textContent.includes(duplicate));assert(h.$('result-notices').textContent.includes(other));
+  h.refine('Remove EMDN context').resolve(result('plain-notices',[person()],{notices:[duplicate,other]}));await h.flush();assert(h.$('result-notices').textContent.includes(duplicate));assert(h.$('result-notices').textContent.includes(other));
+});
+
+test('a first device clarification leaves an empty composer ready for an answer and retains the editable request',async t=>{
+  const h=await setup(t);h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();
+  assert.equal(h.$('followup-input').value,'');assert.equal(h.$('composer-status').textContent,'Add the clinical application to continue.');const p=h.savedProjects.get(h.$('project-select').value);assert.equal(p.draft,'');assert.equal(p.failedSearch.payload.message,'Z11030692');assert(!p.failedSearch.restoredDraft);
+  const pending=h.$('search-error').querySelector('.device-context');assert(pending.classList.contains('device-context-pending'));assert(!pending.classList.contains('device-context-accepted'));assert.equal(pending.querySelector('.device-context-title').textContent,deviceMetadata.code+' · '+deviceMetadata.officialTerm);
+  action(h.$('search-error'),'Edit request').click();assert.equal(h.$('recovery-input').value,'Z11030692');assert.equal(h.$('followup-input').value,'');
+});
+
+test('removing accepted EMDN context sends an explicit clear and preserves location and unsent text',async t=>{
+  const h=await setup(t);await ready(h,'device',[person()],{brief:{...brief,deviceContext:deviceScope()}});h.draft('Keep this next detail');editLocation(h,'Cambridge');action(h.$('result-notices'),'Remove code').click();
+  const request=h.requests.at(-1);assert.equal(request.body.deviceCode,null);assert.equal(request.body.message,undefined);assert.equal(request.body.locationFilter,undefined);assert.equal(h.$('followup-input').value,'Keep this next detail');assert.equal(h.$('followup-location').value,'Cambridge');
+  request.resolve(result('without-device'));await h.flush();assert.equal(h.$('result-notices').querySelector('.device-context'),null);assert.equal(h.$('followup-input').value,'Keep this next detail');assert.equal(h.$('followup-location').value,'Cambridge');
+});
+
+test('device clarification preserves accepted cards and answers through a separate editable application',async t=>{
+  const h=await setup(t);await ready(h);const before=cards(h)[0],pending=h.refine('Z11030692');h.draft('Do not submit this newer draft');pending.resolve(deviceFailure(),422);await h.flush();
+  assert.equal(cards(h)[0],before);assert.equal(h.$('followup-input').value,'Do not submit this newer draft');assert.equal(h.$('composer-status').textContent,'Add the clinical application to continue.');assert.match(h.$('search-error').textContent,/What clinical task/);assert.match(h.$('search-error').textContent,/Official EMDN category/);assert.doesNotMatch(h.$('search-error').textContent,/No leads/);
+  action(h.$('search-error'),'Add clinical application').click();assert.equal(h.$('recovery-input').value,'');assert.equal(h.$('recovery-title').textContent,'Describe the clinical application');assert.match(h.$('recovery-help').textContent,/patient group/);h.$('recovery-input').value='Coronary-disease assessment in adults';h.$('recovery-form').requestSubmit();
+  const request=h.requests.at(-1);assert.equal(request.body.deviceCode,deviceMetadata.code);assert.equal(request.body.message,'Z11030692\nCoronary-disease assessment in adults');assert.deepEqual(request.body.resumeBrief,brief);assert.equal(request.body.deviceContext,undefined);assert.equal(request.body.deviceDraft,undefined);assert.equal(h.$('followup-input').value,'Do not submit this newer draft');
+  request.resolve(result('accepted',[person()],{brief:{...brief,deviceContext:deviceScope()}}));await h.flush();assert.equal(h.$('followup-input').value,'Do not submit this newer draft');assert.equal(h.$('search-error').textContent,'');assert.equal(h.savedProjects.get(h.$('project-select').value).failedSearch,null);
+});
+
+test('a follow-up answer carries only the pending exact code and its independently submitted location',async t=>{
+  const h=await setup(t);h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();assert.equal(cards(h).length,0);editLocation(h,'UK');const request=h.refine('Coronary-disease assessment in adults');
+  assert.equal(request.body.deviceCode,'Z11030692');assert.equal(request.body.message,'Z11030692\nCoronary-disease assessment in adults');assert.equal(request.body.locationFilter.query,'UK');assert.equal(request.body.deviceDraft,undefined);assert.equal(request.body.hierarchy,undefined);
+});
+
+test('a location-only update does not implicitly apply an unresolved device category',async t=>{
+  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();h.draft('');editLocation(h,'Oxford');h.$('followup-form').requestSubmit();assert.equal(h.requests.at(-1).body.locationFilter.query,'Oxford');assert.equal(h.requests.at(-1).body.deviceCode,undefined);
+});
+
+test('editing an unknown or conflicting code retains exact new text rather than silently adding prior metadata',async t=>{
+  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();action(h.$('search-error'),'Edit request').click();assert.equal(h.$('recovery-input').value,'Z11030692');h.$('recovery-input').value='V92 for evaluating primary-care diagnosis';h.$('recovery-form').requestSubmit();
+  assert.equal(h.requests.at(-1).body.message,'V92 for evaluating primary-care diagnosis');assert.equal(h.requests.at(-1).body.deviceCode,undefined);
+});
+
+test('dismissing pending EMDN context changes neither accepted search nor newer draft and needs no request',async t=>{
+  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();h.draft('A newer cardiology query');const count=h.requests.length,before=cards(h)[0];action(h.$('search-error'),'Dismiss code').click();await h.flush();
+  assert.equal(h.requests.length,count);assert.equal(cards(h)[0],before);assert.equal(h.$('followup-input').value,'A newer cardiology query');assert.equal(h.$('search-error').textContent,'');assert.equal(h.savedProjects.get(h.$('project-select').value).failedSearch,null);assert.deepEqual(h.savedProjects.get(h.$('project-select').value).activeBrief,brief);
+  h.refine('A newer cardiology query');assert.equal(h.requests.at(-1).body.deviceCode,undefined);
+});
+
+test('unknown and multiple code errors remain recoverable and do not claim an official category',async t=>{
+  for(const code of ['device-invalid','device-multiple','device-conflict']){
+    const h=await setup(t);await ready(h);h.refine('Unresolved EMDN request').resolve({code,error:'Choose one recognised EMDN code.'},422);await h.flush();assert.equal(cards(h).length,1);assert.equal(h.$('search-error').querySelector('.device-context'),null);assert.match(h.$('search-error').textContent,/Choose one recognised/);assert(action(h.$('search-error'),'Edit request'));assert.equal(h.$('followup-input').value,'Unresolved EMDN request');
+  }
+});
+
+test('device clarification survives reload without automatic lookup or loss of a newer draft',async t=>{
+  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();h.draft('New unsent detail');await h.flush();const p=h.savedProjects.get(h.$('project-select').value),reload=await setup(t,{initialProjects:[p],pathname:'/expert-discovery/project'});
+  assert.equal(reload.requests.length,0);assert.match(reload.$('project-recovery').textContent,/Z11030692/);action(reload.$('project-recovery'),'Add clinical application').click();reload.$('recovery-input').value='Coronary-disease assessment';reload.$('recovery-form').requestSubmit();assert.equal(reload.requests[0].body.deviceCode,'Z11030692');assert.equal(reload.$('followup-input').value,'New unsent detail');
+});
+
+test('device lookup completion in another view never takes over navigation or the newer draft',async t=>{
+  const h=await setup(t);await ready(h);const pending=h.refine('Z11030692 for coronary-disease assessment');h.draft('Newer draft');h.$('brand-home').click();pending.resolve(result('device',[person()],{brief:{...brief,deviceContext:deviceScope()}}));await h.flush();assert.equal(h.$('home').hidden,false);assert.equal(h.$('workspace').hidden,true);h.$('resume-search').click();assert.match(h.$('result-notices').textContent,/Official EMDN category/);assert.equal(h.$('followup-input').value,'Newer draft');assert.equal(h.requests.length,2);
+});
+
+test('a device clarification retains unresolved role, location and priorities without replaying successful history',async t=>{
+  const h=await setup(t);await ready(h);const unresolved='For EMDN Z11030692 find UK cardiologists; research experience is optional.';h.refine(unresolved).resolve(deviceFailure(),422);await h.flush();const request=h.refine('For coronary-disease assessment in adults');
+  assert.equal(request.body.message,unresolved+'\nFor coronary-disease assessment in adults');assert.doesNotMatch(request.body.message,/We need cardiac CT expertise/);assert.equal(request.body.deviceCode,'Z11030692');
+});
+
+test('an oversized clarification stays editable and never silently drops the unresolved request',async t=>{
+  const h=await setup(t);await ready(h);h.refine('Z11030692 '+('clinical context '.repeat(200))).resolve(deviceFailure(),422);await h.flush();const count=h.requests.length,answer='Additional application '.repeat(100);h.refine(answer);
+  assert.equal(h.requests.length,count);assert.equal(h.$('followup-input').value,answer);assert.match(h.$('toast').textContent,/Use Edit request/);assert.match(h.$('search-error').textContent,/Official EMDN category/);
+});
+
+for(const message of ['J010792','Use EMDN J010792 instead','Remove the EMDN code'])test('a real pending CT question cannot be glued to an explicit device change: '+message,async t=>{
+  const interpret=actualDeviceInterpreter(),accepted=await interpret({message:'Dermatologists for Z12040118'}),h=await setup(t);await ready(h,'accepted',[person()],{brief:accepted.brief});
+  const unresolved=await interpret({previous:accepted.brief,message:'EMDN Z11030692'});assert.equal(unresolved.deviceError.code,'device-clarification');h.refine('EMDN Z11030692').resolve(unresolved.deviceError,422);await h.flush();
+  const request=h.refine(message),parsed=await interpret({...request.body,previous:accepted.brief});assert.equal(parsed.deviceError,undefined);assert.equal(request.body.message,message);assert.equal(request.body.deviceCode,undefined);
+  assert.equal(parsed.brief.deviceContext?.code,message.startsWith('Remove')?undefined:'J010792');
+});
+
+test('editing a repeated real clarification can replace its previous explicit code',async t=>{
+  const interpret=actualDeviceInterpreter(),h=await setup(t),unresolved=await interpret({message:'EMDN Z11030692'});h.start('EMDN Z11030692').resolve(unresolved.deviceError,422);await h.flush();
+  const answer=h.refine('Primary care'),again=await interpret(answer.body);assert.equal(again.deviceError.code,'device-clarification');answer.resolve(again.deviceError,422);await h.flush();
+  action(h.$('search-error'),'Edit request').click();h.$('recovery-input').value='J010792';h.$('recovery-form').requestSubmit();const retry=h.requests.at(-1),parsed=await interpret(retry.body);assert.equal(parsed.deviceError,undefined);assert.equal(parsed.brief.deviceContext.code,'J010792');assert.equal(retry.body.deviceCode,undefined);
+});
+
+test('clinical alphanumeric detail is an application answer, not an unrequested replacement code',async t=>{
+  const interpret=actualDeviceInterpreter(),h=await setup(t),unresolved=await interpret({message:'EMDN Z11030692'});h.start('EMDN Z11030692').resolve(unresolved.deviceError,422);await h.flush();
+  const request=h.refine('Lung cancer imaging in patients with a T790M mutation'),parsed=await interpret(request.body);assert.equal(request.body.deviceCode,'Z11030692');assert.equal(parsed.deviceError,undefined);assert.equal(parsed.brief.deviceContext.code,'Z11030692');assert(!parsed.brief.requirements.some(r=>r.label==='Cardiac CT'));
+});
+
+test('actual taxonomy clarification reloads through project validation and accepts its real interpretation',async t=>{
+  const interpret=actualDeviceInterpreter(),h=await setup(t),question=await interpret({message:'For EMDN Z11030692 find UK cardiologists; research is optional.'});h.start('For EMDN Z11030692 find UK cardiologists; research is optional.').resolve(question.deviceError,422);await h.flush();h.draft('Preserve this separate draft');await h.flush();
+  const saved=h.savedProjects.get(h.$('project-select').value),roundtrip=P.importJSON(P.exportJSON(saved));assert.deepEqual(roundtrip.failedSearch.deviceDraft,question.deviceError.deviceDraft);const reload=await setup(t,{initialProjects:[roundtrip],pathname:'/expert-discovery/project'});assert.equal(reload.requests.length,0);
+  action(reload.$('project-recovery'),'Add clinical application').click();reload.$('recovery-input').value='It supports coronary artery disease diagnosis.';reload.$('recovery-form').requestSubmit();const request=reload.requests.at(-1),accepted=await interpret(request.body);assert.equal(accepted.deviceError,undefined);assert.equal(accepted.brief.deviceContext.code,'Z11030692');request.resolve(result('real-device',[person()],{brief:accepted.brief}));await reload.flush();
+  const next=reload.savedProjects.get(reload.$('project-select').value);assert.deepEqual(P.validateProject(next).activeBrief.deviceContext,accepted.brief.deviceContext);assert.equal(next.failedSearch,null);assert.equal(next.draft,'Preserve this separate draft');assert.match(reload.$('result-notices').textContent,/COMPUTED TOMOGRAPHS/);
+});
+
+test('a clarification answer keeps explicit location control authoritative over preserved pending text',async t=>{
+  const interpret=actualDeviceInterpreter(),h=await setup(t),question=await interpret({message:'EMDN Z11030692 in the UK'});h.start('EMDN Z11030692 in the UK').resolve(question.deviceError,422);await h.flush();editLocation(h,'Cambridge');const request=h.refine('Lung cancer imaging');
+  assert.match(request.body.message,/in the UK/);assert.equal(request.body.locationFilter.query,'Cambridge');assert.equal(request.body.deviceCode,'Z11030692');editLocation(h,'Brighton');const accepted=await interpret(request.body);request.resolve(result('geo-device',[person()],{brief:{...accepted.brief,locationFilter:{kind:'country',country:'GB',query:'UK',label:'UK-wide'}}}));await h.flush();assert.equal(h.$('followup-location').value,'Brighton');
+});
+
+test('long official terms and hierarchy remain intact as text with optional metadata depth',async t=>{
+  const h=await setup(t),scope=deviceScope();scope.officialTerm='DEVICE CATEGORY '.repeat(22).trim();scope.hierarchy.at(-1).term=scope.officialTerm;await ready(h,'long-device',[person()],{brief:{...brief,deviceContext:scope}});
+  const block=h.$('result-notices').querySelector('.device-context');assert(block.querySelector('.device-context-title').textContent.endsWith(scope.officialTerm));assert.equal(block.querySelector('details').open,false);assert(block.querySelector('ol').textContent.includes(scope.officialTerm));
+  const css=fs.readFileSync(path.join(__dirname,'public/styles.css'),'utf8');assert.match(css,/\.device-context\{[^}]*overflow-wrap:anywhere/);assert.match(css,/\.device-context-heading>div\{min-width:0\}/);
+});
 
 test('simple discovery presents relevance and optional research without inventing mandatory gaps',async t=>{
   const h=await setup(t),c=person(),b={...brief,requirements:[{id:'ct',kind:'modality',label:'Cardiac CT',text:'Cardiac CT',importance:'focus',matchIntent:'interest'}]};

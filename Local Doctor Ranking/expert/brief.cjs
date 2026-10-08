@@ -8,13 +8,14 @@ const idFor=(kind,text)=>'r-'+createHash('sha256').update(kind+':'+clean(text).t
 // diagnosis, device class, accreditation, or a clinician's competence.
 const CONCEPTS=[
   ['modality','Cardiac CT',/\b(?:cardiac\s+(?:CT|computed tomography)|cardiac\s*\/\s*coronary\s+CT|coronary\s+(?:CT|CTA|computed tomography)|CT\s+coronary\s+angiogra\w*|CCTA|CTCA)\b/i],
-  ['modality','CT imaging',/\b(?:CT scans?|computed tomography)\b/i],
+  ['modality','CT imaging',/\b(?:CT(?:\s+scans?)?|computed tomography)\b/i],
   ['modality','MRI',/\b(?:MRI|magnetic resonance imaging)\b/i],
   ['modality','Ultrasound',/\b(?:ultrasound|echocardiograph\w*)\b/i],
   ['modality','Skin-lesion imaging',/\b(?:skin[- ]lesion imag(?:es?|ing)|derm(?:o|ato)scop\w*|skin imaging|images? of skin lesions?)\b/i],
   ['modality','Cardiovascular imaging',/\b(?:cardiac|cardiovascular|heart)[- ]imaging\b/i],
   ['modality','Medical imaging',/\b(?:radiology|radiological imaging|(?:medical|diagnostic)[- ]imaging|imaging)\b/i],
   ['activity','Image interpretation',/\b(?:(?:interpret(?:s|ing)?|report(?:s|ing)?|read(?:s|ing)?)\s+(?:adult\s+)?(?:cardiac\s*\/\s*coronary|cardiac|coronary|CT|MRI|medical)\s*(?:CT|scans?|images?)?|(?:clinical|cardiac CT|coronary CT|CT|MRI)\s+reporting)\b/i],
+  ['activity','Implanted cardiac device monitoring',/\b(?:remote\s+(?:monitoring|follow[- ]up)[^.;\n]{0,90}(?:implantable\s+cardiac|implanted\s+cardiac|pacemakers?|ICDs?)|(?:implantable\s+cardiac|implanted\s+cardiac|pacemakers?|ICDs?)[^.;\n]{0,90}(?:remote\s+monitoring|remote\s+follow[- ]up))\b/i],
   ['condition','Coronary artery disease',/\b(?:coronary\s+(?:(?:artery|heart)\s+)?disease|ischaemic heart disease)\b/i],
   ['condition','Skin lesions',/\b(?:skin[- ]lesions?|melanoma|skin cancer)\b/i],
   ['condition','Diabetes',/\bdiabetes\b/i],
