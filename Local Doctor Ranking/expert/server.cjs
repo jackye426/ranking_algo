@@ -5,10 +5,12 @@ require('dotenv').config({path:path.join(__dirname,'.env.local'),quiet:true,over
 const express=require('express');
 const {randomUUID}=require('node:crypto');
 const {performance}=require('node:perf_hooks');
-const {createBriefInterpreter}=require('./brief.cjs');
+const {createBriefInterpreter,sufficient,discoveryQuestion,removeRequirement}=require('./brief.cjs');
 const {createExpertAI}=require('./ai.cjs');
 const {restoreBrief}=require('./resume.cjs');
-function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),generate=createExpertAI(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),clock=Date.now,limits={},publicOrigin=process.env.PUBLIC_ORIGIN}={}){
+const {createExpertGeoService,filterCandidates,splitLocationInstruction}=require('./geo.cjs');
+const {buildProfile,profilePreview}=require('./profile.cjs');
+function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),generate=createExpertAI(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),geo=createExpertGeoService(),clock=Date.now,limits={},publicOrigin=process.env.PUBLIC_ORIGIN}={}){
   const app=express(),sessions=new Map(),rates=new Map();
   const limit={sessions:60,retainedCandidateRows:30000,concurrentSearches:2,concurrentAI:2,searchesPerHour:120,aiPerHour:40,globalAI:300,globalInterpretations:500,...limits};
   let activeSearches=0,activeAI=0,global={at:clock(),ai:0,interpretations:0};
@@ -33,12 +35,39 @@ function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_O
   const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
   const fields=(body,allowed)=>object(body)&&Object.keys(body).every(k=>allowed.includes(k));
   const current=(body,res)=>{const s=sessions.get(body.sessionId),snap=s?.snapshots.get(body.searchId);if(!snap){res.status(410).json({error:'This live search expired. Saved projects remain available; run the brief again to refresh results.'});return null;}s.updated=clock();return{s,snap};};
-  const page=(snap,offset)=>{const results=snap.results.slice(offset,offset+6);let nextCursor=null;if(offset+results.length<snap.results.length){nextCursor=randomUUID();snap.cursors.set(nextCursor,offset+results.length);}return{results,total:snap.results.length,nextCursor};};
+  const profiles=new Map();let profileCorpus=null;
+  function fullProfile(candidate,version){
+    if(!engine.corpus||version!==engine.corpus.version)return null;
+    if(profileCorpus!==version){profiles.clear();profileCorpus=version;}
+    if(!profiles.has(candidate.id)){
+      const owner=engine.corpus.candidates.find(c=>c.id===candidate.id&&!c.needsIdentityReview);
+      if(!owner)return null;
+      profiles.set(candidate.id,buildProfile(owner,engine.byCandidate?.get(candidate.id)||engine.corpus.passages,{corpusVersion:version}));
+      if(profiles.size>100)profiles.delete(profiles.keys().next().value);
+    }
+    return profiles.get(candidate.id);
+  }
+  const decorate=(candidate,snap)=>{const profile=fullProfile(candidate,snap.corpusVersion);return {...candidate,backgroundPreview:profile?profilePreview(profile,{query:snap.brief.summary}):[]};};
+  const page=(snap,offset)=>{const results=snap.results.slice(offset,offset+6).map(c=>decorate(c,snap));let nextCursor=null;if(offset+results.length<snap.results.length){nextCursor=randomUUID();snap.cursors.set(nextCursor,offset+results.length);}return{results,total:snap.results.length,nextCursor};};
+  app.post('/api/expert/location',async(req,res)=>{
+    if(!prepare(req,res,'search'))return;
+    if(!fields(req.body,['query','radiusMiles'])||typeof req.body.query!=='string'||req.body.query.length>120)return res.status(400).json({error:'Enter a UK city, town or postcode.'});
+    res.json(await geo.resolveLocation(req.body));
+  });
+  app.post('/api/expert/profile',(req,res)=>{
+    if(!prepare(req,res,'search'))return;const body=req.body||{};
+    if(!fields(body,['sessionId','searchId','candidateId','corpusVersion']))return res.status(400).json({error:'Invalid profile request.'});
+    const state=current(body,res);if(!state)return;
+    if(body.corpusVersion!==state.snap.corpusVersion)return res.status(409).json({error:'The requested profile and search use different evidence versions.'});
+    const candidate=state.snap.results.find(c=>c.id===body.candidateId);if(!candidate)return res.status(404).json({error:'This candidate is not in this search.'});
+    const profile=fullProfile(candidate,state.snap.corpusVersion);if(!profile)return res.status(410).json({error:'This profile version is no longer available. Run the search again; saved evidence is unchanged.'});
+    res.json(profile);
+  });
   app.post('/api/expert/search',async(req,res)=>{
     const prep=prepare(req,res,'search');if(!prep)return;
     const body=req.body||{};
     const operations=['message','removeRequirementId','patch'].filter(key=>body[key]!==undefined);
-    if(!fields(body,['sessionId','resumeBrief','message','removeRequirementId','patch','documentedOnly','excludeContactedIds']) || operations.length>1 || (body.resumeBrief!==undefined&&body.sessionId!==undefined) || (body.sessionId!==undefined&&!identifier(body.sessionId)) || (body.message!==undefined&&(typeof body.message!=='string'||!body.message.trim()||body.message.length>4000)) || (body.removeRequirementId!==undefined&&!identifier(body.removeRequirementId)) || (body.patch!==undefined&&(!fields(body.patch,['requirementId','importance'])||!identifier(body.patch.requirementId)||!['focus','essential','preferred'].includes(body.patch.importance))) || (body.documentedOnly!==undefined&&typeof body.documentedOnly!=='boolean') || (!operations.length&&body.resumeBrief===undefined)){return res.status(400).json({error:'Describe the expertise you need in up to 4,000 characters, update one search criterion, or resume a saved search.'});}
+    if(!fields(body,['sessionId','resumeBrief','message','removeRequirementId','patch','documentedOnly','excludeContactedIds','locationFilter']) || operations.length>1 || (body.resumeBrief!==undefined&&body.sessionId!==undefined) || (body.sessionId!==undefined&&!identifier(body.sessionId)) || (body.message!==undefined&&(typeof body.message!=='string'||!body.message.trim()||body.message.length>4000)) || (body.removeRequirementId!==undefined&&!identifier(body.removeRequirementId)) || (body.patch!==undefined&&(!fields(body.patch,['requirementId','importance'])||!identifier(body.patch.requirementId)||!['focus','essential','preferred'].includes(body.patch.importance))) || (body.documentedOnly!==undefined&&typeof body.documentedOnly!=='boolean') || (body.locationFilter!==undefined&&body.locationFilter!==null&&(!fields(body.locationFilter,['query','radiusMiles'])||typeof body.locationFilter.query!=='string'||body.locationFilter.query.length>120||body.locationFilter.radiusMiles!==undefined&&![10,25,50].includes(body.locationFilter.radiusMiles))) || (!operations.length&&body.resumeBrief===undefined&&body.locationFilter===undefined)){return res.status(400).json({error:'Describe the expertise you need in up to 4,000 characters, update one search criterion or location, or resume a saved search.'});}
     let resumed=null;try{if(body.resumeBrief!==undefined)resumed=restoreBrief(body.resumeBrief);}catch(error){return res.status(400).json({error:error.message});}
     if(body.sessionId&&!sessions.has(body.sessionId))return res.status(410).json({error:'This search expired. Start a new live search; saved projects are unchanged.'});
     if(!body.sessionId&&sessions.size>=limit.sessions)return res.status(503).json({error:'The preview is busy. Retry shortly.'});
@@ -51,15 +80,30 @@ function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_O
     try{
       if(operations.length)s.interpretations++;
       if(body.message)global.interpretations++;
-      const parsed=resumed&&!operations.length?resumed:await interpret({previous:resumed?.brief||s.brief,message:body.message||'',removeRequirementId:body.removeRequirementId,patch:body.patch});
+      const base=resumed?.brief||s.brief;
+      const locationInstruction=splitLocationInstruction(body.message||''),inferred=locationInstruction.location;
+      const locationOnly=inferred!==undefined&&!locationInstruction.clinicalMessage;
+      const parsed=(!operations.length||locationOnly)&&base?{brief:structuredClone(base),needsClarification:!sufficient(base),question:sufficient(base)?null:discoveryQuestion,notices:[],mode:locationOnly?'location-update':'saved-brief'}:await interpret({previous:base,message:locationInstruction.clinicalMessage,removeRequirementId:body.removeRequirementId,patch:body.patch});
+      if(parsed.interpretationIncomplete)return res.status(422).json({error:parsed.unresolvedInstructions?.join(' ')||parsed.question||'Your instruction could not be applied. Please retry or edit it.',code:'interpretation-incomplete',retryable:true});
+      const legacy=parsed.brief?.geography||base?.geography;
+      const removingPlace=body.removeRequirementId&&base?.requirements?.some(r=>r.id===body.removeRequirementId&&r.kind==='geography');
+      const requested=body.locationFilter!==undefined?body.locationFilter:removingPlace?null:inferred!==undefined?inferred:base?.locationFilter!==undefined?(base.locationFilter?{query:base.locationFilter.query,radiusMiles:base.locationFilter.radiusMiles}:null):legacy?{query:legacy}:null;
+      const resolved=await geo.resolveLocation(requested);
+      if(resolved.status!=='resolved')return res.status(422).json({error:resolved.message,code:'location-'+resolved.status,location:resolved,retryable:true});
+      parsed.brief.locationFilter=resolved.location;
+      for(const criterion of [...parsed.brief.requirements])if(criterion.kind==='geography')removeRequirement(parsed.brief,criterion.id);parsed.brief.geography=null;
+      if((!operations.length&&body.locationFilter!==undefined)||locationOnly)parsed.brief.version++;
+      if(body.locationFilter!==undefined&&inferred!==undefined&&JSON.stringify(inferred)!==JSON.stringify(body.locationFilter))parsed.notices.push('Using the location selected in the location field.');
+      if(resumed?.needsClarification&&!operations.length)parsed.needsClarification=true;
       if(parsed.needsClarification){s.brief=parsed.brief||s.brief;s.updated=clock();return res.json({sessionId:id,brief:s.brief,needsClarification:true,question:parsed.question,notices:parsed.notices||[],results:[],total:0});}
       const found=await engine.search(parsed.brief,{documentedOnly:body.documentedOnly===true});
       const excluded=new Set(body.excludeContactedIds||[]);
-      const snap={brief:structuredClone(parsed.brief),corpusVersion:found.corpusVersion,results:found.results.filter(c=>!excluded.has(c.id)),cursors:new Map(),pages:new Map(),cache:new Map(),pending:new Map(),attempts:new Map()};
+      const geographic=filterCandidates(found.results,parsed.brief.locationFilter);
+      const snap={brief:structuredClone(parsed.brief),corpusVersion:found.corpusVersion,locationStats:geographic.stats,results:geographic.results.filter(c=>!excluded.has(c.id)),cursors:new Map(),pages:new Map(),cache:new Map(),pending:new Map(),attempts:new Map()};
       const searchId=randomUUID();s.snapshots.set(searchId,snap);while(s.snapshots.size>10)s.snapshots.delete(s.snapshots.keys().next().value);
       const retained=[...sessions.values()].flatMap(session=>[...session.snapshots].map(([id,snapshot])=>({session,id,snapshot})));let retainedRows=retained.reduce((n,item)=>n+item.snapshot.results.length,0);for(const item of retained){if(retainedRows<=limit.retainedCandidateRows)break;if(item.id!==searchId){item.session.snapshots.delete(item.id);retainedRows-=item.snapshot.results.length;}}
       s.brief=parsed.brief;s.updated=clock();
-      res.set('Server-Timing',`search;dur=${(performance.now()-start).toFixed(1)}`).json({sessionId:id,searchId,brief:snap.brief,corpusVersion:snap.corpusVersion,...page(snap,0),notices:parsed.notices||[],needsClarification:false,scope:engine.publicCounts||{},interpretationMode:parsed.mode});
+      res.set('Server-Timing',`search;dur=${(performance.now()-start).toFixed(1)}`).json({sessionId:id,searchId,brief:snap.brief,corpusVersion:snap.corpusVersion,...page(snap,0),locationStats:snap.locationStats,notices:parsed.notices||[],needsClarification:false,scope:engine.publicCounts||{},interpretationMode:parsed.mode});
     }catch(e){console.error('[expert] search failed',e.name);res.status(500).json({error:'Search could not complete. Your previous results and saved project are unchanged.'});}
     finally{s.busy=false;activeSearches--;}
   });
@@ -108,9 +152,9 @@ async function start(){
   const {loadRows,cacheDir}=require('./reader.cjs'),{buildCorpus}=require('./data.cjs'),{ExpertSearchEngine}=require('./search.cjs');
   let lastProgress=0;const engine=new ExpertSearchEngine({cacheDir:cacheDir(),onProgress:value=>{engine.status=typeof value==='string'?value:JSON.stringify(value);if(Date.now()-lastProgress>15000||engine.status==='Ready'){console.log('[expert]',engine.status);lastProgress=Date.now();}}});
   engine.ready=false;engine.status='Loading professional evidence';
-  const app=createApp(engine);const port=Number(process.env.PORT||3100),host=process.env.HOST||'127.0.0.1';
+  const geo=createExpertGeoService({cacheFile:path.join(cacheDir(),'geocodes-v1.json')});const app=createApp(engine,{geo});const port=Number(process.env.PORT||3100),host=process.env.HOST||'127.0.0.1';
   const server=app.listen(port,host,()=>console.log(`Expert Discovery listening on ${host}:${port}`));
-  try{const raw=await loadRows({onProgress:({rows})=>{engine.status=`Reading professional records: ${rows}`;}});const enrichmentModule=require('./enrichments.cjs');const enrichments=Array.isArray(enrichmentModule)?enrichmentModule:enrichmentModule.enrichments||[];const identityReviews=require('./identity-reviews.cjs');const corpus=buildCorpus(raw.rows,{enrichments,identityReviews});engine.corpus=corpus;engine.publicCounts={sourceRows:raw.rows.length,identityGroups:corpus.candidates.length,identitySupportedCandidates:corpus.candidates.filter(c=>!c.needsIdentityReview).length,heldForIdentityReview:corpus.audit.heldForIdentityReview,indexedCandidates:corpus.audit.searchableCandidates,indexedPassages:corpus.passages.length,sourceCheckedCandidates:new Set(corpus.passages.filter(p=>p.attribution==='verified-source').map(p=>p.candidateId)).size};raw.rows=null;await engine.init(corpus);engine.ready=true;engine.status='Ready';console.log('[expert] Ready',JSON.stringify(engine.publicCounts));}
+  try{const raw=await loadRows({onProgress:({rows})=>{engine.status=`Reading professional records: ${rows}`;}});const enrichmentModule=require('./enrichments.cjs');const enrichments=Array.isArray(enrichmentModule)?enrichmentModule:enrichmentModule.enrichments||[];const identityReviews=require('./identity-reviews.cjs');const corpus=buildCorpus(raw.rows,{enrichments,identityReviews});engine.corpus=corpus;engine.publicCounts={sourceRows:raw.rows.length,identityGroups:corpus.candidates.length,identitySupportedCandidates:corpus.candidates.filter(c=>!c.needsIdentityReview).length,heldForIdentityReview:corpus.audit.heldForIdentityReview,indexedCandidates:corpus.audit.searchableCandidates,indexedPassages:corpus.passages.length,sourceCheckedCandidates:new Set(corpus.passages.filter(p=>p.attribution==='verified-source').map(p=>p.candidateId)).size};raw.rows=null;engine.status='Preparing recorded practice locations';engine.publicCounts.geographicCoverage=await geo.prepareLocations(corpus.candidates.filter(c=>!c.needsIdentityReview));await engine.init(corpus);engine.ready=true;engine.status='Ready';console.log('[expert] Ready',JSON.stringify(engine.publicCounts));}
   catch(e){engine.ready=false;engine.failure=true;engine.status='Expert evidence could not be prepared';console.error('[expert] startup failed',e.message);}
   return{app,engine,server};
 }

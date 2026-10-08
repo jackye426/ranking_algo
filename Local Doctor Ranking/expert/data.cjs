@@ -384,12 +384,17 @@ function rowEvidence(row) {
 }
 function cleanLocations(row) {
   const locationValue=value=>{const text=normalizeText(value);return /^(?:none|null|undefined|unknown|not (?:available|known)|n\/?a|-)$/i.test(text)?'':text;};
-  return asArray(row.locations).filter(x=>x&&typeof x==='object').map(item=>({
+  const numeric=value=>typeof value==='number'?value:typeof value==='string'&&/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim())?Number(value):NaN;
+  return asArray(row.locations).filter(x=>x&&typeof x==='object').map(item=>{
+    const latitude=numeric(item.latitude??item.lat),longitude=numeric(item.longitude??item.lng??item.lon);
+    const coordinates=Number.isFinite(latitude)&&Math.abs(latitude)<=90&&Number.isFinite(longitude)&&Math.abs(longitude)<=180;
+    return {
     name:locationValue(item.hospital||item.name||item.organisation||item.organization),address:locationValue(item.address||item.street),
     city:locationValue(item.city),region:locationValue(item.region),postcode:locationValue(item.postcode),country:locationValue(item.country)||null,
     sourceUrl:safeUrl(item.website||item.sourceUrl),source:normalizeText(item.source)||null,sourceRecordId:String(row.id),field:'locations',
     provenance:sourceFor(row,'locations',item),
-  })).filter(x=>x.name||x.address);
+    ...(coordinates?{latitude,longitude,coordinateSource:safeUrl(item.coordinateSource)||safeUrl(item.sourceUrl||item.website)||'source-record',coordinatePrecision:locationValue(item.coordinatePrecision)||'recorded coordinates',coordinateProvenance:{kind:'source-record',sourceRecordId:String(row.id),field:'locations',sourceUrl:safeUrl(item.coordinateSource||item.sourceUrl||item.website)}}:{}),
+  };}).filter(x=>x.name||x.address||x.postcode||x.city);
 }
 function buildCorpus(input,{enrichments=[],identityReviews=[]}={}) {
   const rows=Array.isArray(input)?input:input?.rows;
@@ -457,7 +462,7 @@ function buildCorpus(input,{enrichments=[],identityReviews=[]}={}) {
     const registry=regs.find(x=>x.body==='GMC')||regs[0]; const namedProfile=group.flatMap(x=>x.identities).find(x=>x.named);
     let id=registry?`expert-${registry.body.toLowerCase()}-${registry.identifier}`:namedProfile?`expert-profile-${hash(namedProfile.url)}`:`expert-record-${hash(group[0].row.id)}`;
     if(candidateById.has(id)) id+=`-${hash(group.map(x=>x.row.id).join('|'))}`;
-    const locations=[...new Map(group.flatMap(x=>cleanLocations(x.row)).map(x=>[`${x.name}|${x.postcode}|${x.address}`,x])).values()];
+    const locationMap=new Map();for(const location of group.flatMap(x=>cleanLocations(x.row))){const key=`${location.name}|${location.postcode}|${location.address}`,prior=locationMap.get(key);locationMap.set(key,prior&&Number.isFinite(prior.latitude)&&!Number.isFinite(location.latitude)?prior:location);}const locations=[...locationMap.values()];
     const candidate={id,name:normalizeText(group[0].row.name),role:unique(group.map(x=>normalizeText(x.row.professional_role||x.row.role||x.row.specialty))).join(' / '),
       specialty:unique(group.map(x=>normalizeText(x.row.specialty))).join(' / '),registrations:regs,organisations:unique(locations.map(x=>x.name)),locations,
       sourceRecordIds:group.map(x=>String(x.row.id)),profileUrls:unique(group.flatMap(x=>x.profileUrls)),evidenceIds:[],needsIdentityReview,identityIssues:issues};

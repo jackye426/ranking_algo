@@ -23,6 +23,8 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
     dispatchEvent(event){return !this.emit(event.type,event).defaultPrevented;}});
   class E {
     constructor(tag='div'){events(this);this.tagName=tag.toUpperCase();this.children=[];this.parentNode=null;this.attributes={};this.style=new Proxy({setProperty(k,v){this[k]=v;},removeProperty(k){delete this[k];}},{set:(target,key,value)=>{styleWrites.push({node:this,key,value});target[key]=value;return true;}});this.dataset={};this._text='';this.className='';this.hidden=false;this.disabled=false;this.value='';this._scrollHeight=34;this._scrollTop=0;this.clientHeight=400;this.clientWidth=600;this.open=false;}
+    get id(){return this.attributes.id||'';}
+    set id(value){if(this.id&&ids.get(this.id)===this)ids.delete(this.id);this.attributes.id=String(value);if(this.attributes.id)ids.set(this.attributes.id,this);}
     get scrollHeight(){if(layoutEnabled&&this.id==='results-region'){const cards=this.querySelectorAll('.candidate-card').filter(node=>!node.closest('[hidden]'));return Math.max(this.clientHeight,...cards.map((card,index)=>card._contentTop??100+index*300).map(top=>top+360));}return this._scrollHeight;}
     set scrollHeight(value){this._scrollHeight=value;}
     get scrollTop(){return this._scrollTop;}
@@ -35,6 +37,7 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
     removeAttribute(key){delete this.attributes[key];if(key==='hidden')this.hidden=false;}
     append(...children){for(let child of children){if(typeof child==='string'){const text=new E('#text');text.textContent=child;child=text;}if(child.tagName==='FRAGMENT'){this.append(...[...child.children]);continue;}child.remove();child.parentNode=this;this.children.push(child);}}
     prepend(...children){for(const child of children.reverse()){child.remove();child.parentNode=this;this.children.unshift(child);}}
+    insertBefore(child,reference){if(reference===null){this.append(child);return child;}assert.ok(this.children.includes(reference),'insertBefore reference must belong to parent');child.remove();child.parentNode=this;this.children.splice(this.children.indexOf(reference),0,child);return child;}
     replaceChildren(...children){this.children.forEach(child=>child.parentNode=null);this.children=[];this._text='';this.append(...children);}
     remove(){if(this.parentNode){this.parentNode.children=this.parentNode.children.filter(child=>child!==this);this.parentNode=null;}}
     click(){if(!this.disabled){if(this.download)downloads.push({name:this.download,url:this.href});this.focus();const event=this.emit('click');if(!event.cancelBubble)document.emit('click',event);}}
@@ -100,7 +103,7 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
   const requests=[];
   const fetch=(url,options)=>{
     if(url==='/api/expert/health')return Promise.resolve({ok:true,json:async()=>({ready:true,corpusVersion:healthCorpusVersion,counts:{candidates:23000}})});
-    assert.ok(['/api/expert/search','/api/expert/explain','/api/expert/page','/api/expert/shortlist-view'].includes(url),'Unexpected offline transport request: '+url);
+    assert.ok(['/api/expert/search','/api/expert/explain','/api/expert/page','/api/expert/shortlist-view','/api/expert/profile','/api/expert/location'].includes(url),'Unexpected offline transport request: '+url);
     return new Promise((resolve,reject)=>requests.push({url,options,body:JSON.parse(options.body),reject,
       resolve:(body,status=200)=>resolve({ok:status>=200&&status<300,status,headers:{get:()=>null},json:async()=>body})}));
   };
@@ -118,12 +121,15 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
   return {$,document,window,history,requests,flush,start,refine,draft,savedProjects,downloads,styleWrites,localValues,sessionValues,advance,setReducedMotion,pendingTimers:delay=>[...timers.values()].filter(timer=>timer.delay===delay).length,setStorageError:value=>{failStorage=value;},enableLayout:()=>{layoutEnabled=true;},dispose:()=>timers.clear()};
 }
 const brief={version:1,summary:'Cardiac CT for coronary artery disease',requirements:[{id:'ct',kind:'modality',label:'Cardiac CT',text:'Cardiac CT',importance:'essential'},{id:'practice',kind:'currentPractice',label:'Current practice',text:'Current practice',importance:'essential'}],manufacturer:null,panelSize:null,roles:[],geography:null};
-function person(id='expert-one',rank=1){const e={id:'e-'+id,candidateId:id,text:'Has a specialist interest in cardiac CT and coronary artery disease.',type:'clinical-interest',field:'biography',sourceRecordId:'source-'+id,sourceUrl:'https://example.com/'+id,sourceLabel:'Professional profile',dates:{sourceDate:null,observedAt:'2026-10-01'},qualifiers:['stated-interest'],attribution:'source-record'};return{id,name:'Dr '+id.replace(/-/g,' '),rank,role:'Consultant Cardiologist',specialty:'Cardiology',organisations:['Example hospital'],locations:[{name:'Example hospital',city:'London'}],registrations:[],evidence:[e],requirementMatrix:[{requirementId:'ct',label:'Cardiac CT',importance:'essential',status:'potential',evidenceIds:[e.id],note:'Stated interest; current activity requires confirmation.'},{requirementId:'practice',label:'Current practice',importance:'essential',status:'unknown',evidenceIds:[],note:'Current practice needs confirmation.'}],reasons:[{text:'Recorded interest in cardiac CT is relevant to the clinical scope.',status:'potential',evidenceIds:[e.id]}],gaps:[{requirementId:'practice',label:'Current practice',importance:'essential',status:'unknown'}],questions:[{kind:'qualification',text:'What is your current cardiac CT practice?'}],relationships:[]};}
+function person(id='expert-one',rank=1){const e={id:'e-'+id,candidateId:id,text:'Has a specialist interest in cardiac CT and coronary artery disease.',type:'clinical-interest',field:'biography',sourceRecordId:'source-'+id,sourceUrl:'https://example.com/'+id,sourceLabel:'Professional profile',dates:{sourceDate:null,observedAt:'2026-10-01'},qualifiers:['stated-interest'],attribution:'source-record'};return{id,name:'Dr '+id.replace(/-/g,' '),rank,role:'Consultant Cardiologist',specialty:'Cardiology',organisations:['Example hospital'],locations:[{name:'Example hospital',city:'London'}],registrations:[],evidenceIds:[e.id,'bio-'+id],sourceRecordIds:['source-'+id],evidence:[e],requirementMatrix:[{requirementId:'ct',label:'Cardiac CT',importance:'essential',status:'potential',evidenceIds:[e.id],note:'Stated interest; current activity requires confirmation.'},{requirementId:'practice',label:'Current practice',importance:'essential',status:'unknown',evidenceIds:[],note:'Current practice needs confirmation.'}],reasons:[{text:'Recorded interest in cardiac CT is relevant to the clinical scope.',status:'potential',evidenceIds:[e.id]}],gaps:[{requirementId:'practice',label:'Current practice',importance:'essential',status:'unknown'}],questions:[{kind:'qualification',text:'What is your current cardiac CT practice?'}],relationships:[]};}
 const result=(id,people=[person()],extras={})=>({sessionId:'session',searchId:id,brief:structuredClone(brief),corpusVersion:'corpus-test',results:people,total:people.length,nextCursor:null,notices:[],needsClarification:false,...extras});
 async function setup(t,options){const h=harness(options);t.after(h.dispose);await h.flush();return h;}
 async function ready(h,id='first',people,extras){h.start('We need cardiac CT expertise').resolve(result(id,people,extras));await h.flush();}
 const cards=h=>h.$('candidate-list').children;
 const action=(host,label)=>host.querySelectorAll('button').find(b=>b.textContent===label);
+const requestsFor=(h,path)=>h.requests.filter(r=>r.url==='/api/expert/'+path);
+const section=(host,label)=>host.querySelectorAll('details').find(d=>d.dataset.section===label);
+const background=(c=person(),version='corpus-test')=>({candidateId:c.id,corpusVersion:version,profileVersion:'expert-profile-v1',qualifications:[],about:[{...c.evidence[0],id:'bio-'+c.id,text:'Recorded training in brain-tumour radiotherapy.',type:'training'}],clinicalInterests:c.evidence,procedures:[],research:[],practiceLocations:c.locations.map(l=>({...l,address:l.address||'',provenance:{sourceRecordId:'source-'+c.id}})),profileUrls:[],registrations:[]});
 
 test('simple discovery presents relevance and optional research without inventing mandatory gaps',async t=>{
   const h=await setup(t),c=person(),b={...brief,requirements:[{id:'ct',kind:'modality',label:'Cardiac CT',text:'Cardiac CT',importance:'focus',matchIntent:'interest'}]};
@@ -136,7 +142,7 @@ test('simple discovery presents relevance and optional research without inventin
   assert.equal(h.$('result-count').textContent,'1 candidate to explore');assert.equal(h.$('requirements').querySelector('select').value,'focus');
   assert.equal(card.querySelectorAll('.relevance-lead').length,1);assert.equal(card.querySelectorAll('.relevance-detail').length,1);
   assert.ok(card.children.indexOf(card.querySelector('.card-relevance'))<card.children.indexOf(card.querySelector('.card-actions')));
-  action(card,'View evidence →').click();assert.equal(h.$('profile-dialog').open,true);assert.match(h.$('profile-content').querySelector('.relevance-panel').textContent,/Related research/);assert.doesNotMatch(h.$('profile-content').querySelector('.relevance-panel').textContent,/Availability and regulatory/);assert.match(h.$('profile-content').textContent,/Availability and regulatory/);assert.equal(h.requests.length,1);
+  action(card,'View profile →').click();assert.equal(h.$('profile-dialog').open,true);assert.match(h.$('profile-content').querySelector('.relevance-panel').textContent,/Related research/);assert.doesNotMatch(h.$('profile-content').querySelector('.relevance-panel').textContent,/Availability and regulatory/);assert.match(h.$('profile-content').textContent,/Availability and regulatory/);assert.equal(requestsFor(h,'search').length,1);assert.equal(requestsFor(h,'profile').length,1);assert.equal(requestsFor(h,'explain').length,0);
 });
 
 test('user can make a focus criterion mandatory and return it to focus without changing a newer draft',async t=>{
@@ -151,11 +157,11 @@ test('comparison includes additional sourced research without adding it to the s
   a.evidence.push(e);a.relatedEvidence=[{evidenceId:e.id,text:e.text,kind:'source-quote',evidenceType:'research',sourceDate:'2010-05-11',relatedToRequirementIds:['ct']}];await ready(h,'related',[a,b],{brief:scope});action(cards(h)[0],'Compare').click();action(cards(h)[1],'Compare').click();h.$('compare-open').click();assert.match(h.$('comparison-table').textContent,/Related research · additional context/);assert.match(h.$('comparison-table').textContent,/2010-05-11/);assert.doesNotMatch(h.$('requirements').textContent,/Related research/);assert.equal(h.requests.length,1);
 });
 
-test('compact cards do not hide unresolved focus behind an unused evidence id',async t=>{
+test('compact cards disclose unresolved optional focus in source checks without inventing must-haves',async t=>{
   const h=await setup(t),c=person(),scope={...brief,requirements:[{id:'ct',kind:'modality',label:'Cardiac CT',importance:'focus'},{id:'cad',kind:'condition',label:'Coronary disease',importance:'focus'},{id:'adults',kind:'population',label:'Adults',importance:'focus'},{id:'setting',kind:'setting',label:'Primary care',importance:'focus'}]};
   c.evidence=scope.requirements.map((r,i)=>({...c.evidence[0],id:'f'+i,text:['I report cardiac CT.','I treat coronary disease.','I treat adult patients.','I trained in primary care.'][i],type:i===3?'training':'clinical-practice'}));
   c.requirementMatrix=scope.requirements.map((r,i)=>({requirementId:r.id,label:r.label,kind:r.kind,importance:r.importance,status:i===3?'potential':'documented',evidenceIds:['f'+i]}));
-  await ready(h,'many-focus',[c],{brief:scope});const card=cards(h)[0];assert.equal(card.querySelectorAll('.relevance-detail').length,1);assert.match(card.textContent,/Partial evidence: Primary care/);assert.doesNotMatch(card.textContent,/Must-have/);action(card,'View evidence →').click();assert.ok(action(h.$('profile-content'),'How each search criterion matches')===undefined);assert.match(h.$('profile-content').textContent,/How each search criterion matches/);assert.equal(h.$('profile-content').querySelectorAll('.criterion-evidence').length,4);
+  await ready(h,'many-focus',[c],{brief:scope});const card=cards(h)[0];assert.equal(card.querySelectorAll('.relevance-detail').length,1);assert.doesNotMatch(card.textContent,/Must-have/);action(card,'View profile →').click();const checks=section(h.$('profile-content'),'Sources and search checks');assert.equal(checks.open,false);assert.match(checks.textContent,/How each search criterion matches/);assert.equal(checks.querySelectorAll('.criterion-evidence').length,4);const primary=checks.querySelectorAll('.criterion-evidence').find(r=>r.textContent.includes('Primary care'));assert.match(primary.textContent,/Partial|Potential|confirmation/i);assert.match(primary.textContent,/I trained in primary care/);
 });
 
 test('multiple recorded limitations remain visible for ordinary search-focus criteria',async t=>{
@@ -164,7 +170,7 @@ test('multiple recorded limitations remain visible for ordinary search-focus cri
 
 test('a dangling mismatch source is unavailable evidence rather than a recorded limitation on cards and profiles',async t=>{
   const h=await setup(t),c=person(),scope={...brief,requirements:[{...brief.requirements[0],importance:'focus'}]};c.requirementMatrix=[{requirementId:'ct',label:'Cardiac CT',importance:'focus',status:'mismatch',evidenceIds:['missing-source'],note:'An unsupported imported limitation.'}];
-  await ready(h,'dangling-mismatch',[c],{brief:scope});const card=cards(h)[0];assert.match(card.textContent,/Not found in sources: Cardiac CT/);assert.doesNotMatch(card.textContent,/Recorded limitation|unsupported imported limitation/);action(card,'View evidence →').click();assert.doesNotMatch(h.$('profile-content').querySelector('.relevance-panel').textContent,/Recorded limitation|unsupported imported limitation/);assert.match(h.$('profile-content').textContent,/Supporting text is unavailable/);assert.equal(c.requirementMatrix[0].status,'mismatch');
+  await ready(h,'dangling-mismatch',[c],{brief:scope});const card=cards(h)[0];assert.match(card.textContent,/Specific experience requested in this search is not established/);assert.doesNotMatch(card.textContent,/Recorded limitation|unsupported imported limitation/);action(card,'View profile →').click();assert.doesNotMatch(h.$('profile-content').querySelector('.relevance-panel').textContent,/Recorded limitation|unsupported imported limitation/);assert.match(h.$('profile-content').textContent,/Supporting text is unavailable/);assert.equal(c.requirementMatrix[0].status,'mismatch');
 });
 
 test('comparison does not claim an excluded role is recorded without its source and retains valid role evidence',async t=>{
@@ -328,8 +334,8 @@ test('focused and directory views retain the snapshot; paging uses only its curs
 
 test('card, source and save interactions are independent; opening and Forward never request AI',async t=>{
   const h=await setup(t);await ready(h);const card=cards(h)[0];card.querySelector('.source-link').click();assert.equal(h.$('profile-dialog').open,false);action(card,'Save').click();await h.flush();assert.equal(h.$('profile-dialog').open,false);assert.equal([...h.savedProjects.values()][0].candidates.length,1);
-  card.click();assert.equal(h.$('profile-dialog').open,true);assert.equal(h.requests.length,1);h.$('profile-close').click();await h.flush();assert.equal(h.$('profile-dialog').open,false);assert.equal(h.document.activeElement.className,'card-open');
-  h.history.forward();await h.flush();assert.equal(h.$('profile-dialog').open,true);assert.equal(h.requests.length,1);
+  card.click();assert.equal(h.$('profile-dialog').open,true);assert.equal(requestsFor(h,'profile').length,1);assert.equal(requestsFor(h,'explain').length,0);h.$('profile-close').click();await h.flush();assert.equal(h.$('profile-dialog').open,false);assert.equal(h.document.activeElement.className,'card-open');
+  h.history.forward();await h.flush();assert.equal(h.$('profile-dialog').open,true);assert.equal(requestsFor(h,'profile').length,1);assert.equal(requestsFor(h,'explain').length,0);
 });
 
 test('text selection prevents card activation and the primary name action is keyboard reachable',async t=>{
@@ -337,14 +343,14 @@ test('text selection prevents card activation and the primary name action is key
 });
 
 test('profile disclosures and reading position survive close and reopen for the same search',async t=>{
-  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();const sections=h.$('profile-content').querySelectorAll('details');sections[1].open=true;sections[4].open=true;h.$('profile-scroll').scrollTop=570;
-  h.$('profile-close').click();await h.flush();cards(h)[0].querySelector('.card-open').click();assert.equal(h.$('profile-scroll').scrollTop,570);const reopened=h.$('profile-content').querySelectorAll('details');assert.equal(reopened[1].open,true);assert.equal(reopened[4].open,true);assert.equal(reopened[0].open,false);assert.equal(h.requests.length,1);
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();requestsFor(h,'profile')[0].resolve(background());await h.flush();const content=h.$('profile-content');assert.equal(section(content,'About').open,true);section(content,'About').open=false;section(content,'Recorded procedures').open=true;section(content,'Practice locations').open=true;h.$('profile-scroll').scrollTop=570;
+  h.$('profile-close').click();await h.flush();cards(h)[0].querySelector('.card-open').click();assert.equal(h.$('profile-scroll').scrollTop,570);assert.equal(section(content,'Recorded procedures').open,true);assert.equal(section(content,'Practice locations').open,true);assert.equal(section(content,'About').open,false);assert.equal(content.querySelector('.optional-ai').open,false);assert.equal(requestsFor(h,'profile').length,1);assert.equal(requestsFor(h,'explain').length,0);
 });
 
 test('AI starts deliberately once and replaces only its answer area with source evidence retained',async t=>{
-  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();const sections=h.$('profile-content').querySelectorAll('details');sections[0].open=true;const explain=action(h.$('profile-content'),'Generate a relevance summary');explain.click();assert.equal(h.requests.at(-1).url,'/api/expert/explain');assert.equal(h.requests.at(-1).body.kind,'explanation');explain.click();assert.equal(h.requests.length,2);
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();const sections=h.$('profile-content').querySelectorAll('details');sections[0].open=true;const explain=action(h.$('profile-content'),'Generate a relevance summary');explain.click();assert.equal(h.requests.at(-1).url,'/api/expert/explain');assert.equal(h.requests.at(-1).body.kind,'explanation');explain.click();assert.equal(h.requests.length,3);
   h.requests.at(-1).resolve({summary:'The profile records an interest in the relevant modality.',sections:[],citations:[],provider:'openrouter',retryable:false});await h.flush();assert.equal(sections[0].open,true);assert.equal(sections[0].isConnected,true);assert.match(h.$('profile-content').textContent,/Current practice/);assert.equal(action(h.$('profile-content'),'Explanation ready').disabled,true);
-  h.$('profile-close').click();await h.flush();h.history.forward();await h.flush();assert.equal(h.requests.length,2);assert.match(h.$('profile-content').textContent,/The profile records an interest/);
+  h.$('profile-close').click();await h.flush();h.history.forward();await h.flush();assert.equal(h.requests.length,3);assert.match(h.$('profile-content').textContent,/The profile records an interest/);
 });
 
 test('comparison uses the same evidence outcomes and only requests AI on explicit action',async t=>{
@@ -390,16 +396,16 @@ test('historical snapshots show their own filters and require explicit return be
 });
 
 test('closing and reopening a profile during AI preparation reuses the pending request',async t=>{
-  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();action(h.$('profile-content'),'Generate a relevance summary').click();const pending=h.requests.at(-1);h.$('profile-close').click();await h.flush();cards(h)[0].querySelector('.card-open').click();assert.equal(action(h.$('profile-content'),'Checking the source evidence…').disabled,true);assert.equal(h.requests.length,2);
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();action(h.$('profile-content'),'Generate a relevance summary').click();const pending=h.requests.at(-1);h.$('profile-close').click();await h.flush();cards(h)[0].querySelector('.card-open').click();assert.equal(action(h.$('profile-content'),'Checking the source evidence…').disabled,true);assert.equal(h.requests.length,3);
   pending.resolve({summary:'An evidence-grounded explanation of the clinical interest.',sections:[],citations:[],retryable:false});await h.flush();assert.match(h.$('profile-content').textContent,/An evidence-grounded explanation/);assert.equal(action(h.$('profile-content'),'Explanation ready').disabled,true);
 });
 
 test('AI failure preserves the source evidence and offers an explicit retry',async t=>{
-  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();action(h.$('profile-content'),'Generate a relevance summary').click();h.requests.at(-1).reject(new Error('Provider temporarily unavailable'));await h.flush();assert.match(h.$('profile-content').textContent,/specialist interest in cardiac CT/);assert.equal(action(h.$('profile-content'),'Retry personalisation').disabled,false);assert.equal(h.requests.length,2);
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();action(h.$('profile-content'),'Generate a relevance summary').click();h.requests.at(-1).reject(new Error('Provider temporarily unavailable'));await h.flush();assert.match(h.$('profile-content').textContent,/specialist interest in cardiac CT/);assert.equal(action(h.$('profile-content'),'Retry personalisation').disabled,false);assert.equal(h.requests.length,3);
 });
 
 test('a changed search never inherits another snapshot’s explanation or profile disclosure state',async t=>{
-  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();h.$('profile-content').querySelector('details').open=true;action(h.$('profile-content'),'Generate a relevance summary').click();h.requests.at(-1).resolve({summary:'Only the old brief.',sections:[],citations:[],retryable:false});await h.flush();h.$('profile-close').click();await h.flush();h.refine('Research is preferred').resolve(result('new-search'));await h.flush();cards(h)[0].querySelector('.card-open').click();assert.doesNotMatch(h.$('profile-content').textContent,/Only the old brief/);assert.equal(h.$('profile-content').querySelector('details').open,false);assert.equal(action(h.$('profile-content'),'Generate a relevance summary').disabled,false);assert.equal(h.requests.length,3);
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();h.$('profile-content').querySelector('details').open=true;action(h.$('profile-content'),'Generate a relevance summary').click();h.requests.at(-1).resolve({summary:'Only the old brief.',sections:[],citations:[],retryable:false});await h.flush();h.$('profile-close').click();await h.flush();h.refine('Research is preferred').resolve(result('new-search'));await h.flush();cards(h)[0].querySelector('.card-open').click();assert.doesNotMatch(h.$('profile-content').textContent,/Only the old brief/);assert.equal(h.$('profile-content').querySelector('details').open,false);assert.equal(action(h.$('profile-content'),'Generate a relevance summary').disabled,false);assert.equal(h.requests.length,4);
 });
 
 test('project contact filtering uses only explicit local activity and does not contact anyone',async t=>{
@@ -599,7 +605,7 @@ test('saved cards lead with scoped evidence, all gap names and independent close
 });
 
 test('all retained source provenance links are accessible from the profile without a model request',async t=>{
-  const h=await setup(t),c=person();c.evidence[0].sources=[{sourceUrl:'https://second.example/profile',sourceLabel:'Second professional profile'},{sourceUrl:'javascript:alert(1)',sourceLabel:'Unsafe'}];await ready(h,'sources',[c]);cards(h)[0].querySelector('.card-open').click();const links=h.$('profile-content').querySelectorAll('a');assert.ok(links.some(a=>a.href==='https://second.example/profile'));assert.ok(links.some(a=>a.href.includes('?evidence=e-expert-one#evidence-e-expert-one')));assert.ok(!links.some(a=>a.href.startsWith('javascript:')));assert.equal(h.requests.length,1);
+  const h=await setup(t),c=person();c.evidence[0].sources=[{sourceUrl:'https://second.example/profile',sourceLabel:'Second professional profile'},{sourceUrl:'javascript:alert(1)',sourceLabel:'Unsafe'}];await ready(h,'sources',[c]);cards(h)[0].querySelector('.card-open').click();const links=h.$('profile-content').querySelectorAll('a');assert.ok(links.some(a=>a.href==='https://second.example/profile'));assert.ok(links.some(a=>a.href.includes('?evidence=e-expert-one#evidence-e-expert-one')));assert.ok(!links.some(a=>a.href.startsWith('javascript:')));assert.equal(h.requests.length,2);
 });
 
 test('candidate scanning leads with reachable actions and omits duplicate card chrome',async t=>{
@@ -648,4 +654,137 @@ test('starting a new Home assessment clears only its submitted Home mirror and k
 
 test('malformed or wrong-project draft mirrors cannot replace a saved draft',async t=>{
   const p=P.setBrief(P.createProject('Existing'),brief,'corpus-test');p.draft='Saved refinement';p.newAssessmentDraft='Saved Home draft';const valid={schema:1,projectId:p.id,draft:'Untrusted replacement',homeDraft:'Untrusted Home',failedAutoDraft:null};for(const value of ['not-json',JSON.stringify({...valid,schema:99}),JSON.stringify({...valid,projectId:'another-project'}),JSON.stringify({...valid,draft:['invalid']}),JSON.stringify({...valid,draft:'x'.repeat(12001)})]){const h=await setup(t,{initialProjects:[p],initialSessionValues:[['docmap-expert-draft-v1:'+p.id,value]]});assert.equal(h.$('home-input').value,'Saved Home draft');h.$('resume-search').click();assert.equal(h.$('followup-input').value,'Saved refinement');}
+});
+
+const resolvedLocation={kind:'radius',country:'GB',query:'London',label:'London',latitude:51.5074,longitude:-.1278,radiusMiles:25,precision:'city centre',sourceUrl:'https://www.openstreetmap.org/'};
+function editLocation(h,value,which='followup',radius=25){h.$(which+'-location').value=value;h.$(which+'-location').emit('input');h.$(which+'-radius').value=String(radius);h.$(which+'-radius').emit('change');}
+
+test('expertise-only search omits location; location edits wait for submission and make the radius visible',async t=>{
+  const h=await setup(t);assert.equal(h.$('home-location').placeholder,'Anywhere');assert.equal(h.$('home-location').parentNode.querySelector('.radius-label').hidden,true);
+  const first=h.start('Cardiologists with radiology interests');assert.equal(Object.hasOwn(first.body,'locationFilter'),false);first.resolve(result('first'));await h.flush();
+  editLocation(h,'London');assert.equal(h.requests.length,1);assert.equal(h.$('followup-location').parentNode.querySelector('.radius-label').hidden,false);
+  h.$('followup-form').requestSubmit();const update=h.requests.at(-1);assert.equal(update.body.message,undefined);assert.deepEqual(update.body.locationFilter,{query:'London',radiusMiles:25});assert.equal(update.body.sessionId,'session');
+  update.resolve(result('local',[person()],{brief:{...brief,locationFilter:resolvedLocation}}));await h.flush();assert.match(h.$('result-notices').textContent,/Within 25 miles of London/);
+});
+
+test('country selection hides radius and a cleared location is an explicit update',async t=>{
+  const h=await setup(t);editLocation(h,'UK','home');assert.equal(h.$('home-location').parentNode.querySelector('.radius-label').hidden,true);
+  const request=h.start('Cardiologists');assert.deepEqual(request.body.locationFilter,{query:'UK',radiusMiles:25});request.resolve(result('country',[person()],{brief:{...brief,locationFilter:{kind:'country',country:'GB',query:'UK',label:'UK-wide'}}}));await h.flush();
+  assert.equal(h.$('followup-location').value,'UK');editLocation(h,'');h.$('followup-form').requestSubmit();assert.equal(h.requests.at(-1).body.locationFilter,null);assert.equal(h.requests.at(-1).body.message,undefined);
+});
+
+test('recognised geography fills the control but a late search cannot overwrite a newer location draft',async t=>{
+  const h=await setup(t);h.start('Cardiologists in London').resolve(result('first',[person()],{brief:{...brief,locationFilter:resolvedLocation}}));await h.flush();assert.equal(h.$('followup-location').value,'London');
+  const pending=h.refine('With cardiac MRI experience');editLocation(h,'Bristol',undefined,50);h.draft('My next requirement');pending.resolve(result('second',[person()],{brief:{...brief,locationFilter:resolvedLocation}}));await h.flush();
+  assert.equal(h.$('followup-location').value,'Bristol');assert.equal(Number(h.$('followup-radius').value),50);assert.equal(h.$('followup-input').value,'My next requirement');
+  h.$('followup-form').requestSubmit();assert.deepEqual(h.requests.at(-1).body.locationFilter,{query:'Bristol',radiusMiles:50});
+});
+
+test('location lookup failure retains results and newer drafts; Search anywhere is explicit recovery',async t=>{
+  const h=await setup(t);await ready(h);editLocation(h,'Newport');const pending=h.refine('Clinical reporting');h.draft('Keep this newer draft');pending.resolve({error:'More than one UK place has that name. Add a county or postcode.',code:'location-ambiguous'},422);await h.flush();
+  assert.equal(cards(h).length,1);assert.equal(h.$('followup-input').value,'Keep this newer draft');assert.equal(h.$('followup-location').value,'Newport');assert.match(h.$('search-error').textContent,/More than one UK place/);
+  action(h.$('search-error'),'Search anywhere').click();const retry=h.requests.at(-1);assert.equal(retry.body.locationFilter,null);assert.equal(retry.body.message,'Clinical reporting');assert.equal(h.$('followup-input').value,'Keep this newer draft');
+});
+
+test('incomplete interpretation offers its own retry and preserves the pending requirement',async t=>{
+  const h=await setup(t);await ready(h);h.refine('Must have radioactive brain-implant experience').resolve({error:'We could not apply the new must-have. Edit it or retry interpretation.',code:'interpretation-incomplete'},422);await h.flush();
+  assert.equal(cards(h).length,1);assert.match(h.$('followup-input').value,/Must have radioactive/);assert.ok(action(h.$('search-error'),'Retry interpretation'));action(h.$('search-error'),'Retry interpretation').click();assert.equal(h.requests.at(-1).body.message,'Must have radioactive brain-implant experience');
+});
+
+test('location drafts survive reload separately from the applied search scope',async t=>{
+  const h=await setup(t);await ready(h,'local',[person()],{brief:{...brief,locationFilter:resolvedLocation}});editLocation(h,'Bristol',undefined,50);await h.flush();const saved=[...h.savedProjects.values()][0];assert.equal(saved.activeBrief.locationFilter.query,'London');assert.equal(saved.locationDrafts.followup.query,'Bristol');
+  const restored=await setup(t,{initialProjects:[saved],initialSessionValues:[...h.sessionValues]});assert.equal(restored.$('followup-location').value,'Bristol');assert.equal(Number(restored.$('followup-radius').value),50);assert.equal(restored.requests.length,0);
+});
+
+test('an indirect-match card provides sourced background and its profile loads without AI',async t=>{
+  const h=await setup(t),c=person();c.requirementMatrix=[];c.backgroundPreview=[{...c.evidence[0],id:'brain-background',text:'Recorded training in brain-tumour radiotherapy.',type:'training'}];
+  await ready(h,'indirect',[c]);const card=cards(h)[0];assert.match(card.textContent,/Recorded training in brain-tumour radiotherapy/);assert.match(card.textContent,/Specific experience requested.*not established/);assert.doesNotMatch(card.textContent,/Related passages were retrieved/);assert.equal(requestsFor(h,'profile').length,0);assert.equal(requestsFor(h,'explain').length,0);
+  action(card,'View profile →').click();const req=requestsFor(h,'profile')[0];assert.deepEqual(req.body,{sessionId:'session',searchId:'indirect',candidateId:c.id,corpusVersion:'corpus-test'});req.resolve(background(c));await h.flush();
+  const content=h.$('profile-content');assert.equal(section(content,'About').open,true);assert.match(section(content,'About').textContent,/brain-tumour radiotherapy/);for(const title of ['Clinical interests','Recorded procedures','Research','Practice locations','Sources and search checks'])assert.equal(section(content,title).open,false);assert.equal(requestsFor(h,'explain').length,0);
+});
+
+test('late background preserves open source checks and reading position without replacing the relevance panel',async t=>{
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();const content=h.$('profile-content'),relevance=content.querySelector('.relevance-panel'),checks=section(content,'Sources and search checks');checks.open=true;h.$('profile-scroll').scrollTop=420;
+  requestsFor(h,'profile')[0].resolve(background());await h.flush();assert.equal(content.querySelector('.relevance-panel'),relevance);assert.equal(checks.isConnected,true);assert.equal(checks.open,true);assert.equal(h.$('profile-scroll').scrollTop,420);assert.equal(section(content,'About').open,true);
+});
+
+test('wrong-candidate and wrong-version background cannot appear; explicit retry keeps sourced search evidence',async t=>{
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();requestsFor(h,'profile')[0].resolve({...background(),candidateId:'someone-else'});await h.flush();assert.doesNotMatch(h.$('profile-content').textContent,/Recorded training in brain-tumour/);assert.match(h.$('profile-content').textContent,/could not be verified/);assert.match(h.$('profile-content').textContent,/specialist interest in cardiac CT/);
+  action(h.$('profile-content'),'Retry background').click();requestsFor(h,'profile')[1].resolve({...background(),corpusVersion:'old-version'});await h.flush();assert.match(h.$('profile-content').textContent,/could not be verified/);assert.equal(requestsFor(h,'explain').length,0);
+  action(h.$('profile-content'),'Retry background').click();requestsFor(h,'profile')[2].resolve(background());await h.flush();assert.match(section(h.$('profile-content'),'About').textContent,/brain-tumour/);
+});
+
+test('background arriving after another profile opens never paints the wrong consultant',async t=>{
+  const h=await setup(t),a=person('first'),b=person('second');await ready(h,'two',[a,b]);cards(h)[0].querySelector('.card-open').click();const old=requestsFor(h,'profile')[0];h.$('profile-close').click();await h.flush();cards(h)[1].querySelector('.card-open').click();old.resolve({...background(a),about:[{...a.evidence[0],text:'First consultant only.'}]});await h.flush();assert.doesNotMatch(h.$('profile-content').textContent,/First consultant only/);assert.match(h.$('profile-identity').textContent,/Dr second/);
+  requestsFor(h,'profile')[1].resolve({...background(b),about:[{...b.evidence[0],text:'Second consultant only.'}]});await h.flush();assert.match(section(h.$('profile-content'),'About').textContent,/Second consultant only/);
+});
+
+test('loaded background saves with its source version and reopens offline without silent replacement',async t=>{
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();requestsFor(h,'profile')[0].resolve(background());await h.flush();action(h.$('profile-identity'),'Save').click();await h.flush();const saved=[...h.savedProjects.values()][0];assert.equal(saved.candidates[0].candidate.profileBackground.corpusVersion,'corpus-test');
+  const restored=await setup(t,{initialProjects:[saved],pathname:'/expert-discovery/project',healthCorpusVersion:'new-corpus'});action(restored.$('project-candidates'),'View evidence').click();assert.match(section(restored.$('profile-content'),'About').textContent,/brain-tumour/);assert.equal(restored.requests.length,0);assert.equal(action(restored.$('profile-content'),'Generate a relevance summary').disabled,true);
+});
+
+test('older saved snapshots explicitly lack fuller background without fetching current records',async t=>{
+  const p=P.saveCandidate(P.createProject('Older assessment'),person(),brief,'corpus-test'),h=await setup(t,{initialProjects:[p],pathname:'/expert-discovery/project'});action(h.$('project-candidates'),'View evidence').click();assert.match(h.$('profile-content').textContent,/saved snapshot contains search evidence only/);assert.match(h.$('profile-content').textContent,/specialist interest in cardiac CT/);assert.equal(h.requests.length,0);
+});
+
+for(const hasSavedBackground of [false,true])test(`saved profile remains a frozen snapshot when a matching live search has newer cached background${hasSavedBackground?' and its own saved background':''}`,async t=>{
+  const c=person();if(hasSavedBackground)c.profileBackground={...background(c),about:[{...background(c).about[0],text:'Background retained when the team saved this candidate.'}]};
+  const p=P.saveCandidate(P.createProject('Frozen evidence'),c,brief,'corpus-test');p.notes='Private team observations, never part of discovery.';p.candidates[0].notes='An independently saved candidate note.';const savedBefore=structuredClone(p.candidates[0]);
+  const h=await setup(t,{initialProjects:[p],pathname:'/expert-discovery/project'});h.$('project-return').click();const live=person();requestsFor(h,'search')[0].resolve(result('same-scope',[live]));await h.flush();
+  cards(h)[0].querySelector('.card-open').click();requestsFor(h,'profile')[0].resolve({...background(live),about:[{...background(live).about[0],text:'Newly loaded live background must not enter a saved snapshot.'}]});await h.flush();assert.match(h.$('profile-content').textContent,/Newly loaded live background/);
+  h.$('profile-close').click();await h.flush();h.$('open-project').click();const requestsBefore=h.requests.length;action(h.$('project-candidates'),'View evidence').click();
+  assert.doesNotMatch(h.$('profile-content').textContent,/Newly loaded live background/);assert.equal(action(h.$('profile-content'),'Generate a relevance summary').disabled,true);assert.match(h.$('profile-content').textContent,/Saved evidence snapshot/);assert.equal(h.requests.length,requestsBefore,'Opening saved evidence cannot refresh it or start AI');
+  if(hasSavedBackground)assert.match(section(h.$('profile-content'),'About').textContent,/Background retained when the team saved/);else assert.match(h.$('profile-content').textContent,/saved snapshot contains search evidence only/);
+  await h.flush();const stored=h.savedProjects.get(p.id);assert.deepEqual(stored.candidates[0],savedBefore,'No implicit resave, source replacement, decision or note changes');assert.equal(stored.notes,p.notes);assert.equal(requestsFor(h,'explain').length,0);
+});
+
+test('background expansion preserves a visible source-check anchor rather than only its numeric scroll offset',async t=>{
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();const region=h.$('profile-scroll'),content=h.$('profile-content'),host=content.querySelector('.profile-background'),relevance=content.querySelector('.relevance-panel'),checks=section(content,'Sources and search checks');checks.open=true;region.scrollTop=420;
+  const rectangle=(top,height)=>({left:0,right:600,top,bottom:top+height,width:600,height});region.getBoundingClientRect=()=>rectangle(100,400);relevance.getBoundingClientRect=()=>rectangle(-200,280);
+  // Model the real layout dependency: a newly opened About section adds 360px
+  // above the evidence the user is reading. Scrolling must compensate by 360px.
+  checks.getBoundingClientRect=()=>rectangle(100+560+(section(host,'About')?360:0)-region.scrollTop,400);const beforeTop=checks.getBoundingClientRect().top;
+  requestsFor(h,'profile')[0].resolve(background());await h.flush();assert.equal(region.scrollTop,780);assert.equal(checks.getBoundingClientRect().top,beforeTop);assert.equal(checks.open,true);assert.equal(checks.isConnected,true);assert.equal(section(content,'About').open,true);assert.equal(requestsFor(h,'explain').length,0);
+});
+
+test('each background Record details disclosure retains its independent state on reopening',async t=>{
+  const h=await setup(t);await ready(h);cards(h)[0].querySelector('.card-open').click();requestsFor(h,'profile')[0].resolve(background());await h.flush();const details=h.$('profile-content').querySelectorAll('.record-details');assert.equal(details.length,2);assert.equal(new Set(details.map(d=>d.dataset.section)).size,details.length);details[0].open=true;details[1].open=false;const openId=details[0].dataset.section,closedId=details[1].dataset.section;h.$('profile-scroll').scrollTop=250;
+  h.$('profile-close').click();await h.flush();cards(h)[0].querySelector('.card-open').click();const reopened=h.$('profile-content');assert.equal(section(reopened,openId).open,true);assert.equal(section(reopened,closedId).open,false);assert.equal(h.$('profile-scroll').scrollTop,250);assert.equal(requestsFor(h,'profile').length,1);assert.equal(requestsFor(h,'explain').length,0);
+});
+
+test('location-only Home submission asks for expertise and retains the selected geography for the answer',async t=>{
+  const h=await setup(t);editLocation(h,'UK','home');const pending=h.start('');assert.ok(pending);assert.equal(Object.hasOwn(pending.body,'message'),false);assert.deepEqual(pending.body.locationFilter,{query:'UK',radiusMiles:25});assert.equal(h.$('workspace').hidden,false);assert.equal(h.$('search-loading').hidden,false);
+  const locationFilter={kind:'country',country:'GB',query:'UK',label:'UK-wide'},locationBrief={...brief,summary:'',requirements:[],locationFilter};pending.resolve({sessionId:'location-session',brief:locationBrief,needsClarification:true,question:'What expertise are you looking for? Enter a specialty or clinical interest.',notices:[],results:[],total:0});await h.flush();
+  assert.match(h.$('clarification').textContent,/What expertise are you looking for/);assert.equal(cards(h).length,0);assert.equal(h.$('followup-location').value,'UK');assert.equal(h.$('search-loading').hidden,true);assert.equal(h.$('followup-submit').disabled,false);assert.equal(h.requests.length,1,'Clarification must not silently rank or request another search');
+  const answer=h.refine('Cardiologists with radiology interests');assert.equal(answer.body.sessionId,'location-session');assert.equal(answer.body.message,'Cardiologists with radiology interests');assert.equal(Object.hasOwn(answer.body,'locationFilter'),false,'Unchanged location remains in the current session');answer.resolve(result('answered',[person()],{sessionId:'location-session',brief:{...brief,locationFilter}}));await h.flush();assert.equal(cards(h).length,1);assert.match(h.$('result-notices').textContent,/UK-wide/);assert.equal(requestsFor(h,'explain').length,0);
+});
+
+test('entirely empty Home submission gives actionable feedback without a request or new assessment',async t=>{
+  const h=await setup(t),projectsBefore=[...h.savedProjects.keys()];h.$('home-input').value='   ';h.$('home-form').requestSubmit();await h.flush();
+  assert.equal(h.requests.length,0);assert.deepEqual([...h.savedProjects.keys()],projectsBefore);assert.equal(h.$('home').hidden,false);assert.equal(h.$('workspace').hidden,true);assert.equal(h.document.activeElement,h.$('home-input'));assert.equal(h.$('toast').hidden,false);assert.match(h.$('toast').textContent,/Enter a specialty, clinical interest or the expertise you need/);
+});
+
+for(const change of ['remove criterion','change priority','documented-only filter','retry clinical request'])test(`an earlier unsent location draft survives ${change} without being acknowledged as applied`,async t=>{
+  const h=await setup(t);await ready(h,'london',[person()],{brief:{...brief,locationFilter:resolvedLocation}});
+  if(change==='retry clinical request'){h.refine('Research experience is preferred').reject(new Error('Temporary fixture failure'));await h.flush();}
+  editLocation(h,'Bristol',undefined,50);h.draft('My unrelated unsent refinement');
+  if(change==='remove criterion')h.$('requirements').querySelector('.remove-requirement').click();
+  else if(change==='change priority'){const select=h.$('requirements').querySelector('select');select.value='preferred';select.emit('change');}
+  else if(change==='documented-only filter'){h.$('documented-only').checked=true;h.$('documented-only').emit('change');}
+  else action(h.$('search-error'),'Retry').click();
+  const pending=h.requests.at(-1);assert.equal(Object.hasOwn(pending.body,'locationFilter'),false,'This operation did not submit the Bristol draft');pending.resolve(result('updated',[person()],{brief:{...brief,locationFilter:resolvedLocation}}));await h.flush();
+  assert.equal(h.$('followup-location').value,'Bristol');assert.equal(Number(h.$('followup-radius').value),50);assert.equal(h.$('followup-input').value,'My unrelated unsent refinement');const stored=[...h.savedProjects.values()][0];assert.equal(stored.activeBrief.locationFilter.query,'London');assert.deepEqual(stored.locationDrafts.followup,{query:'Bristol',radiusMiles:50,dirty:true});
+  h.$('followup-form').requestSubmit();assert.deepEqual(h.requests.at(-1).body.locationFilter,{query:'Bristol',radiusMiles:50},'The next deliberate submission still sends the preserved draft');
+});
+
+test('retrying an older location request cannot clear a different unsubmitted place',async t=>{
+  const h=await setup(t);await ready(h,'london',[person()],{brief:{...brief,locationFilter:resolvedLocation}});editLocation(h,'Manchester',undefined,10);h.$('followup-form').requestSubmit();h.requests.at(-1).reject(new Error('Temporary geocoder outage'));await h.flush();
+  editLocation(h,'Bristol',undefined,50);action(h.$('search-error'),'Retry').click();const retry=h.requests.at(-1);assert.deepEqual(retry.body.locationFilter,{query:'Manchester',radiusMiles:10});retry.resolve(result('retried-manchester',[person()],{brief:{...brief,locationFilter:{...resolvedLocation,query:'Manchester',label:'Manchester',radiusMiles:10}}}));await h.flush();
+  assert.equal(h.$('followup-location').value,'Bristol');assert.equal(Number(h.$('followup-radius').value),50);const saved=[...h.savedProjects.values()][0];assert.equal(saved.activeBrief.locationFilter.query,'Manchester');assert.deepEqual(saved.locationDrafts.followup,{query:'Bristol',radiusMiles:50,dirty:true});
+});
+
+test('a submitted location draft becomes clean and subsequent text-driven geography can fill the control',async t=>{
+  const h=await setup(t);await ready(h,'london',[person()],{brief:{...brief,locationFilter:resolvedLocation}});editLocation(h,'Bristol',undefined,50);h.$('followup-form').requestSubmit();h.requests.at(-1).resolve(result('bristol',[person()],{brief:{...brief,locationFilter:{...resolvedLocation,query:'Bristol',label:'Bristol',radiusMiles:50}}}));await h.flush();assert.equal([...h.savedProjects.values()][0].locationDrafts.followup.dirty,false);
+  const textUpdate=h.refine('Anywhere is fine');assert.equal(Object.hasOwn(textUpdate.body,'locationFilter'),false,'An acknowledged field cannot override a later text instruction');textUpdate.resolve(result('anywhere',[person()],{brief:{...brief,locationFilter:null}}));await h.flush();assert.equal(h.$('followup-location').value,'');assert.equal([...h.savedProjects.values()][0].locationDrafts.followup.dirty,false);
 });

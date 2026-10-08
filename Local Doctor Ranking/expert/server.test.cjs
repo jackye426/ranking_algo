@@ -36,7 +36,7 @@ test('simple discovery reaches retrieval and a focus priority patch preserves in
 
 test('API resumes short discovery with exact intent and rejects invented intent metadata',async t=>{
   const h=await harness(t),brief=parseBrief({message:'Cardiologists with research interests in imaging. Research is helpful.'}).brief;
-  const resumed=await h.post('search',{resumeBrief:brief});assert.equal(resumed.status,200);assert.deepEqual(resumed.body.brief,brief);assert.equal(resumed.body.interpretationMode,'saved-brief');
+  const resumed=await h.post('search',{resumeBrief:brief});assert.equal(resumed.status,200);assert.deepEqual(resumed.body.brief,{...brief,locationFilter:null});assert.equal(resumed.body.interpretationMode,'saved-brief');
   const invalid=structuredClone(brief);invalid.requirements.find(r=>r.kind==='modality').matchIntent='approved';
   assert.equal((await h.post('search',{resumeBrief:invalid})).status,400);assert.equal(h.counts().searches,1);
 });

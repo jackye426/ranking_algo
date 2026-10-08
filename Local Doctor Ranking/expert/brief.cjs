@@ -108,7 +108,7 @@ function instructionEdits(brief,raw){
   }
   let text=raw;for(const [start,end] of blocked)text=text.slice(0,start)+' '.repeat(end-start)+text.slice(end);
   const question=unresolved.length?'Which active requirement should '+(unresolved[0].operation==='remove'?'be removed':'change priority')+' for “'+unresolved[0].target+'”? '+(brief.requirements.length?'Current requirements: '+brief.requirements.map(r=>r.label).join(', ')+'.':'There are no matching active requirements.') :null;
-  return {text,blocked,question,removedKeys};
+  return {text,blocked,question,removedKeys,unresolved};
 }
 function researchActivityWithoutRole(value){
   const text=clean(value),research=CONCEPTS.filter(([kind])=>kind==='research');
@@ -330,14 +330,93 @@ function parseBrief(input={}){
   const result={brief,needsClarification:!!edits.question||!sufficient(brief),question:edits.question||(!sufficient(brief)?discoveryQuestion:null),notices:edits.question?['An instruction needs a specific active requirement before it can be applied.']:[],mode:'deterministic'};
   interpretationMeta.set(result,edits);return result;
 }
+// The model may help name an unfamiliar clinical subject, but it must not be
+// the only place the user's explicit positive expertise survives. These
+// patterns retain quoted noun phrases; they do not expand or diagnose them.
+function explicitExpertise(input,parsed,edits){
+  const raw=clean(input.message),visible=edits?.text??raw,found=[],unresolved=[];
+  const patterns=[
+    /\b(?:experience|expertise|background|training|skills?|track record|prior work|interests?)\s+(?:in|with|of)\s+([^.;!?]+)/gi,
+    /\b(?:experienced|interested)\s+in\s+([^.;!?]+)/gi,
+    /\b(?:with|has|have|having)\s+([^.;!?]+?)\s+(?:experience|expertise|interests?)(?=\s*(?:[.;!?]|$|is\b|are\b|would\b|should\b))/gi,
+  ];
+  for(const pattern of patterns)for(const match of visible.matchAll(pattern)){
+    const start=match.index+match[0].indexOf(match[1]);
+    // Negative clinical predicates cannot be represented by an ordinary
+    // positive topic. Leave them to the explicit unresolved-instruction path.
+    if(/\b(?:no|not|without|exclude|avoid|never|remove|drop)\b/i.test(localClauseBefore(visible,start,110)))continue;
+    const context=engagementQuestion(visible);
+    if(context&&start>=context.index&&start<context.index+context[0].length)continue;
+    let phrase=clean(match[1].split(/\s+(?:but|while|and\s+(?=(?:can|who|with|research|validation|diagnostic|must|should|would|is|are)\b))/i)[0]);
+    phrase=phrase.replace(/\s+(?:(?:is|are|should be|would be|can be|must be|remains?|as|to)\s+)?(?:(?:only|just)\s+)?(?:not essential|not mandatory|nice to have|a bonus|bonus|optional|useful|helpful|preferred|essential|required|mandatory)\s*$/i,'');
+    phrase=phrase.replace(/\s+(?:in|across|within|from)\s+(?:the\s+)?(?:UK|United Kingdom|Britain)\s*(?:only)?\s*$/i,'').trim();
+    if(!phrase||phrase.length>220||/\b(?:must|should|require|exclude|without|instead|rather than|not|never)\b/i.test(phrase))continue;
+    for(const part of phrase.split(/\s+and\s+/i)){
+      const text=clean(part);if(!text||!/\p{L}/u.test(text))continue;
+      // Canonical concepts remain owned by the existing clause-aware parser.
+      // A copied modifier must not create a second, competing requirement.
+      if(CONCEPTS.some(([, ,pattern])=>pattern.test(text)))continue;
+      if(/^(?:this|that|these|those|the)\s+(?:(?:particular|specific|same|previous|above|earlier)\s+)*(?:procedures?|techniques?|fields?|areas?|types?|kinds?|experience|expertise|devices?|technolog(?:y|ies)|activit(?:y|ies)|skills?|approaches?|ones?)(?:\s+of\s+(?:experience|expertise))?$/i.test(text)){
+        unresolved.push(`Which expertise do you mean by “${text}”? Name the procedure, clinical subject or activity.`);continue;
+      }
+      if(/^(?:clinical|medical|healthcare|relevant|specialist|professional|some|any|this|that|it|these|those)(?:\s+(?:experience|expertise|background|training))?$/i.test(text))continue;
+      const offset=raw.indexOf(text,start),index=offset>=0?offset:start;
+      const kind=/\bresearch\b/i.test(text)?'research':'activity';
+      const intent=/\binterests?|interested\b/i.test(match[0].slice(0,match[0].indexOf(match[1])))?'interest':kind==='research'?'research':'activity';
+      const prior=parsed.brief.requirements.find(r=>sameRequirement(kind,text,r));
+      upsert(parsed.brief,{kind,label:prior?.label||text,text:prior?.text||text,evidence:text,importance:wordingImportance(raw,index,index+text.length)||prior?.importance||'focus',matchIntent:intent});
+      found.push({text,index,kind,id:parsed.brief.requirements.find(r=>sameRequirement(kind,text,r)).id});
+    }
+  }
+  if(found.length){derive(parsed.brief);parsed.needsClarification=!sufficient(parsed.brief);if(!parsed.needsClarification)parsed.question=null;}
+  return {found,unresolved};
+}
+function incompleteInterpretation(input,parsed,instructions,question){
+  return {...parsed,brief:input.previous?clone(input.previous):blankBrief(),interpretationIncomplete:true,unresolvedInstructions:[...new Set(instructions)],retryable:true,needsClarification:true,question:question||instructions[0],notices:[question||instructions[0]],mode:'deterministic'};
+}
+function unresolvedControls(input,parsed,edits){
+  const original=clean(input.message),visible=edits?.text??original,issues=[];
+  for(const sentence of visible.split(/[.;!?]/).map(clean).filter(Boolean)){
+    // All handled canonical edits have already been masked by instructionEdits.
+    // Remaining command-shaped phrases must never silently rerun the old brief.
+    const priority=/^(?:please\s+)?(?:make|change|demote|promote|set|mark)\s+.+\b(?:optional|preferred|essential|required|mandatory|focus)\b/i.test(sentence);
+    if(priority){issues.push(`We could not apply the priority instruction “${sentence}”. Choose an active criterion to change.`);continue;}
+    const negative=/\b(?:must not|should not|do not|don['’]t|without|exclude|avoid|never|no longer)\b/i.test(sentence)||/^(?:no|not)\s+/i.test(sentence);
+    if(negative){
+      // Known role exclusions, negated commands and topic removals have their
+      // own tested semantics. An unknown negative expertise predicate does not.
+      const knownRole=CONCEPTS.some(([kind,,pattern])=>kind==='role'&&pattern.test(sentence));
+      const representedRole=parsed.brief.requirements.some(r=>r.kind==='role'&&[r.label,r.text,r.evidence].some(t=>t&&comparable(sentence).includes(comparable(t))));
+      const negatedNoop=negatedInstruction(sentence)||/\bnot\s+(?:only|just)\b|\b(?:cannot|can't)\s+accept\s+any\s+role\b/i.test(sentence);
+      const removedConcept=CONCEPTS.some(([kind,label,pattern])=>pattern.test(sentence)&&!parsed.brief.requirements.some(r=>sameRequirement(kind,label,r))&&/\b(?:not interested in|without requiring|no longer (?:need|require)|do not (?:need|require)|don['’]t (?:need|require))\b/i.test(sentence));
+      const negativeExpertise=/\b(?:without|not|never)\s+(?:(?:have|has|having|any|prior|documented)\s+)*(?:experience|expertise|training|skills?|interests?)\b/i.test(sentence);
+      if(negativeExpertise||!knownRole&&!representedRole&&!negatedNoop&&!removedConcept)issues.push(`We could not safely apply “${sentence}”. Remove or edit the specific criterion before searching.`);
+    }
+    if(/\b(?:must|required|mandatory|essential|only)\b/i.test(sentence)&&!negative){
+      // Every explicit must-have clause needs a represented requirement. A
+      // previous requirement elsewhere in the message does not satisfy it.
+      const clauses=sentence.split(/\s+(?:and|but|while)\s+(?=(?:they|who|we|it|also|must|should|only|have|has)\b|[^.;]{1,100}\s+(?:is|are)\s+(?:essential|required|mandatory)\b)/i);
+      for(const clause of clauses){
+        if(!/\b(?:must|required|mandatory|essential|only)\b/i.test(clause))continue;
+        const represented=parsed.brief.requirements.some(r=>r.importance==='essential'&&[r.evidence,r.text,r.label].some(t=>t&&comparable(clause).includes(comparable(t))));
+        if(!represented&&!/\b(?:not\s+only|not\s+mandatory|not\s+essential|role restrictions?|role filters?)\b/i.test(clause))issues.push(`We could not identify the required expertise in “${clean(clause)}”. Restate that requirement or retry.`);
+      }
+    }
+  }
+  return issues;
+}
 function createBriefInterpreter({client,model=process.env.OPENROUTER_QUERY_MODEL||'deepseek/deepseek-v3.2'}={}){
   if(client===undefined&&process.env.OPENROUTER_API_KEY){const OpenAI=require('openai');client=new OpenAI({apiKey:process.env.OPENROUTER_API_KEY,baseURL:'https://openrouter.ai/api/v1',timeout:6000,maxRetries:0});}
   const cache=new Map();
   const interpret=async input=>{
     const parsed=parseBrief(input);
     const edits=interpretationMeta.get(parsed);
-    if(!client||edits?.question||input?.removeRequirementId||input?.patch||!clean(input?.message)||input.message.length>4000)return parsed;
-    const cacheKey=createHash('sha256').update(JSON.stringify(['expert-brief-v10-discovery',model,input.previous||null,input.message])).digest('hex');
+    if(input?.removeRequirementId||input?.patch||!clean(input?.message)||input.message.length>4000)return parsed;
+    if(edits?.question)return incompleteInterpretation(input,parsed,edits.unresolved.map(r=>`We could not ${r.operation==='remove'?'remove':'change the priority of'} “${r.target}”.`),edits.question);
+    const recovery=explicitExpertise(input,parsed,edits),recovered=recovery.found;
+    const finish=()=>{const issues=[...recovery.unresolved,...unresolvedControls(input,parsed,edits)];return issues.length?incompleteInterpretation(input,parsed,issues):parsed;};
+    if(!client)return finish();
+    const cacheKey=createHash('sha256').update(JSON.stringify(['expert-brief-v11-faithful-recovery',model,input.previous||null,input.message])).digest('hex');
     if(cache.has(cacheKey))return clone(cache.get(cacheKey));
     // Interpret only the new message. Removed requirements are absent from the
     // current brief and cannot return through an old transcript.
@@ -349,6 +428,9 @@ function createBriefInterpreter({client,model=process.env.OPENROUTER_QUERY_MODEL
       let onlyRolesScoped=hasOnlyRole(clean(input.message));
       for(const r of patch.requirements){
         if(!KINDS.has(r.kind)||!['add','remove'].includes(r.operation)||typeof r.text!=='string'||!clean(r.text)||r.text.length>300||typeof r.evidence!=='string'||r.evidence.length<3||!input.message.toLowerCase().includes(r.evidence.toLowerCase()))continue;
+        // Explicit professional experience is not engagement context merely
+        // because the quoted subject is a device or an unfamiliar procedure.
+        if(recovered.some(item=>(comparable(r.text).includes(comparable(item.text))||comparable(item.text)===comparable(r.evidence))&&(r.kind!==item.kind||comparable(r.text)!==comparable(item.text))))continue;
         // No unquoted semantic expansions become requirements. Existing
         // canonical equivalences were handled by the deterministic layer.
         const allowed=new Set(r.evidence.toLowerCase().match(/[a-z0-9]+/g)||[]);
@@ -402,9 +484,9 @@ function createBriefInterpreter({client,model=process.env.OPENROUTER_QUERY_MODEL
       }
       if(edits?.relaxedRoleId&&parsed.brief.requirements.filter(r=>r.kind==='role'&&r.polarity!=='exclude').length>1){const relaxed=parsed.brief.requirements.find(r=>r.id===edits.relaxedRoleId);if(relaxed?.importance==='preferred')relaxed.importance='focus';}
       relaxUnboundedRole(parsed.brief,input.message);
-      derive(parsed.brief);parsed.needsClarification=!sufficient(parsed.brief);if(!parsed.needsClarification)parsed.question=null;parsed.mode='deepseek';cache.set(cacheKey,clone(parsed));if(cache.size>150)cache.delete(cache.keys().next().value);
-    }catch{parsed.notices.push('The brief uses the details we could identify directly. You can refine it below.');}
-    return parsed;
+      derive(parsed.brief);parsed.needsClarification=!sufficient(parsed.brief);if(!parsed.needsClarification)parsed.question=null;parsed.mode='deepseek';const result=finish();if(!result.interpretationIncomplete){cache.set(cacheKey,clone(result));if(cache.size>150)cache.delete(cache.keys().next().value);}return result;
+    }catch{parsed.notices.push('Search uses your stated expertise. Automatic interpretation was unavailable; your criteria remain editable.');}
+    return finish();
   };
   interpret.configured=!!client;interpret.model=client?model:null;interpret.requiresAI=input=>!!client&&!input?.removeRequirementId&&!input?.patch&&!!clean(input?.message);return interpret;
 }
