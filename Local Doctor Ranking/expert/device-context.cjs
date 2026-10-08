@@ -2,6 +2,7 @@
 // A nomenclature describes devices, never a professional's credentials. Only
 // active, visible clinical requirements enter retrieval; the label is metadata.
 const {blankBrief,idFor,sufficient,removeRequirement,discoveryQuestion,CONCEPTS}=require('./brief.cjs');
+const {QUESTIONS,createClarification,withClarification}=require('./clarifications.cjs');
 const clean=v=>String(v||'').replace(/\s+/g,' ').trim();
 const clone=v=>structuredClone(v);
 const object=v=>v&&typeof v==='object'&&!Array.isArray(v);
@@ -28,14 +29,20 @@ function reconcile(brief){
   return derive(brief);
 }
 function clearDevice(brief){for(const c of brief.deviceContext?.concepts||[])if(c.state==='active'&&!c.sharedWithUser)removeRequirement(brief,c.requirementId);delete brief.deviceContext;return derive(brief);}
-function failure(input,code,question,draft){return {brief:clone(input.previous||blankBrief()),deviceError:{code,error:question,question,retryable:false,...(draft?{deviceDraft:{...draft,question}}:{})},needsClarification:true,question,notices:[],mode:'device-lookup'};}
+function failure(input,code,question,draft,kind){
+  const clarification=code==='device-clarification'?createClarification(kind||'context',{question,deviceCode:draft?.code}):null;
+  return {brief:clone(input.previous||blankBrief()),deviceError:{code,error:question,question,retryable:false,...(draft?{deviceDraft:{...draft,question}}:{}),...(clarification?{clarification}:{})},needsClarification:true,question,...(clarification?{clarification}:{}),notices:[],mode:'device-lookup'};
+}
 function stripReferences(message,detected){let value=String(message||'');for(const ref of [...(detected.references||[])].sort((a,b)=>b.start-a.start)){if(Number.isInteger(ref.start)&&Number.isInteger(ref.end))value=value.slice(0,ref.start)+' '+value.slice(ref.end);}for(const code of detected.codes||[])value=value.replace(new RegExp('\\b'+code+'\\b','gi'),' ');return clean(value.replace(/\bEMDN(?:\s+(?:code|category))?\s*:?/gi,' ').replace(/\b(?:device\s+)?code\s*:\s*/gi,' ').replace(/[()\[\]]/g,' '));}
 const generic=text=>!text||/^(?:(?:please|find|show|me|us|an?|the|clinical|experts?|specialists?|clinicians?|for|with|device|software|category|now|use|search|using)\s*)+[.!?]*$/i.test(text);
 const application=/\b(?:cardiac|coronary|heart|brain|head|neuro\w*|lung|thoracic|chest|abdomen|abdominal|pelvi\w*|oncolog\w*|cancer|radiotherap\w*|musculoskel\w*|orthopaedic\w*|vascular|dental|whole[- ]body|general|any\s+(?:clinical|CT)|all\s+(?:clinical|CT))\b/i;
 const purpose=/\b(?:analys\w*|analyz\w*|detect\w*|diagnos\w*|monitor\w*|screen\w*|measure\w*|treat\w*|plan\w*|predict\w*|support\w*|reconstruct\w*|segment\w*|visuali[sz]\w*)\b/i;
+// Generic purpose wording still needs a clinical subject even if a model
+// categorises “clinical condition” or “treatment planning” as expertise.
+const unscopedPurpose=value=>!clean(value).replace(/\b(?:the|a|an|and|or|for|of|to|in|with|software|device|clinical|medical|condition|conditions|subject|area|supports?|supporting|diagnosis|diagnostic|diagnostics|monitors?|monitoring|treatment|treatments|planning)\b/gi,'').replace(/[^\p{L}\p{N}]/gu,'');
 function createDeviceInterpreter({interpret,taxonomy}={}){
   const getTaxonomy=()=>taxonomy||require('./emdn-taxonomy.cjs');
-  return async function deviceInterpret(input={}){
+  async function deviceInterpret(input={}){
     const t=getTaxonomy(),message=clean(input.message),previous=input.previous||blankBrief(),base=clone(previous),detected=t.detectCodes(message);
     const codes=[...new Set(detected.codes||[])],explicit=input.deviceCode!==undefined;
     if(detected.invalidCodes?.length||detected.ambiguousCategories?.length)return failure(input,'device-invalid','We could not resolve that EMDN code. Check the code or describe the clinical expertise you need.');
@@ -77,10 +84,10 @@ function createDeviceInterpreter({interpret,taxonomy}={}){
     const positiveClinical=clinical.replace(/\s+(?=(?:not(?!\s+(?:only|just))|rather than|instead of)\b)/gi,';').split(/[.;,]|\bbut\b/i).filter(part=>!/^\s*(?:(?:and|but)\s+)?(?:not|no|exclude|without|avoid|rather than|instead of)\b/i.test(part)).join(' ');
     const skin=/\b(?:derm(?:o|ato)scop\w*|skin[- ]lesion|melanoma)\b/i,cardiac=/\b(?:cardiac|coronary)\s+CT|implantable\s+cardiac|remote\s+monitoring\b/i;
     if(ct&&skin.test(positiveClinical)||node.code==='Z12040118'&&cardiac.test(positiveClinical)||node.code==='J010792'&&skin.test(positiveClinical))return failure(input,'device-conflict','The clinical description points to a different area from this EMDN category. Check the code or clarify how those areas relate.',meta);
-    if(ct&&!application.test(positiveClinical))return failure(input,'device-clarification',clarification?.question||'Which CT application is this for—for example cardiac, brain, lung or general CT?',meta);
+    if(ct&&!application.test(positiveClinical))return failure(input,'device-clarification',QUESTIONS['ct-application'],meta,'ct-application');
     if(ct&&/\b(?:not(?!\s+(?:only|just|essential|mandatory))|rather than|instead of)\s+\S/i.test(clinical))return failure(input,'device-conflict','We could not safely apply that change of clinical application. Remove the earlier clinical criterion or describe one CT application to use.',meta);
     if(ct&&sameVersion){const wanted=/\b(?:cardiac|coronary|heart)\b/i.test(positiveClinical)?'Cardiac CT':'CT imaging';const earlier=base.deviceContext.concepts.filter(c=>c.state==='active').map(c=>base.requirements.find(r=>r.id===c.requirementId)).find(r=>r?.kind==='modality'&&r.label!==wanted);if(earlier)return failure(input,'device-conflict',`This changes the earlier ${earlier.label.toLowerCase()} application. Remove that criterion or clear the code before choosing the new CT application.`,meta);}
-    if(broad&&(generic(clinical)||!purpose.test(clinical)))return failure(input,'device-clarification',clarification?.question||'What does the software do, and in which clinical area will it be used?',meta);
+    if(broad&&(generic(clinical)||!purpose.test(clinical)))return failure(input,'device-clarification',node.code==='V92'?QUESTIONS['device-purpose']:clarification?.question||'What does the device do, and in which clinical area will it be used?',meta,'device-purpose');
     let parsed=generic(clinical)?{brief:base,notices:[],mode:'device-lookup'}:await interpret({...input,previous:base,message:clinical});
     if(parsed.interpretationIncomplete)return parsed;
     // Unrequested specialty changes are never guessed from category codes.
@@ -94,8 +101,8 @@ function createDeviceInterpreter({interpret,taxonomy}={}){
     if(broad&&!specs.length){
       // The user's literal purpose remains a clinical search focus. The code
       // contributes no imagined clinical domain or professional role.
-      const supplied=parsed.brief.requirements.filter(r=>(!previous.requirements.some(old=>old.id===r.id)||explicitlyMentions(positiveClinical,r))&&!['technology','workflow','question','geography','role'].includes(r.kind));
-      if(!supplied.length)return failure(input,'device-clarification','Which clinical subject, procedure or modality does this purpose concern? Include that expertise with what the software does.',meta);
+      const supplied=parsed.brief.requirements.filter(r=>(!previous.requirements.some(old=>old.id===r.id)||explicitlyMentions(positiveClinical,r))&&!['technology','workflow','question','geography','role'].includes(r.kind)&&!unscopedPurpose(r.text));
+      if(!supplied.length)return failure(input,'device-clarification',QUESTIONS['device-clinical-subject'],meta,'device-clinical-subject');
     }
     const context=sameVersion?clone(base.deviceContext):{...meta,interpretation:'',concepts:[],derivedRequirementIds:[]};
     for(const spec of specs){
@@ -108,6 +115,7 @@ function createDeviceInterpreter({interpret,taxonomy}={}){
       if(!old)context.concepts.push({key,requirementId:id,state:'active',sharedWithUser:!!match});
     }
     parsed.brief.deviceContext=context;parsed.brief.version=previous.version+1;reconcile(parsed.brief);parsed.needsClarification=!sufficient(parsed.brief);parsed.question=parsed.needsClarification?discoveryQuestion:null;parsed.mode='device-lookup';parsed.notices=[...(parsed.notices||[]),'The EMDN category guides related expertise discovery; it does not establish experience with this device.'];return parsed;
-  };
+  }
+  return async input=>withClarification(await deviceInterpret(input));
 }
 module.exports={createDeviceInterpreter,validateDeviceContext};

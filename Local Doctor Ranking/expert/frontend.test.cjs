@@ -79,9 +79,9 @@ function harness({pathname='/expert-discovery',initialProjects=[],storageError=f
   move('workspace',['brief-content','results-region','followup-form','composer-status','compare-tray','results-title','result-count','home-return','focused-view','directory-view','view-updated','toggle-brief']);
   move('brief-content',['requirements','brief-facts','documented-only','uncontacted-only','sidebar-project']);
   const sidebar=new E();sidebar.className='brief-sidebar';$('workspace').append(sidebar);sidebar.append($('brief-slot'));$('brief-slot').append($('brief-content'));move('brief-content',['original-brief']);move('original-brief',['original-brief-text']);move('brief-dialog',['brief-close','brief-done','brief-dialog-content']);move('recovery-dialog',['recovery-form','recovery-close']);move('recovery-form',['recovery-title','recovery-help','recovery-input-label','recovery-input','recovery-submit']);move('home',['home-recovery']);move('project-view',['project-recovery']);
-  move('results-region',['results-title','result-count','search-error','result-notices','clarification','candidate-list','load-more','ranking-note']);
+  move('results-heading',['results-title','result-count']);move('results-region',['results-heading','initial-conversation','search-error','result-notices','clarification','candidate-list','load-more','ranking-note']);
   move('results-region',['search-loading']);move('search-loading',['search-loading-phrase','search-loading-detail']);move('workspace',['composer-progress']);move('composer-progress',['composer-progress-phrase']);
-  move('followup-form',['followup-input','followup-submit']);move('compare-tray',['compare-count','compare-clear','compare-open']);
+  move('workspace',['composer-question','conversation-history-open']);move('conversation-history-dialog',['conversation-history-close','conversation-history-title','conversation-history-content']);move('followup-form',['followup-label','followup-input','followup-submit']);move('compare-tray',['compare-count','compare-clear','compare-open']);
   move('project-view',['project-title','project-subtitle','project-return','export-json','export-html','import-project','import-file','project-brief','project-candidates','project-notes','project-save-status','save-project-notes']);
   move('profile-dialog',['profile-close','profile-scroll']);move('profile-scroll',['profile-identity','profile-content']);
   move('compare-dialog',['compare-title','compare-close','comparison-brief','comparison-table','comparison-explain','comparison-answer']);
@@ -143,10 +143,101 @@ const deviceMetadata={system:'EMDN',code:deviceNode.code,officialTerm:deviceNode
 const actualDeviceInterpreter=()=>require('./device-context.cjs').createDeviceInterpreter({taxonomy,interpret:require('./brief.cjs').createBriefInterpreter({client:null})});
 const deviceScope=()=>({...structuredClone(deviceMetadata),interpretation:'Clinical expertise in cardiac CT, based on the stated coronary-disease application.',concepts:[{key:'cardiac-ct',requirementId:'ct',state:'active',sharedWithUser:false}],derivedRequirementIds:['ct']});
 const deviceDraft=()=>({...structuredClone(deviceMetadata),question:'What clinical task and patient group will this CT system be used for?'});
-const deviceFailure=()=>({code:'device-clarification',error:'The device category needs clinical context.',question:deviceDraft().question,deviceDraft:deviceDraft()});
+const deviceFailure=()=>({code:'device-clarification',error:'The device category needs clinical context.',question:deviceDraft().question,deviceDraft:deviceDraft(),clarification:{kind:'ct-application',question:deviceDraft().question,quickReplies:[{id:'cardiac-ct',message:'Cardiac CT'},{id:'brain-ct',message:'Brain CT'},{id:'lung-ct',message:'Lung CT'},{id:'general-ct',message:'General CT'}]}});
+const questionPanel=h=>h.$('workspace').querySelector('.conversation-question');
+const genericQuestion=(proposed={...structuredClone(brief),requirements:[],roles:[],summary:''})=>({sessionId:'partial-session',brief:proposed,needsClarification:true,question:'What expertise are you looking for?',clarification:require('./clarifications.cjs').createClarification('expertise',{question:'What expertise are you looking for?'}),notices:[],results:[],total:0});
+
+test('ordinary clarification retains accepted cards, scope, selections and draft instead of committing a partial brief',async t=>{
+  const h=await setup(t);await ready(h,'accepted',[person('a'),person('b',2)]);action(cards(h)[0],'Compare').click();const before=cards(h)[0],p=h.savedProjects.get(h.$('project-select').value),versions=p.briefVersions.length,request=h.refine('Remove this clinical focus');h.draft('Keep my new draft');request.resolve(genericQuestion());await h.flush();
+  const saved=h.savedProjects.get(p.id);assert.equal(cards(h)[0],before);assert.deepEqual(saved.activeBrief,brief);assert.equal(saved.briefVersions.length,versions);assert.equal(saved.pendingClarification.kind,'expertise');assert.equal(saved.failedSearch,null);assert.equal(h.$('compare-count').textContent,'1 selected');assert.equal(h.$('followup-input').value,'Keep my new draft');assert.equal(h.$('followup-label').textContent,'Your reply');assert.equal(h.$('followup-submit').textContent,'Send reply');assert.equal(h.$('followup-input').getAttribute('aria-describedby'),'clarification-question');assert.match(questionPanel(h).textContent,/Examples — choose one to send/);assert.match(questionPanel(h).textContent,/Previous results — awaiting your answer/);assert.equal(h.$('result-count').textContent,'Previous results — awaiting your answer');assert.equal(h.$('search-error').textContent,'');
+});
+
+test('generic example clicks send exactly the visible reply against the proposed scope and preserve a separate draft',async t=>{
+  const h=await setup(t);h.start('I need a specialist').resolve(genericQuestion());await h.flush();h.draft('A separate detail');const count=h.requests.length;action(questionPanel(h),'Cardiologists').click();
+  assert.equal(h.requests.length,count+1);const req=h.requests.at(-1);assert.equal(req.body.message,'Cardiologists');assert.deepEqual(req.body.resumeBrief.requirements,[]);assert.equal(req.body.sessionId,undefined);assert.equal(h.$('followup-input').value,'A separate detail');assert.equal(h.$('recovery-dialog').open,false);assert.equal(h.$('workspace').classList.contains('conversation-start'),true);
+  req.resolve(result('cardio'));await h.flush();assert.equal(h.$('workspace').classList.contains('conversation-start'),false);assert.equal(h.$('followup-label').textContent,'Refine your search');assert.equal(h.$('followup-submit').getAttribute('aria-label'),'Update expert search');
+});
+
+test('generic proposed removals survive export reload and the reply without replaying the removed role',async t=>{
+  const interpret=require('./brief.cjs').createBriefInterpreter({client:null}),accepted=await interpret({message:'Cardiologists'}),h=await setup(t);await ready(h,'cardio',[person()],{brief:accepted.brief});const role=accepted.brief.requirements[0];h.$('requirements').querySelector('button').click();const proposed=await interpret({previous:accepted.brief,removeRequirementId:role.id});h.requests.at(-1).resolve(genericQuestion(proposed.brief));await h.flush();
+  const p=P.importJSON(P.exportJSON(h.savedProjects.get(h.$('project-select').value))),reload=await setup(t,{initialProjects:[p]});assert.equal(reload.$('resume-search').hidden,false);reload.$('resume-search').click();assert.equal(reload.requests.length,0);action(questionPanel(reload),'Dermatologists').click();const req=reload.requests.at(-1),restored=require('./resume.cjs').restoreBrief(req.body.resumeBrief),answer=await interpret({previous:restored.brief,message:req.body.message});assert.deepEqual(answer.brief.requirements.map(r=>r.label),['Dermatologist']);assert.equal(req.body.removeRequirementId,undefined);assert.equal(req.body.sessionId,undefined);assert.deepEqual(p.activeBrief,accepted.brief);
+});
+
+test('cancelled clarification resets hidden session scope and the next refinement uses the accepted brief',async t=>{
+  const h=await setup(t);await ready(h);h.refine('Remove the last topic').resolve(genericQuestion());await h.flush();h.draft('Keep this text');action(questionPanel(h),'Keep previous search').click();await h.flush();assert.equal(questionPanel(h),null);assert.match(h.$('result-count').textContent,/1 candidate to explore/);assert.equal(h.$('followup-input').value,'Keep this text');const req=h.refine('Research is helpful');assert.deepEqual(req.body.resumeBrief,brief);assert.equal(req.body.sessionId,undefined);
+});
+
+test('V92 quick purpose reply leads to a clinical-subject question with no guessed domain or repeated purpose options',async t=>{
+  const interpret=actualDeviceInterpreter(),h=await setup(t),first=await interpret({message:'V92'});h.start('V92').resolve(first.deviceError,422);await h.flush();action(questionPanel(h),'The software supports diagnosis.').click();const req=h.requests.at(-1),next=await interpret(req.body);assert.equal(next.deviceError.clarification.kind,'device-clinical-subject');req.resolve(next.deviceError,422);await h.flush();assert.equal(questionPanel(h).querySelectorAll('.quick-reply').length,0);assert.match(questionPanel(h).textContent,/clinical subject/);assert.equal(h.savedProjects.get(h.$('project-select').value).activeBrief,null);const answer=h.refine('Skin-lesion diagnosis'),accepted=await interpret(answer.body);assert.equal(accepted.deviceError,undefined);assert(!accepted.brief.requirements.some(r=>r.label==='Cardiac CT'));assert.match(answer.body.message,/supports diagnosis/);
+});
+
+for(const viaChip of [true,false])test('failed '+(viaChip?'quick':'typed')+' EMDN answer restores only its visible reply and retries without duplicating history',async t=>{
+  const h=await setup(t);h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();if(viaChip)action(questionPanel(h),'Cardiac CT').click();else h.refine('Coronary-disease assessment');const visible=viaChip?'Cardiac CT':'Coronary-disease assessment',req=h.requests.at(-1);assert.match(req.body.message,/Z11030692\n/);req.reject(new Error('Temporary failure'));await h.flush();assert.equal(h.$('followup-input').value,visible);assert(questionPanel(h));const p=h.savedProjects.get(h.$('project-select').value),before=p.conversationLog.filter(x=>x.role==='user');assert.deepEqual(before.map(x=>x.text),['Z11030692',visible]);action(h.$('search-error'),'Retry').click();const retry=h.requests.at(-1);assert.equal(retry.body.message,req.body.message);retry.reject(new Error('Still unavailable'));await h.flush();assert.equal(h.$('followup-input').value,visible);assert.deepEqual(h.savedProjects.get(p.id).conversationLog.filter(x=>x.role==='user'),before);
+});
+
+test('typing toggles the quick-reply draft notice without replacing the focused chips or open definition',async t=>{
+  const h=await setup(t);h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();const panel=questionPanel(h),chip=action(panel,'Cardiac CT'),definition=panel.querySelector('.question-definition');definition.open=true;assert.equal(h.$('quick-reply-draft-note').hidden,true);h.draft('A separate draft');assert.equal(questionPanel(h),panel);assert.equal(action(panel,'Cardiac CT'),chip);assert.equal(definition.open,true);assert.equal(h.$('quick-reply-draft-note').hidden,false);h.draft('');assert.equal(h.$('quick-reply-draft-note').hidden,true);
+});
+
+test('quick replies cannot double-submit, keyboard activation focuses the composer and pointer activation does not',async t=>{
+  for(const detail of [0,1]){const h=await setup(t);h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();const chip=action(questionPanel(h),'Cardiac CT');chip.focus();const count=h.requests.length;chip.emit('click',{detail});chip.emit('click',{detail});assert.equal(h.requests.length,count+1);if(detail===0)assert.equal(h.document.activeElement,h.$('followup-input'));else assert.notEqual(h.document.activeElement,h.$('followup-input'));}
+});
+
+test('a pending question on an earlier result view offers only a route back to the current conversation',async t=>{
+  const h=await setup(t);await ready(h,'older');h.$('directory-view').click();h.refine('Research is helpful').resolve(result('newer'));await h.flush();h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();h.history.back();await h.flush();assert.equal(h.history.state.searchId,'older');assert.equal(questionPanel(h),null);assert.equal(h.$('followup-input').readOnly,true);const count=h.requests.length;action(h.$('composer-question'),'Return to current question').click();assert.equal(h.requests.length,count);assert.equal(h.history.state.searchId,'newer');assert(questionPanel(h));
+});
+
+test('a clarification arriving after navigation stays with its origin project and does not open a conversation',async t=>{
+  const h=await setup(t);await ready(h);const oldId=h.$('project-select').value,pending=h.refine('Z11030692');h.$('new-project').click();h.$('new-project-name').value='Another assessment';h.$('new-project-form').requestSubmit();await h.flush();const newId=h.$('project-select').value;h.draft('New home draft','home-input');pending.resolve(deviceFailure(),422);await h.flush();assert.equal(h.$('project-select').value,newId);assert.equal(h.$('home').hidden,false);assert.equal(h.$('home-input').value,'New home draft');assert(h.savedProjects.get(oldId).pendingClarification);assert(!h.savedProjects.get(newId).pendingClarification);assert.equal(h.$('home-recovery').textContent,'');
+});
+
+test('history contains only submitted turns and result acknowledgements and never drives retrieval',async t=>{
+  const h=await setup(t);h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();action(questionPanel(h),'Cardiac CT').click();h.requests.at(-1).resolve(result('accepted'));await h.flush();const p=h.savedProjects.get(h.$('project-select').value);assert.deepEqual(p.conversationLog.map(e=>e.type),['message','question','message','result']);assert.equal(p.conversationLog[2].text,'Cardiac CT');assert.doesNotMatch(p.conversationLog[2].text,/Z11030692/);const count=h.requests.length;h.$('conversation-history-open').click();assert.equal(h.$('conversation-history-dialog').open,true);assert.equal(h.requests.length,count);assert.match(h.$('conversation-history-content').textContent,/Found 1 candidate/);h.$('conversation-history-close').click();const req=h.refine('Research is optional');assert.equal(req.body.message,'Research is optional');assert.equal(req.body.conversationLog,undefined);
+});
+
+test('pending contact filters survive reload answers but never leak into a cancelled search',async t=>{
+  let p=P.saveCandidate(P.createProject('Contact filter'),person(),brief,'corpus-test');p=P.recordEvent(p,'expert-one','contact-recorded','Recorded contact',{actor:'user'});p.discoveryFilters={documentedOnly:false,uncontactedOnly:false};const h=await setup(t,{initialProjects:[p]});h.$('resume-search').click();h.requests.at(-1).resolve(result('accepted'));await h.flush();h.refine('Remove the clinical focus. Not already contacted').resolve(genericQuestion());await h.flush();const pending=h.savedProjects.get(p.id);assert.equal(pending.pendingClarification.filters.uncontactedOnly,true);assert.equal(pending.discoveryFilters.uncontactedOnly,false);
+  const reload=await setup(t,{initialProjects:[P.importJSON(P.exportJSON(pending))]});reload.$('resume-search').click();action(questionPanel(reload),'Dermatologists').click();assert.deepEqual(reload.requests.at(-1).body.excludeContactedIds,['expert-one']);
+  action(questionPanel(h),'Keep previous search').click();await h.flush();h.refine('Adults preferred');assert.deepEqual(h.requests.at(-1).body.excludeContactedIds,[]);assert.deepEqual(h.requests.at(-1).body.resumeBrief,brief);
+});
+
+test('stale quick reply, change and cancel controls cannot act on another project with the same imported question id',async t=>{
+  const seed=await setup(t);seed.start('Z11030692').resolve(deviceFailure(),422);await seed.flush();const original=seed.savedProjects.get(seed.$('project-select').value),imported=structuredClone(original);imported.id='imported-copy';imported.name='Imported copy';const h=await setup(t,{initialProjects:[original,imported],rememberedProjectId:original.id});h.$('resume-search').click();const panel=questionPanel(h),chip=action(panel,'Cardiac CT'),change=action(panel,'Change request'),cancel=action(panel,'Start over');h.$('project-select').value=imported.id;h.$('project-select').emit('change');h.$('project-return').click();const count=h.requests.length;chip.emit('click',{detail:1});change.emit('click',{detail:1});cancel.emit('click',{detail:1});assert.equal(h.requests.length,count);assert.equal(h.$('recovery-dialog').open,false);assert.equal(h.$('project-select').value,imported.id);assert.equal(h.savedProjects.get(imported.id).pendingClarification.id,original.pendingClarification.id);assert(questionPanel(h));
+});
+
+test('initial clarification explicitly hides the results heading until an accepted result exists',async t=>{
+  const h=await setup(t);h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();assert.equal(h.$('results-heading').hidden,true);assert(h.$('results-heading').contains(h.$('result-count')));assert.equal(h.$('results-title').closest('[hidden]'),h.$('results-heading'));action(questionPanel(h),'Cardiac CT').click();h.requests.at(-1).resolve(result('accepted'));await h.flush();assert.equal(h.$('results-heading').hidden,false);assert.match(h.$('result-count').textContent,/candidate/);
+});
+
+test('pending location disclosure reuses the same controls and submits their draft without per-keystroke requests',async t=>{
+  const h=await setup(t),input=h.$('followup-location'),radius=h.$('followup-radius');h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();const details=h.$('question-location');assert.equal(details.hidden,false);assert.equal(details.open,false);assert(details.contains(input));assert.equal(h.$('question-location-summary').textContent,'Location: Anywhere');const count=h.requests.length;details.open=true;details.emit('toggle');input.focus();editLocation(h,'Cambridge');radius.value='50';radius.emit('change');assert.equal(h.requests.length,count);assert.equal(h.$('question-location-summary').textContent,'Location: Cambridge · 50 miles');assert.equal(h.$('followup-form').classList.contains('location-expanded'),true);action(questionPanel(h),'Brain CT').click();const req=h.requests.at(-1);assert.deepEqual(req.body.locationFilter,{query:'Cambridge',radiusMiles:50});input.focus();editLocation(h,'Brighton');req.resolve(result('brain'));await h.flush();assert.equal(h.$('followup-location'),input);assert.equal(input.value,'Brighton');assert.equal(h.document.activeElement,input);assert.equal(details.hidden,true);assert.equal(input.parentNode.parentNode,h.$('followup-form'));
+});
+
+test('a question arriving while location is being edited keeps the disclosure open and preserves focus',async t=>{
+  const h=await setup(t);await ready(h);const request=h.refine('Z11030692'),input=h.$('followup-location');input.focus();editLocation(h,'Oxford');request.resolve(deviceFailure(),422);await h.flush();assert.equal(h.$('question-location').open,true);assert.equal(input.value,'Oxford');assert.equal(h.document.activeElement,input);assert.equal(h.$('question-location-summary').textContent,'Location: Oxford · 25 miles');
+});
+
+test('accepted device and geography clear actions pause during search and clarification while pending location remains editable',async t=>{
+  const h=await setup(t),scope={...brief,deviceContext:deviceScope(),locationFilter:{kind:'country',country:'GB',query:'UK',label:'UK-wide'}};await ready(h,'accepted',[person()],{brief:scope});const remove=action(h.$('result-notices'),'Remove code'),anywhere=action(h.$('result-notices'),'Search anywhere');assert.equal(remove.disabled,false);assert.equal(anywhere.disabled,false);const filters=[h.$('documented-only'),h.$('uncontacted-only')];for(const filter of filters)assert.equal(filter.disabled,false);const request=h.refine('Remove the clinical focus'),count=h.requests.length;assert.equal(remove.disabled,true);assert.equal(anywhere.disabled,true);for(const filter of filters)assert.equal(filter.disabled,true);remove.emit('click');anywhere.emit('click');assert.equal(h.requests.length,count);
+  request.resolve(genericQuestion());await h.flush();assert.equal(remove.disabled,true);assert.equal(anywhere.disabled,true);for(const filter of filters)assert.equal(filter.disabled,true);remove.emit('click');anywhere.emit('click');assert.equal(h.requests.length,count);assert.equal(h.$('followup-location').disabled,false);h.$('question-location').open=true;editLocation(h,'Cambridge');assert.equal(h.requests.length,count);action(questionPanel(h),'Keep previous search').click();await h.flush();assert.equal(remove.disabled,false);assert.equal(anywhere.disabled,false);for(const filter of filters)assert.equal(filter.disabled,false);anywhere.click();assert.equal(h.requests.at(-1).body.locationFilter,null);assert.equal(h.$('followup-location').value,'Cambridge');
+});
+
+for(const otherDraft of ['', 'A separate dermatology draft'])test(`initial Start over keeps its unsent reply editable and starts with a fresh original brief${otherDraft?' while retaining a separate Home draft':''}`,async t=>{
+  const h=await setup(t);h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();h.draft('Cardiac CT in adults');
+  if(otherDraft){h.$('home-return').click();h.$('home-input').value=otherDraft;h.$('home-input').emit('input');h.$('resume-search').click();}
+  const count=h.requests.length;action(questionPanel(h),'Start over').click();await h.flush();assert.equal(h.$('home').hidden,false);assert.equal(h.$('home-input').value,'Cardiac CT in adults');assert.equal(h.$('other-home-draft').hidden,!otherDraft);assert.equal(h.requests.length,count);
+  const saved=h.savedProjects.get(h.$('project-select').value);assert.equal(saved.pendingClarification,null);assert.equal(saved.activeBrief,null);assert.equal(saved.originalBrief,'');assert.equal(saved.draft,'Cardiac CT in adults');assert(saved.conversationLog.some(entry=>entry.role==='user'&&entry.text==='Z11030692'));
+  const reloaded=await setup(t,{initialProjects:[saved],rememberedProjectId:saved.id});assert.equal(reloaded.$('home-input').value,'Cardiac CT in adults');
+  if(otherDraft){assert.equal(reloaded.$('other-home-draft').hidden,false);reloaded.$('other-home-draft').click();assert.equal(reloaded.$('home-input').value,otherDraft);reloaded.$('other-home-draft').click();assert.equal(reloaded.$('home-input').value,'Cardiac CT in adults');}
+  const request=reloaded.start('Dermatologists');assert.equal(request.body.message,'Dermatologists');assert.equal(request.body.deviceCode,undefined);assert.equal(request.body.resumeBrief,undefined);assert.equal(request.body.sessionId,undefined);request.resolve(result('dermatology'));await reloaded.flush();assert.equal(reloaded.savedProjects.get(saved.id).originalBrief,'Dermatologists');
+});
+
+test('historical and stale accepted-scope buttons cannot clear the current device or geography',async t=>{
+  const h=await setup(t),scope={...brief,deviceContext:deviceScope(),locationFilter:{kind:'country',country:'GB',query:'UK',label:'UK-wide'}};await ready(h,'older',[person()],{brief:scope});const oldRemove=action(h.$('result-notices'),'Remove code');h.$('directory-view').click();h.refine('Research is helpful').resolve(result('newer',[person()],{brief:scope}));await h.flush();const count=h.requests.length;oldRemove.emit('click');assert.equal(h.requests.length,count);h.history.back();await h.flush();const remove=action(h.$('result-notices'),'Remove code'),anywhere=action(h.$('result-notices'),'Search anywhere');assert.equal(remove.disabled,true);assert.equal(anywhere.disabled,true);remove.emit('click');anywhere.emit('click');assert.equal(h.requests.length,count);
+});
 
 test('results heading shares the scrolling region while view controls and composer remain separate',()=>{
-  const html=fs.readFileSync(path.join(__dirname,'public/index.html'),'utf8'),region=html.indexOf('id="results-region"'),heading=html.indexOf('class="results-heading"'),composer=html.indexOf('class="composer-wrap"');
+  const html=fs.readFileSync(path.join(__dirname,'public/index.html'),'utf8'),region=html.indexOf('id="results-region"'),heading=html.indexOf('id="results-heading"'),composer=html.indexOf('class="composer-wrap"');
   assert(region<heading);assert(heading<html.indexOf('id="candidate-list"'));assert(html.indexOf('id="focused-view"')<region);assert(html.indexOf('id="home-return"')<region);assert(composer>html.indexOf('id="ranking-note"'));
 });
 
@@ -170,9 +261,9 @@ test('only the exact duplicated device notice is removed from accepted results',
 
 test('a first device clarification leaves an empty composer ready for an answer and retains the editable request',async t=>{
   const h=await setup(t);h.start('Z11030692').resolve(deviceFailure(),422);await h.flush();
-  assert.equal(h.$('followup-input').value,'');assert.equal(h.$('composer-status').textContent,'Add the clinical application to continue.');const p=h.savedProjects.get(h.$('project-select').value);assert.equal(p.draft,'');assert.equal(p.failedSearch.payload.message,'Z11030692');assert(!p.failedSearch.restoredDraft);
-  const pending=h.$('search-error').querySelector('.device-context');assert(pending.classList.contains('device-context-pending'));assert(!pending.classList.contains('device-context-accepted'));assert.equal(pending.querySelector('.device-context-title').textContent,deviceMetadata.code+' · '+deviceMetadata.officialTerm);
-  action(h.$('search-error'),'Edit request').click();assert.equal(h.$('recovery-input').value,'Z11030692');assert.equal(h.$('followup-input').value,'');
+  assert.equal(h.$('followup-input').value,'');assert.equal(h.$('composer-status').textContent,'Reply below to continue.');const p=h.savedProjects.get(h.$('project-select').value);assert.equal(p.draft,'');assert.equal(p.pendingClarification.payload.message,'Z11030692');assert.equal(p.failedSearch,null);
+  const pending=questionPanel(h).querySelector('.device-context');assert(pending.classList.contains('device-context-pending'));assert(!pending.classList.contains('device-context-accepted'));assert.equal(pending.querySelector('.device-context-title').textContent,deviceMetadata.code+' · '+deviceMetadata.officialTerm);
+  action(questionPanel(h),'Change request').click();assert.equal(h.$('recovery-input').value,'Z11030692');assert.equal(h.$('followup-input').value,'');
 });
 
 test('removing accepted EMDN context sends an explicit clear and preserves location and unsent text',async t=>{
@@ -181,12 +272,11 @@ test('removing accepted EMDN context sends an explicit clear and preserves locat
   request.resolve(result('without-device'));await h.flush();assert.equal(h.$('result-notices').querySelector('.device-context'),null);assert.equal(h.$('followup-input').value,'Keep this next detail');assert.equal(h.$('followup-location').value,'Cambridge');
 });
 
-test('device clarification preserves accepted cards and answers through a separate editable application',async t=>{
+test('device clarification preserves accepted cards and sends an explicit quick reply without a modal',async t=>{
   const h=await setup(t);await ready(h);const before=cards(h)[0],pending=h.refine('Z11030692');h.draft('Do not submit this newer draft');pending.resolve(deviceFailure(),422);await h.flush();
-  assert.equal(cards(h)[0],before);assert.equal(h.$('followup-input').value,'Do not submit this newer draft');assert.equal(h.$('composer-status').textContent,'Add the clinical application to continue.');assert.match(h.$('search-error').textContent,/What clinical task/);assert.match(h.$('search-error').textContent,/Official EMDN category/);assert.doesNotMatch(h.$('search-error').textContent,/No leads/);
-  action(h.$('search-error'),'Add clinical application').click();assert.equal(h.$('recovery-input').value,'');assert.equal(h.$('recovery-title').textContent,'Describe the clinical application');assert.match(h.$('recovery-help').textContent,/patient group/);h.$('recovery-input').value='Coronary-disease assessment in adults';h.$('recovery-form').requestSubmit();
-  const request=h.requests.at(-1);assert.equal(request.body.deviceCode,deviceMetadata.code);assert.equal(request.body.message,'Z11030692\nCoronary-disease assessment in adults');assert.deepEqual(request.body.resumeBrief,brief);assert.equal(request.body.deviceContext,undefined);assert.equal(request.body.deviceDraft,undefined);assert.equal(h.$('followup-input').value,'Do not submit this newer draft');
-  request.resolve(result('accepted',[person()],{brief:{...brief,deviceContext:deviceScope()}}));await h.flush();assert.equal(h.$('followup-input').value,'Do not submit this newer draft');assert.equal(h.$('search-error').textContent,'');assert.equal(h.savedProjects.get(h.$('project-select').value).failedSearch,null);
+  assert.equal(cards(h)[0],before);assert.equal(h.$('followup-input').value,'Do not submit this newer draft');assert.equal(h.$('composer-status').textContent,'Your unsent reply is still here.');assert.match(questionPanel(h).textContent,/What clinical task/);assert.match(questionPanel(h).textContent,/Official EMDN category/);assert.equal(h.$('search-error').textContent,'');
+  action(questionPanel(h),'Cardiac CT').click();const request=h.requests.at(-1);assert.equal(request.body.deviceCode,deviceMetadata.code);assert.equal(request.body.message,'Z11030692\nCardiac CT');assert.deepEqual(request.body.resumeBrief,brief);assert.equal(request.body.sessionId,undefined);assert.equal(request.body.deviceContext,undefined);assert.equal(request.body.deviceDraft,undefined);assert.equal(h.$('followup-input').value,'Do not submit this newer draft');assert.equal(h.$('recovery-dialog').open,false);
+  request.resolve(result('accepted',[person()],{brief:{...brief,deviceContext:deviceScope()}}));await h.flush();assert.equal(h.$('followup-input').value,'Do not submit this newer draft');assert.equal(questionPanel(h),null);assert.equal(h.savedProjects.get(h.$('project-select').value).pendingClarification,null);
 });
 
 test('a follow-up answer carries only the pending exact code and its independently submitted location',async t=>{
@@ -194,17 +284,17 @@ test('a follow-up answer carries only the pending exact code and its independent
   assert.equal(request.body.deviceCode,'Z11030692');assert.equal(request.body.message,'Z11030692\nCoronary-disease assessment in adults');assert.equal(request.body.locationFilter.query,'UK');assert.equal(request.body.deviceDraft,undefined);assert.equal(request.body.hierarchy,undefined);
 });
 
-test('a location-only update does not implicitly apply an unresolved device category',async t=>{
-  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();h.draft('');editLocation(h,'Oxford');h.$('followup-form').requestSubmit();assert.equal(h.requests.at(-1).body.locationFilter.query,'Oxford');assert.equal(h.requests.at(-1).body.deviceCode,undefined);
+test('a location-only draft waits for the actual answer to an unresolved question',async t=>{
+  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();editLocation(h,'Oxford');const count=h.requests.length;h.$('followup-form').requestSubmit();assert.equal(h.requests.length,count);assert.match(h.$('toast').textContent,/Add your answer/);action(questionPanel(h),'Brain CT').click();assert.equal(h.requests.at(-1).body.locationFilter.query,'Oxford');assert.equal(h.requests.at(-1).body.deviceCode,'Z11030692');
 });
 
 test('editing an unknown or conflicting code retains exact new text rather than silently adding prior metadata',async t=>{
-  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();action(h.$('search-error'),'Edit request').click();assert.equal(h.$('recovery-input').value,'Z11030692');h.$('recovery-input').value='V92 for evaluating primary-care diagnosis';h.$('recovery-form').requestSubmit();
+  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();action(questionPanel(h),'Change request').click();assert.equal(h.$('recovery-input').value,'Z11030692');h.$('recovery-input').value='V92 for evaluating primary-care diagnosis';h.$('recovery-form').requestSubmit();
   assert.equal(h.requests.at(-1).body.message,'V92 for evaluating primary-care diagnosis');assert.equal(h.requests.at(-1).body.deviceCode,undefined);
 });
 
 test('dismissing pending EMDN context changes neither accepted search nor newer draft and needs no request',async t=>{
-  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();h.draft('A newer cardiology query');const count=h.requests.length,before=cards(h)[0];action(h.$('search-error'),'Dismiss code').click();await h.flush();
+  const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();h.draft('A newer cardiology query');const count=h.requests.length,before=cards(h)[0];action(questionPanel(h),'Keep previous search').click();await h.flush();
   assert.equal(h.requests.length,count);assert.equal(cards(h)[0],before);assert.equal(h.$('followup-input').value,'A newer cardiology query');assert.equal(h.$('search-error').textContent,'');assert.equal(h.savedProjects.get(h.$('project-select').value).failedSearch,null);assert.deepEqual(h.savedProjects.get(h.$('project-select').value).activeBrief,brief);
   h.refine('A newer cardiology query');assert.equal(h.requests.at(-1).body.deviceCode,undefined);
 });
@@ -215,9 +305,9 @@ test('unknown and multiple code errors remain recoverable and do not claim an of
   }
 });
 
-test('device clarification survives reload without automatic lookup or loss of a newer draft',async t=>{
+test('device clarification survives reload and resumes the same composer without a request or draft loss',async t=>{
   const h=await setup(t);await ready(h);h.refine('Z11030692').resolve(deviceFailure(),422);await h.flush();h.draft('New unsent detail');await h.flush();const p=h.savedProjects.get(h.$('project-select').value),reload=await setup(t,{initialProjects:[p],pathname:'/expert-discovery/project'});
-  assert.equal(reload.requests.length,0);assert.match(reload.$('project-recovery').textContent,/Z11030692/);action(reload.$('project-recovery'),'Add clinical application').click();reload.$('recovery-input').value='Coronary-disease assessment';reload.$('recovery-form').requestSubmit();assert.equal(reload.requests[0].body.deviceCode,'Z11030692');assert.equal(reload.$('followup-input').value,'New unsent detail');
+  assert.equal(reload.requests.length,0);assert.match(reload.$('project-recovery').textContent,/What clinical task/);action(reload.$('project-recovery'),'Continue conversation →').click();assert.equal(reload.requests.length,0);assert.match(questionPanel(reload).textContent,/Z11030692/);action(questionPanel(reload),'Cardiac CT').click();assert.equal(reload.requests[0].body.deviceCode,'Z11030692');assert.equal(reload.$('followup-input').value,'New unsent detail');
 });
 
 test('device lookup completion in another view never takes over navigation or the newer draft',async t=>{
@@ -231,7 +321,7 @@ test('a device clarification retains unresolved role, location and priorities wi
 
 test('an oversized clarification stays editable and never silently drops the unresolved request',async t=>{
   const h=await setup(t);await ready(h);h.refine('Z11030692 '+('clinical context '.repeat(200))).resolve(deviceFailure(),422);await h.flush();const count=h.requests.length,answer='Additional application '.repeat(100);h.refine(answer);
-  assert.equal(h.requests.length,count);assert.equal(h.$('followup-input').value,answer);assert.match(h.$('toast').textContent,/Use Edit request/);assert.match(h.$('search-error').textContent,/Official EMDN category/);
+  assert.equal(h.requests.length,count);assert.equal(h.$('followup-input').value,answer);assert.match(h.$('toast').textContent,/Use Edit request/);assert.match(questionPanel(h).textContent,/Official EMDN category/);
 });
 
 for(const message of ['J010792','Use EMDN J010792 instead','Remove the EMDN code'])test('a real pending CT question cannot be glued to an explicit device change: '+message,async t=>{
@@ -244,7 +334,7 @@ for(const message of ['J010792','Use EMDN J010792 instead','Remove the EMDN code
 test('editing a repeated real clarification can replace its previous explicit code',async t=>{
   const interpret=actualDeviceInterpreter(),h=await setup(t),unresolved=await interpret({message:'EMDN Z11030692'});h.start('EMDN Z11030692').resolve(unresolved.deviceError,422);await h.flush();
   const answer=h.refine('Primary care'),again=await interpret(answer.body);assert.equal(again.deviceError.code,'device-clarification');answer.resolve(again.deviceError,422);await h.flush();
-  action(h.$('search-error'),'Edit request').click();h.$('recovery-input').value='J010792';h.$('recovery-form').requestSubmit();const retry=h.requests.at(-1),parsed=await interpret(retry.body);assert.equal(parsed.deviceError,undefined);assert.equal(parsed.brief.deviceContext.code,'J010792');assert.equal(retry.body.deviceCode,undefined);
+  action(questionPanel(h),'Change request').click();h.$('recovery-input').value='J010792';h.$('recovery-form').requestSubmit();const retry=h.requests.at(-1),parsed=await interpret(retry.body);assert.equal(parsed.deviceError,undefined);assert.equal(parsed.brief.deviceContext.code,'J010792');assert.equal(retry.body.deviceCode,undefined);
 });
 
 test('clinical alphanumeric detail is an application answer, not an unrequested replacement code',async t=>{
@@ -254,8 +344,8 @@ test('clinical alphanumeric detail is an application answer, not an unrequested 
 
 test('actual taxonomy clarification reloads through project validation and accepts its real interpretation',async t=>{
   const interpret=actualDeviceInterpreter(),h=await setup(t),question=await interpret({message:'For EMDN Z11030692 find UK cardiologists; research is optional.'});h.start('For EMDN Z11030692 find UK cardiologists; research is optional.').resolve(question.deviceError,422);await h.flush();h.draft('Preserve this separate draft');await h.flush();
-  const saved=h.savedProjects.get(h.$('project-select').value),roundtrip=P.importJSON(P.exportJSON(saved));assert.deepEqual(roundtrip.failedSearch.deviceDraft,question.deviceError.deviceDraft);const reload=await setup(t,{initialProjects:[roundtrip],pathname:'/expert-discovery/project'});assert.equal(reload.requests.length,0);
-  action(reload.$('project-recovery'),'Add clinical application').click();reload.$('recovery-input').value='It supports coronary artery disease diagnosis.';reload.$('recovery-form').requestSubmit();const request=reload.requests.at(-1),accepted=await interpret(request.body);assert.equal(accepted.deviceError,undefined);assert.equal(accepted.brief.deviceContext.code,'Z11030692');request.resolve(result('real-device',[person()],{brief:accepted.brief}));await reload.flush();
+  const saved=h.savedProjects.get(h.$('project-select').value),roundtrip=P.importJSON(P.exportJSON(saved));assert.deepEqual(roundtrip.pendingClarification.deviceDraft,question.deviceError.deviceDraft);const reload=await setup(t,{initialProjects:[roundtrip],pathname:'/expert-discovery/project'});assert.equal(reload.requests.length,0);
+  action(reload.$('project-recovery'),'Continue conversation →').click();action(questionPanel(reload),'Cardiac CT').click();const request=reload.requests.at(-1),accepted=await interpret(request.body);assert.equal(accepted.deviceError,undefined);assert.equal(accepted.brief.deviceContext.code,'Z11030692');request.resolve(result('real-device',[person()],{brief:accepted.brief}));await reload.flush();
   const next=reload.savedProjects.get(reload.$('project-select').value);assert.deepEqual(P.validateProject(next).activeBrief.deviceContext,accepted.brief.deviceContext);assert.equal(next.failedSearch,null);assert.equal(next.draft,'Preserve this separate draft');assert.match(reload.$('result-notices').textContent,/COMPUTED TOMOGRAPHS/);
 });
 
@@ -521,7 +611,7 @@ test('removing a requirement sends the stable identifier and does not alter a dr
 
 test('an empty or clarification response replaces the shortlist without losing the composer',async t=>{
   const h=await setup(t);await ready(h);h.refine('Only fully documented essentials').resolve(result('empty',[]));await h.flush();assert.equal(cards(h).length,0);assert.match(h.$('clarification').textContent,/current constraints/);assert.equal(h.$('followup-input').closest('[hidden]'),null);
-  h.refine('Start a new brief').resolve({sessionId:'session',brief,needsClarification:true,question:'Which clinical use is this assessment about?',notices:[],results:[],total:0});await h.flush();assert.match(h.$('clarification').textContent,/Which clinical use/);assert.equal(cards(h).length,0);assert.equal(h.$('followup-submit').disabled,false);
+  h.refine('Start a new brief').resolve({sessionId:'session',brief,needsClarification:true,question:'Which clinical use is this assessment about?',notices:[],results:[],total:0});await h.flush();assert.match(questionPanel(h).textContent,/Which clinical use/);assert.equal(cards(h).length,0);assert.equal(h.$('followup-submit').disabled,false);
 });
 
 test('retrying a failed filter retries its intended values while retaining the new draft',async t=>{
@@ -895,8 +985,8 @@ test('each background Record details disclosure retains its independent state on
 test('location-only Home submission asks for expertise and retains the selected geography for the answer',async t=>{
   const h=await setup(t);editLocation(h,'UK','home');const pending=h.start('');assert.ok(pending);assert.equal(Object.hasOwn(pending.body,'message'),false);assert.deepEqual(pending.body.locationFilter,{query:'UK',radiusMiles:25});assert.equal(h.$('workspace').hidden,false);assert.equal(h.$('search-loading').hidden,false);
   const locationFilter={kind:'country',country:'GB',query:'UK',label:'UK-wide'},locationBrief={...brief,summary:'',requirements:[],locationFilter};pending.resolve({sessionId:'location-session',brief:locationBrief,needsClarification:true,question:'What expertise are you looking for? Enter a specialty or clinical interest.',notices:[],results:[],total:0});await h.flush();
-  assert.match(h.$('clarification').textContent,/What expertise are you looking for/);assert.equal(cards(h).length,0);assert.equal(h.$('followup-location').value,'UK');assert.equal(h.$('search-loading').hidden,true);assert.equal(h.$('followup-submit').disabled,false);assert.equal(h.requests.length,1,'Clarification must not silently rank or request another search');
-  const answer=h.refine('Cardiologists with radiology interests');assert.equal(answer.body.sessionId,'location-session');assert.equal(answer.body.message,'Cardiologists with radiology interests');assert.equal(Object.hasOwn(answer.body,'locationFilter'),false,'Unchanged location remains in the current session');answer.resolve(result('answered',[person()],{sessionId:'location-session',brief:{...brief,locationFilter}}));await h.flush();assert.equal(cards(h).length,1);assert.match(h.$('result-notices').textContent,/UK-wide/);assert.equal(requestsFor(h,'explain').length,0);
+  assert.match(questionPanel(h).textContent,/What expertise are you looking for/);assert.equal(cards(h).length,0);assert.equal(h.$('followup-location').value,'UK');assert.equal(h.$('search-loading').hidden,true);assert.equal(h.$('followup-submit').disabled,false);assert.equal(h.requests.length,1,'Clarification must not silently rank or request another search');
+  const answer=h.refine('Cardiologists with radiology interests');assert.equal(answer.body.sessionId,undefined);assert.deepEqual(answer.body.resumeBrief,locationBrief);assert.equal(answer.body.message,'Cardiologists with radiology interests');assert.equal(Object.hasOwn(answer.body,'locationFilter'),false,'Unchanged location remains in the explicit proposed brief');answer.resolve(result('answered',[person()],{sessionId:'location-session',brief:{...brief,locationFilter}}));await h.flush();assert.equal(cards(h).length,1);assert.match(h.$('result-notices').textContent,/UK-wide/);assert.equal(requestsFor(h,'explain').length,0);
 });
 
 test('entirely empty Home submission gives actionable feedback without a request or new assessment',async t=>{

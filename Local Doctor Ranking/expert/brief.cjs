@@ -1,6 +1,7 @@
 'use strict';
 
 const {createHash}=require('node:crypto');
+const {QUESTIONS,withClarification}=require('./clarifications.cjs');
 const clean=value=>String(value||'').replace(/\s+/g,' ').trim();
 const comparable=value=>clean(value).normalize('NFKC').replace(/[\u2010-\u2015-]/g,' ').toLowerCase().replace(/\s+/g,' ');
 const idFor=(kind,text)=>'r-'+createHash('sha256').update(kind+':'+clean(text).toLowerCase()).digest('hex').slice(0,12);
@@ -231,8 +232,8 @@ function relaxUnboundedRole(brief,raw){
   roles[0].importance='preferred';roles[0].strictRole=false;brief.roleMode=null;
   return roles[0].id;
 }
-const discoveryQuestion='What expertise are you looking for? A specialty, clinical interest, procedure or research area is enough to start.';
-function parseBrief(input={}){
+const discoveryQuestion=QUESTIONS.expertise;
+function parseBriefCore(input={}){
   const previous=normalizeBrief(input.previous),brief=clone(previous);let raw=clean(input.message);
   // An older saved brief can contain duplicate aliases. If its visible chip
   // used the discarded alias ID, apply the action to the surviving equivalent
@@ -331,6 +332,10 @@ function parseBrief(input={}){
   const result={brief,needsClarification:!!edits.question||!sufficient(brief),question:edits.question||(!sufficient(brief)?discoveryQuestion:null),notices:edits.question?['An instruction needs a specific active requirement before it can be applied.']:[],mode:'deterministic'};
   interpretationMeta.set(result,edits);return result;
 }
+function parseBrief(input={}){
+  const parsed=parseBriefCore(input),edits=interpretationMeta.get(parsed);
+  return withClarification(parsed,edits?.question||clean(input.message).length>4000?'context':'expertise');
+}
 // The model may help name an unfamiliar clinical subject, but it must not be
 // the only place the user's explicit positive expertise survives. These
 // patterns retain quoted noun phrases; they do not expand or diagnose them.
@@ -373,7 +378,7 @@ function explicitExpertise(input,parsed,edits){
   return {found,unresolved};
 }
 function incompleteInterpretation(input,parsed,instructions,question){
-  return {...parsed,brief:input.previous?clone(input.previous):blankBrief(),interpretationIncomplete:true,unresolvedInstructions:[...new Set(instructions)],retryable:true,needsClarification:true,question:question||instructions[0],notices:[question||instructions[0]],mode:'deterministic'};
+  return withClarification({...parsed,brief:input.previous?clone(input.previous):blankBrief(),interpretationIncomplete:true,unresolvedInstructions:[...new Set(instructions)],retryable:true,needsClarification:true,question:question||instructions[0],notices:[question||instructions[0]],mode:'deterministic'});
 }
 function unresolvedControls(input,parsed,edits){
   const original=clean(input.message),visible=edits?.text??original,issues=[];
@@ -415,7 +420,7 @@ function createBriefInterpreter({client,model=process.env.OPENROUTER_QUERY_MODEL
     if(input?.removeRequirementId||input?.patch||!clean(input?.message)||input.message.length>4000)return parsed;
     if(edits?.question)return incompleteInterpretation(input,parsed,edits.unresolved.map(r=>`We could not ${r.operation==='remove'?'remove':'change the priority of'} “${r.target}”.`),edits.question);
     const recovery=explicitExpertise(input,parsed,edits),recovered=recovery.found;
-    const finish=()=>{const issues=[...recovery.unresolved,...unresolvedControls(input,parsed,edits)];return issues.length?incompleteInterpretation(input,parsed,issues):parsed;};
+    const finish=()=>{const issues=[...recovery.unresolved,...unresolvedControls(input,parsed,edits)];return issues.length?incompleteInterpretation(input,parsed,issues):withClarification(parsed);};
     if(!client)return finish();
     const cacheKey=createHash('sha256').update(JSON.stringify(['expert-brief-v11-faithful-recovery',model,input.previous||null,input.message])).digest('hex');
     if(cache.has(cacheKey))return clone(cache.get(cacheKey));

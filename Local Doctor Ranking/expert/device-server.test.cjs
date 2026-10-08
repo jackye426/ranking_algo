@@ -37,3 +37,21 @@ test('unresolved first requests do not consume the live-session pool',async t=>{
 test('adding a code to an incomplete resumed brief rechecks its new sufficiency',async t=>{
   const h=await harness(t),first=await h.post('search',{message:'Z12040118'}),removed=await h.post('search',{sessionId:first.body.sessionId,removeRequirementId:first.body.brief.requirements[0].id});assert.equal(removed.body.needsClarification,true);const resumed=await h.post('search',{resumeBrief:removed.body.brief,deviceCode:'J010792'});assert.equal(resumed.status,200);assert.equal(resumed.body.needsClarification,false);assert.equal(h.searches.length,2);assert.equal(resumed.body.brief.deviceContext.code,'J010792');
 });
+test('generic clarification returns a proposed partial brief and structured examples without running discovery',async t=>{
+  const h=await harness(t),r=await h.post('search',{message:'Adults in primary care'});
+  assert.equal(r.status,200);assert.equal(r.body.needsClarification,true);assert.equal(r.body.question,r.body.clarification.question);assert.equal(r.body.clarification.kind,'expertise');assert.deepEqual(r.body.clarification.quickReplies.map(x=>x.message),['Cardiologists','Dermatologists','Cardiac imaging research']);assert.deepEqual(r.body.brief.requirements.map(r=>r.label),['Adults','Primary care']);assert.equal(h.searches.length,0);assert.equal(r.body.searchId,undefined);
+  const answered=await h.post('search',{resumeBrief:r.body.brief,message:'Cardiologists'});assert.equal(answered.status,200);assert.equal(answered.body.needsClarification,false);assert.equal(answered.body.clarification,undefined);assert.ok(answered.body.brief.requirements.some(r=>r.label==='Primary care'));assert.equal(h.searches.length,1);
+});
+test('cancelling a generic proposal can resume the accepted brief in a new session while the old snapshot stays readable',async t=>{
+  const h=await harness(t),accepted=await h.post('search',{message:'Cardiologists in primary care'}),pending=await h.post('search',{sessionId:accepted.body.sessionId,removeRequirementId:accepted.body.brief.requirements.find(r=>r.kind==='role').id});
+  assert.equal(pending.body.needsClarification,true);assert.equal(pending.body.clarification.kind,'expertise');assert.ok(!pending.body.brief.requirements.some(r=>r.kind==='role'));assert.equal(h.searches.length,1);
+  const afterCancel=await h.post('search',{resumeBrief:accepted.body.brief,message:'Clinical research helpful'});assert.equal(afterCancel.body.needsClarification,false);assert.notEqual(afterCancel.body.sessionId,accepted.body.sessionId);assert.ok(afterCancel.body.brief.requirements.some(r=>r.label==='Cardiologist'));assert.ok(afterCancel.body.brief.requirements.some(r=>r.label==='Primary care'));
+  const old=await h.post('shortlist-view',{sessionId:accepted.body.sessionId,searchId:accepted.body.searchId,candidateIds:['candidate']});assert.equal(old.status,200);assert.deepEqual(old.body.brief,accepted.body.brief);
+});
+test('device clarification exposes deterministic CT and V92 steps while genuine errors expose no quick replies',async t=>{
+  const h=await harness(t),ct=await h.post('search',{message:'Z11030692'});assert.equal(ct.status,422);assert.equal(ct.body.code,'device-clarification');assert.equal(ct.body.clarification.kind,'ct-application');assert.equal(ct.body.clarification.question,'That’s CT medical-device software. What will it be used for?');assert.equal(ct.body.question,ct.body.clarification.question);assert.deepEqual(ct.body.clarification.quickReplies.map(x=>x.message),['Cardiac CT','Brain CT','Lung CT','General CT']);
+  const first=await h.post('search',{message:'V92'});assert.equal(first.status,422);assert.equal(first.body.clarification.kind,'device-purpose');
+  for(const reply of first.body.clarification.quickReplies){const next=await h.post('search',{deviceCode:'V92',message:reply.message});assert.equal(next.status,422);assert.equal(next.body.clarification.kind,'device-clinical-subject');assert.deepEqual(next.body.clarification.quickReplies,[]);}
+  for(const message of ['EMDN X999999','Z11030692 for dermoscopy','Remove photonics experience']){const bad=await h.post('search',{message});assert.equal(bad.status,422);assert.notEqual(bad.body.code,'device-clarification');assert.equal(bad.body.clarification,undefined);}
+  assert.equal(h.searches.length,0);
+});

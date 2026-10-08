@@ -11,6 +11,7 @@ const {restoreBrief}=require('./resume.cjs');
 const {createExpertGeoService,filterCandidates,splitLocationInstruction}=require('./geo.cjs');
 const {buildProfile,profilePreview}=require('./profile.cjs');
 const {createDeviceInterpreter}=require('./device-context.cjs');
+const {withClarification}=require('./clarifications.cjs');
 function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),generate=createExpertAI(process.env.EXPERT_OFFLINE==='1'?{client:null}:{}),geo=createExpertGeoService(),taxonomy,clock=Date.now,limits={},publicOrigin=process.env.PUBLIC_ORIGIN}={}){
   const app=express(),sessions=new Map(),rates=new Map();
   const interpretDevice=createDeviceInterpreter({interpret,taxonomy});
@@ -98,7 +99,7 @@ function createApp(engine,{interpret=createBriefInterpreter(process.env.EXPERT_O
       if((!operations.length&&body.locationFilter!==undefined)||locationOnly)parsed.brief.version++;
       if(body.locationFilter!==undefined&&inferred!==undefined&&JSON.stringify(inferred)!==JSON.stringify(body.locationFilter))parsed.notices.push('Using the location selected in the location field.');
       if(resumed?.needsClarification&&!operations.length&&body.deviceCode===undefined)parsed.needsClarification=true;
-      if(parsed.needsClarification){s.brief=parsed.brief||s.brief;s.updated=clock();return res.json({sessionId:id,brief:s.brief,needsClarification:true,question:parsed.question,notices:parsed.notices||[],results:[],total:0});}
+      if(parsed.needsClarification){withClarification(parsed,'context');s.brief=parsed.brief||s.brief;s.updated=clock();return res.json({sessionId:id,brief:s.brief,needsClarification:true,question:parsed.question,clarification:parsed.clarification,notices:parsed.notices||[],results:[],total:0});}
       const found=await engine.search(parsed.brief,{documentedOnly:body.documentedOnly===true});
       const excluded=new Set(body.excludeContactedIds||[]);
       const geographic=filterCandidates(found.results,parsed.brief.locationFilter);
