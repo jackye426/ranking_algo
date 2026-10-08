@@ -548,7 +548,7 @@ test('a changed search never inherits another snapshot’s explanation or profil
 });
 
 test('project contact filtering uses only explicit local activity and does not contact anyone',async t=>{
-  const h=await setup(t);await ready(h);action(cards(h)[0],'Save').click();await h.flush();h.$('open-project').click();action(h.$('project-candidates'),'Record activity').click();h.$('event-type').value='contact-recorded';h.$('event-detail').value='Team recorded an earlier enquiry.';h.$('event-form').requestSubmit();await h.flush();h.$('project-return').click();h.refine('Only people we have not already contacted');assert.deepEqual(h.requests.at(-1).body.excludeContactedIds,['expert-one']);assert.equal(h.requests.filter(r=>r.url.includes('send')).length,0);assert.equal(h.requests.length,2);
+  const h=await setup(t);await ready(h);action(cards(h)[0],'Save').click();await h.flush();h.$('open-project').click();action(h.$('project-candidates'),'Record activity').click();h.$('event-type').value='contact-recorded';h.$('event-detail').value='Team recorded an earlier enquiry.';h.$('event-form').requestSubmit();await h.flush();h.$('project-return').click();h.refine('Only people we have not already contacted');assert.deepEqual(h.requests.at(-1).body.excludeContactedIds,['expert-one']);assert.equal(h.requests.filter(r=>r.url.includes('send')).length,0);assert.equal(requestsFor(h,'search').length,2);assert.equal(requestsFor(h,'profile').length,1);
 });
 
 test('saved snapshots offer editable outreach drafts without making a model or sending request',async t=>{
@@ -645,7 +645,7 @@ test('Home starts a separate assessment with clean filters while preserving note
   const next=h.start('Assess skin-lesion software for primary care');assert.equal(next.body.sessionId,undefined);assert.equal(next.body.documentedOnly,false);assert.deepEqual(next.body.excludeContactedIds,[]);const secondId=h.$('project-select').value;assert.notEqual(secondId,firstId);
   next.resolve(result('skin',[person('skin')],{sessionId:'skin-session',brief:{...brief,summary:'Skin-lesion assessment'}}));await h.flush();
   const first=h.savedProjects.get(firstId);assert.equal(first.notes,'Keep the original assessment decisions.');assert.equal(first.candidates.length,1);assert.equal(first.draft,'A cardiac refinement still being written');assert.equal(first.activeBrief.summary,brief.summary);assert.equal(first.briefVersions.length,1);
-  h.history.back();await h.flush();assert.equal(h.$('project-select').value,firstId);h.$('resume-search').click();assert.equal(h.$('followup-input').value,first.draft);assert.equal(h.$('documented-only').checked,true);assert.equal(h.history.state.searchId,'strict-cardiac');assert.equal(h.requests.length,3);
+  h.history.back();await h.flush();assert.equal(h.$('project-select').value,firstId);h.$('resume-search').click();assert.equal(h.$('followup-input').value,first.draft);assert.equal(h.$('documented-only').checked,true);assert.equal(h.history.state.searchId,'strict-cardiac');assert.equal(requestsFor(h,'search').length,3);assert.equal(requestsFor(h,'profile').length,1);
   const refinement=h.refine('Clinical research is optional');assert.equal(refinement.body.sessionId,'session');assert.equal(refinement.body.documentedOnly,true);
 });
 
@@ -744,7 +744,7 @@ test('saved cards lead with scoped evidence, all gap names and independent close
 });
 
 test('all retained source provenance links are accessible from the profile without a model request',async t=>{
-  const h=await setup(t),c=person();c.evidence[0].sources=[{sourceUrl:'https://second.example/profile',sourceLabel:'Second professional profile'},{sourceUrl:'javascript:alert(1)',sourceLabel:'Unsafe'}];await ready(h,'sources',[c]);cards(h)[0].querySelector('.card-open').click();const links=h.$('profile-content').querySelectorAll('a');assert.ok(links.some(a=>a.href==='https://second.example/profile'));assert.ok(links.some(a=>a.href.includes('?evidence=e-expert-one#evidence-e-expert-one')));assert.ok(!links.some(a=>a.href.startsWith('javascript:')));assert.equal(h.requests.length,2);
+  const h=await setup(t),c=person();c.evidence[0].sources=[{sourceUrl:'https://second.example/profile',sourceLabel:'Second professional profile'},{sourceUrl:'javascript:alert(1)',sourceLabel:'Unsafe'}];await ready(h,'sources',[c]);cards(h)[0].querySelector('.card-open').click();const links=h.$('profile-content').querySelectorAll('a');assert.ok(links.some(a=>a.href==='https://second.example/profile'));assert.ok(links.some(a=>a.href.includes('?evidence=e-expert-one&corpusVersion=corpus-test#evidence-e-expert-one')));assert.ok(!links.some(a=>a.href.startsWith('javascript:')));assert.equal(h.requests.length,2);
 });
 
 test('candidate scanning leads with reachable actions and omits duplicate card chrome',async t=>{
@@ -955,4 +955,46 @@ test('native Escape saves profile reading position before the browser can close 
   const cancel=dialog.emit('cancel',{cancelable:true});if(!cancel.defaultPrevented){dialog.close();region.scrollTop=0;}
   assert.equal(cancel.defaultPrevented,true);assert.equal(dialog.open,true,'Controlled history navigation closes after capturing visible state');assert.equal(region.scrollTop,570);await h.flush();assert.equal(dialog.open,false);assert.equal(closes,1);assert.equal(h.history.state.profileId,null);assert.equal(h.document.activeElement.className,'card-open');
   cards(h)[0].querySelector('.card-open').click();assert.equal(dialog.open,true);assert.equal(region.scrollTop,570);assert.equal(section(content,'About').open,false);assert.equal(section(content,'Clinical interests').open,true);assert.equal(section(content,'Sources and search checks').open,true);assert.equal(requestsFor(h,'profile').length,1);assert.equal(requestsFor(h,'explain').length,0);
+});
+
+test('saving a result fetches matching full background without opening a profile or using AI',async t=>{
+  const h=await setup(t),c=person(),dataReleaseId='r0-safe-20261008-v2';await ready(h,'save-background',[c],{profileVersion:'expert-profile-v2',dataReleaseId});
+  action(cards(h)[0],'Save').click();await h.flush();assert.equal(h.$('profile-dialog').open,false);assert.equal(requestsFor(h,'profile').length,1);assert.equal(requestsFor(h,'explain').length,0);
+  let saved=[...h.savedProjects.values()][0];assert.equal(saved.candidates[0].candidate.profileBackgroundStatus.state,'loading');assert.equal(saved.candidates[0].candidate.profileBackground,undefined);
+  assert.equal(saved.dataReleaseId,dataReleaseId);assert.equal(saved.candidates[0].dataReleaseId,dataReleaseId);
+  assert.equal(requestsFor(h,'profile')[0].body.profileVersion,'expert-profile-v2');requestsFor(h,'profile')[0].resolve({...background(c),profileVersion:'expert-profile-v2',dataReleaseId});await h.flush();
+  saved=[...h.savedProjects.values()][0];assert.equal(saved.candidates[0].candidate.profileBackgroundStatus.state,'complete');assert.equal(saved.candidates[0].candidate.profileBackground.corpusVersion,'corpus-test');assert.equal(h.$('profile-dialog').open,false);assert.doesNotThrow(()=>P.exportJSON(saved));
+  assert.equal(saved.candidates[0].candidate.profileBackground.dataReleaseId,dataReleaseId);assert.equal(P.importJSON(P.exportJSON(saved)).candidates[0].dataReleaseId,dataReleaseId);
+});
+
+test('a mismatched release cannot silently replace the background in a saved search snapshot',async t=>{
+  const h=await setup(t),c=person();await ready(h,'release-mismatch',[c],{dataReleaseId:'r0-safe-20261008-v2'});action(cards(h)[0],'Save').click();await h.flush();
+  requestsFor(h,'profile')[0].resolve({...background(c),dataReleaseId:'bupa-r1-20261008-v2'});await h.flush();
+  const saved=[...h.savedProjects.values()][0].candidates[0];assert.equal(saved.dataReleaseId,'r0-safe-20261008-v2');assert.equal(saved.candidate.profileBackgroundStatus.state,'partial');assert.equal(saved.candidate.profileBackground,undefined);
+});
+
+test('failed or wrong-projection background stays partial and can be retried without losing notes',async t=>{
+  const h=await setup(t),c=person();await ready(h,'save-retry',[c],{profileVersion:'expert-profile-v2'});action(cards(h)[0],'Save').click();await h.flush();
+  requestsFor(h,'profile')[0].reject(new Error('Fixture unavailable'));await h.flush();let saved=[...h.savedProjects.values()][0];assert.equal(saved.candidates[0].candidate.profileBackgroundStatus.state,'partial');assert.equal(saved.candidates[0].candidate.profileBackground,undefined);
+  h.$('open-project').click();h.$('project-notes').value='Keep the team notes.';h.$('save-project-notes').click();await h.flush();action(h.$('project-candidates'),'Retry background').click();await h.flush();requestsFor(h,'profile')[1].resolve(background(c));await h.flush();saved=[...h.savedProjects.values()][0];assert.equal(saved.candidates[0].candidate.profileBackgroundStatus.state,'partial');assert.equal(saved.notes,'Keep the team notes.');
+  action(h.$('project-candidates'),'Retry background').click();await h.flush();requestsFor(h,'profile')[2].resolve({...background(c),profileVersion:'expert-profile-v2'});await h.flush();saved=[...h.savedProjects.values()][0];assert.equal(saved.candidates[0].candidate.profileBackgroundStatus.state,'complete');assert.equal(saved.notes,'Keep the team notes.');assert.equal(saved.candidates.length,1);
+});
+
+test('an older save-background response cannot overwrite a newer saved evidence version',async t=>{
+  const h=await setup(t),c=person();await ready(h,'old-save',[c]);action(cards(h)[0],'Save').click();await h.flush();const older=requestsFor(h,'profile')[0];
+  h.refine('Research preferred').resolve(result('new-save',[c],{corpusVersion:'corpus-new'}));await h.flush();cards(h)[0].querySelector('[data-save-id]').click();await h.flush();const newer=requestsFor(h,'profile')[1];
+  newer.resolve({...background(c,'corpus-new'),about:[{...background(c).about[0],text:'The newer saved professional background.'}]});await h.flush();older.resolve(background(c));await h.flush();
+  const saved=[...h.savedProjects.values()][0].candidates[0];assert.equal(saved.corpusVersion,'corpus-new');assert.equal(saved.candidate.profileBackground.corpusVersion,'corpus-new');assert.equal(saved.candidate.profileBackground.about[0].text,'The newer saved professional background.');assert.equal(saved.candidate.profileBackgroundStatus.state,'complete');
+});
+
+test('qualifications without registrations, passage counts and versioned full sources remain visible',async t=>{
+  const h=await setup(t),c=person();await ready(h,'qualifications',[c],{profileVersion:'expert-profile-v2'});cards(h)[0].querySelector('.card-open').click();
+  const p={...background(c),profileVersion:'expert-profile-v2',qualifications:[{...c.evidence[0],text:'MSc Clinical Imaging',type:'professional-background',field:'qualifications'}],counts:{about:9,qualifications:1},truncated:true};requestsFor(h,'profile')[0].resolve(p);await h.flush();
+  assert.match(section(h.$('profile-content'),'Registration and qualifications').textContent,/MSc Clinical Imaging/);assert.match(h.$('profile-content').textContent,/About: showing 1 of 9 recorded passages/);
+  const link=h.$('profile-content').querySelectorAll('a').find(a=>a.textContent==='Open full source collection ↗'),url=new URL(link.href);assert.equal(url.searchParams.get('corpusVersion'),'corpus-test');assert.equal(url.searchParams.get('profileVersion'),'expert-profile-v2');
+});
+
+test('compact background never cuts a terminal negative marker from its scoped list',async t=>{
+  const h=await setup(t),c=person(),text='Recorded modalities:\n'+('CT MR '.repeat(34))+'\nNo';c.requirementMatrix=[];c.backgroundPreview=[{...c.evidence[0],text,excerpt:text,qualifiers:['contains-negation']}];await ready(h,'negative-preview',[c]);
+  assert.equal(cards(h)[0].querySelector('.background-copy').textContent,text);assert.match(cards(h)[0].querySelector('.background-copy').textContent,/No$/);
 });

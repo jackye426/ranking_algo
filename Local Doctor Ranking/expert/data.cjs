@@ -3,7 +3,7 @@
 // Professional discovery projection only. This module never reads credentials,
 // contacts, patient material, appointment history or recruitment decisions.
 const {createHash} = require('node:crypto');
-const VERSION = 'expert-corpus-v1';
+const VERSION = 'expert-corpus-v2';
 const SENTENCES=typeof Intl.Segmenter==='function' ? new Intl.Segmenter('en',{granularity:'sentence'}) : null;
 const hash = value => createHash('sha256').update(String(value)).digest('hex').slice(0,20);
 const unique = values => [...new Set(values.filter(Boolean))];
@@ -17,6 +17,9 @@ function normalizeText(value) {
     .replace(/\r/g,'').replace(/[\t ]+/g,' ').replace(/ *\n */g,'\n').trim();
 }
 function safeUrl(value) {
+  // Missing per-item URLs are common in procedure records. Avoid constructing
+  // and catching an invalid URL for every optional provenance lookup.
+  if(value==null)return null;
   try { const u = new URL(String(value)); return /^(?:http|https):$/.test(u.protocol) && !u.username && !u.password ? u.href : null; } catch { return null; }
 }
 function dateValue(value) {
@@ -133,7 +136,17 @@ function sourceFor(row,field,item={}) {
   const sourceUrl=safeUrl(item.sourceUrl||item.source_url||item.url||row[`${field}_source_url`]) || safeUrl(provider?.[1]);
   return {sourceRecordId:String(row.id),field,sourceUrl,sourceLabel:supplied||'Integrated professional record',
     dates:{sourceDate:dateValue(item.sourceDate||item.source_date||item.published_at),observedAt:dateValue(item.observedAt||item.retrieved_at||row.source_retrieved_at),mergeDate:dateValue(row.merge_date)},
-    attribution:sourceUrl?'linked-source':'source-record'};
+    attribution:sourceUrl?'linked-source':'source-record',...repairProvenance(item.repairProvenance)};
+}
+function repairProvenance(value) {
+  if(!value||typeof value!=='object'||Array.isArray(value))return {};
+  const kept={};
+  for(const [key,max]of Object.entries({releaseId:160,baselineSha256:64,beforeHash:64,snapshotSha256:64,parserVersion:160,reviewId:240,originalSourceField:160})){
+    const item=value[key];if(typeof item!=='string'||!item||item.length>max)continue;
+    if(/Sha256$|Hash$/.test(key)&&!/^[a-f0-9]{64}$/.test(item))continue;
+    kept[key]=item;
+  }
+  return Object.keys(kept).length?{repairProvenance:kept}:{};
 }
 const ATTRIBUTES={
   modality:[['cardiac CT',/\b(?:cardiac[ /-]*(?:coronary[ /-]*)?(?:CT|computed tomography)|coronary[ /-]*(?:CT|computed tomography)|CT\s+coronary|CTCA)\b/i],['cardiac MRI',/\b(?:cardiac|cardiovascular)\s+(?:MRI|magnetic resonance)|\bCMR\b/i],['CT',/\bCT\b|computed tomography/i],['MRI',/\bMRI\b|magnetic resonance/i],['dermoscopy',/dermoscop/i],['ultrasound',/ultrasound|sonograph/i],['echocardiography',/echocardiog|\becho\b/i],['radiography',/radiograph|x[ -]?ray/i],['endoscopy',/endoscop/i],['robotic surgery',/robotic\s+(?:surg|procedure)|da vinci|hugo platform/i],['electrocardiography',/\bECG\b|electrocardiogra/i]],
@@ -197,7 +210,7 @@ function directClinicalActivity(text) {
 function extractAttributes(text,context={}) {
   const field=typeof context==='string'?context:context.field||'',type=typeof context==='string'?classifyPassage(text,field):context.type;
   const clean=normalizeText(text),output=emptyAttributes();
-  if(PURE_METADATA_FIELDS.test(field)||type==='location')return output;
+  if(PURE_METADATA_FIELDS.test(field)||/^professional_context\.(?!condition$)/.test(field)||type==='location')return output;
   // Background affiliations and qualifications can contain clinical words in
   // organisation or journal names. Keep their exact text searchable, without
   // promoting those names into individual practice/population attributes.
@@ -271,6 +284,9 @@ function qualifiers(text,type) {
 }
 function sourceStatements(value) {
   const text=normalizeText(value); if(!text) return [];
+  // A detached "No" cannot safely be discarded while retaining its adjacent
+  // list as positive evidence. Keep the complete source block and its scope.
+  if(negativeList(text))return [text];
   // Several source bios omit the space between complete sentences. Split at
   // recognised sentence starts without rewriting any supporting words. Share
   // these boundaries with activity classification and the requirement matrix.
@@ -287,7 +303,12 @@ function sourceStatements(value) {
   });
   return sentenceSegments;
 }
+function negativeList(text){return /(?:^|\n|[•*])\s*No\s*[:.!]?\s*(?=$|\n|[•*])/i.test(text)||/\b(?:do not|does not|did not|never|no longer)\b[^\n]*:\s*(?:\n|[•*])/i.test(text);}
 function splitPassages(value) {
+  const normalized=normalizeText(value);
+  // Oversized ambiguous lists are withheld rather than split into unqualified
+  // positive fragments. This bound matches the owned-source/profile contract.
+  if(negativeList(normalized))return normalized.length<=5000?[normalized]:[];
   const sentenceSegments=sourceStatements(value);
   const output=[];
   for(const sentence of sentenceSegments) for(const line of sentence.split(/\n+/)) {
@@ -300,7 +321,7 @@ function splitPassages(value) {
   return output;
 }
 function useful(text,field) {
-  if(text.length<3||/^(?:null|none|unknown|n\/?a|not available|undefined)$/i.test(text)) return false;
+  if((text.length<3&&!/^(?:CT|MR|US|GI|MS|No)$/.test(text))||/^(?:null|none|unknown|n\/?a|not available|undefined)$/i.test(text)) return false;
   if(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text)) return false;
   if(/\b(?:telephone|phone|mobile|contact|booking|book an appointment)\b/i.test(text)&&/\+?\d[\d ()-]{8,}\d|https?:\/\//i.test(text)) return false;
   if(/\b(?:my\s+(?:wife|husband|children|family)|spare\s+time|outside\s+(?:of\s+)?work|hobbies|enjoy\s+(?:golf|ski|travel|music)|married\s+with|golf\s+club)\b/i.test(text)) return false;
@@ -334,19 +355,25 @@ function valueEntries(value) {
 function volumeFor(item,field) {
   if(!item||typeof item!=='object'||!/procedure|volume/i.test(field)) return null;
   const period=normalizeText(item.reporting_period||item.period||item.date_range||item.year||'')||null;
-  const range=normalizeText(item.count_range||item.count_bucket||item.range||item.volume||item.count||'')||null;
+  const range=normalizeText(item.count_range||item.count_bucket||item.range||item.volume||item.count||(typeof item.admissions==='string'&&/^(?:[<>]=?\s*\d+|\d+\s*[-–]\s*\d+)$/.test(item.admissions.trim())?item.admissions:'')||'')||null;
   const numeric=typeof item.count_numeric==='number' ? item.count_numeric : null;
   const reportedAdmissions=Number.isFinite(item.admissions)?item.admissions:null;
   if(!period&&!range&&numeric==null&&reportedAdmissions==null) return null;
   return {activity:normalizeText(item.description||item.procedure_name||item.procedure||item.name||item.text),reportedRange:range,reportingPeriod:period,
-    reportedAdmissions,countNumeric:numeric,countNumericDerived:numeric!==null,comparable:false,sourceField:field};
+    reportedAdmissions,countNumeric:numeric,countNumericDerived:numeric!==null,comparable:false,sourceField:field,
+    hospital:normalizeText(item.hospital)||null,procedureCode:normalizeText(item.code||item.procedure_id)||null,
+    sourceUrl:safeUrl(item.source_url||item.sourceUrl),sourceDate:dateValue(item.sourceDate||item.source_date||item.last_updated)};
 }
 function rowEvidence(row) {
   const output=[];
   const fields=['about','about_alternatives','specialty','specialty_alternatives','specialties','professional_role','clinical_interests','areas_of_interest','procedures',
     'procedures_completed','procedure_volumes_phin','research_interests','publications','qualifications','detailed_qualifications','professional_memberships',
     'nhs_posts','nhs_base','professional_experience','isrctn_trials','trials','teaching_interests'];
-  for(const field of fields) for(const item of valueEntries(row[field])) {
+  for(const field of fields) {
+    const entries=valueEntries(row[field]),bySource=new Map();
+    for(const item of entries){const key=JSON.stringify(sourceFor(row,field,item));if(!bySource.has(key))bySource.set(key,[]);bySource.get(key).push(item);}
+    const contextual=[...bySource.values()].flatMap(items=>items.some(item=>/^No\s*[:.!]?$/i.test(item.text))?[{...items[0],text:items.map(item=>item.text).join('\n')}]:items);
+    for(const item of contextual) {
     const source=sourceFor(row,field,item); const volume=volumeFor(item,field);
     // A bibliography/profile link is useful metadata, not proof of authorship,
     // study design or a clinician's contribution to any named paper.
@@ -356,6 +383,15 @@ function rowEvidence(row) {
     }
     const extra=field==='publications' ? {publication:{title:item.text,doi:normalizeText(item.doi)||null,journal:normalizeText(item.journal)||null,year:dateValue(item.year),authors:asArray(item.authors).filter(x=>typeof x==='string')}} : {};
     for(const text of splitPassages(item.text)) if(useful(text,field)) output.push({text,...source,...extra,...(volume?{volume}:{})});
+    }
+  }
+  // Only a trusted, professional-only release adapter supplies these fields.
+  // They add attributed context; they never change canonical identity or role.
+  const kinds={profession:'professional-background',condition:'clinical-interest',population:'professional-background',language:'professional-background',service:'professional-background'};
+  for(const item of asArray(row.professional_context)){
+    if(!item||!Object.hasOwn(kinds,item.kind)||typeof item.text!=='string'||!safeUrl(item.sourceUrl)||!item.repairProvenance?.releaseId||!item.repairProvenance?.reviewId)continue;
+    const field='professional_context.'+item.kind;
+    for(const text of splitPassages(item.text))if(useful(text,field))output.push({text,...sourceFor(row,field,item),type:kinds[item.kind],qualifiers:[item.kind==='condition'?'listed-condition-not-performed-care':'recorded-context-not-performed-activity']});
   }
   // Compact complete statements from the same source, field, evidential type and
   // qualifier state. Nothing is truncated: additional chunks retain the rest.
@@ -365,7 +401,7 @@ function rowEvidence(row) {
   for(const entry of output) {
     const type=entry.type||classifyPassage(entry.text,entry.field);
     const qs=unique([...(entry.qualifiers||[]),...qualifiers(entry.text,type),...(entry.field==='research_interests'&&type!=='research'?['stated-interest','research-interest-not-study-experience']:[])]);
-    const key=JSON.stringify([entry.field,entry.sourceUrl,entry.sourceLabel,entry.dates,type,qs]);
+    const key=JSON.stringify([entry.field,entry.sourceUrl,entry.sourceLabel,entry.dates,type,qs,entry.repairProvenance||null]);
     let current=buckets.get(key);
     if(current&&current.text.split('\n').includes(entry.text)) {
       if(entry.volume) (current.volumes??=[]).push(entry.volume);
@@ -434,9 +470,10 @@ function buildCorpus(input,{enrichments=[],identityReviews=[]}={}) {
   const groups=new Map(); for(let i=0;i<prepared.length;i++) {const k=find(i);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(prepared[i]);}
   const candidates=[],passages=[]; const passageByKey=new Map(); const candidateById=new Map();const sourceToCandidate=new Map();
   function addPassage(candidate,entry) {
-    const key=`${candidate.id}|${entry.text}`; const type=entry.type||classifyPassage(entry.text,entry.field);
+    const type=entry.type||classifyPassage(entry.text,entry.field),entryQualifiers=unique([...(entry.qualifiers||[]),...qualifiers(entry.text,type)]).sort();
+    const key=JSON.stringify([candidate.id,entry.text,type,entryQualifiers,entry.dates||{},entry.reviewedParaphrase===true,entry.sourceQuote||null]);
     const source={sourceRecordId:entry.sourceRecordId,field:entry.field,sourceUrl:entry.sourceUrl,sourceLabel:entry.sourceLabel,dates:entry.dates,attribution:entry.attribution,
-      ...(entry.reviewedParaphrase?{reviewedParaphrase:true,sourceQuote:entry.sourceQuote||null}:{}),...(entry.review?{review:entry.review}:{}),...(entry.identityBasis?{identityBasis:entry.identityBasis}:{})};
+      ...(entry.reviewedParaphrase?{reviewedParaphrase:true,sourceQuote:entry.sourceQuote||null}:{}),...(entry.review?{review:entry.review}:{}),...(entry.identityBasis?{identityBasis:entry.identityBasis}:{}),...repairProvenance(entry.repairProvenance)};
     const old=passageByKey.get(key);
     if(old) {
       if(!old.sources.some(s=>JSON.stringify(s)===JSON.stringify(source))) old.sources.push(source);
@@ -449,7 +486,7 @@ function buildCorpus(input,{enrichments=[],identityReviews=[]}={}) {
       if(weight[entry.attribution]>weight[old.attribution]) Object.assign(old,source,{type,attributes:extractAttributes(entry.text,{field:entry.field,type}),qualifiers:unique([...(old.qualifiers||[]),...(entry.qualifiers||[]),...qualifiers(entry.text,type)])});
       return;
     }
-    const passage={id:`evidence-${hash(key)}`,candidateId:candidate.id,...entry,type,attributes:extractAttributes(entry.text,{field:entry.field,type}),qualifiers:unique([...(entry.qualifiers||[]),...qualifiers(entry.text,type)]),sources:[source]};
+    const passage={id:`evidence-${hash(key)}`,candidateId:candidate.id,...entry,type,attributes:extractAttributes(entry.text,{field:entry.field,type}),qualifiers:entryQualifiers,sources:[source]};
     passageByKey.set(key,passage);passages.push(passage);candidate.evidenceIds.push(passage.id);
   }
   for(const group of groups.values()) {
@@ -501,4 +538,4 @@ function buildCorpus(input,{enrichments=[],identityReviews=[]}={}) {
   const fingerprint=createHash('sha256');for(const c of candidates) fingerprint.update(JSON.stringify(c));for(const p of passages) fingerprint.update(JSON.stringify(p));
   return {candidates,passages,audit,identityLedger,version:`${VERSION}-${fingerprint.digest('hex').slice(0,20)}`};
 }
-module.exports={buildCorpus,extractAttributes,classifyPassage,normalizeRegistration,normalizeText,splitPassages,activityClauses,compatibleNames,safeUrl,VERSION};
+module.exports={buildCorpus,extractAttributes,classifyPassage,normalizeRegistration,normalizeText,splitPassages,activityClauses,compatibleNames,safeUrl,repairProvenance,VERSION};

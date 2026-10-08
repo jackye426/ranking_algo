@@ -4,6 +4,11 @@ const brief={version:1,summary:'Cardiac CT',requirements:[{id:'ct',label:'Cardia
 const candidate={id:'expert-a',name:'Dr A',role:'Radiologist',reasons:['Documented cardiac CT reporting.'],requirementMatrix:[{requirementId:'ct',label:'Cardiac CT',status:'documented',importance:'essential',evidenceIds:['e1']}],evidence:[{id:'e1',candidateId:'expert-a',sourceRecordId:'r1',field:'about',type:'clinical-practice',text:'Reports cardiac CT.',sourceUrl:'https://example.org/a',dates:{sourceDate:null}}],questions:[{text:'Confirm current activity.'}]};
 const saved=()=>p.saveCandidate(p.createProject('Cardiac pathway'),candidate,brief,'corpus-v1');
 test('project namespace is separate from patient storage',()=>assert.equal(p.DATABASE,'docmap-expert-projects-v1'));
+
+test('every exported matrix and appendix source citation pins the saved corpus without requiring full background',()=>{
+  const html=p.exportHTML(saved()),links=[...html.matchAll(/href="([^"]*\/api\/expert\/sources\/[^\"]+)"/g)].map(match=>new URL(match[1].replace(/&amp;/g,'&')));
+  assert.ok(links.length>=2);assert.ok(links.every(url=>url.searchParams.get('corpusVersion')==='corpus-v1'));
+});
 test('save snapshots evidence and exact brief without aliasing',()=>{const s=saved();s.candidates[0].candidate.evidence[0].text='Changed';assert.equal(candidate.evidence[0].text,'Reports cardiac CT.');assert.deepEqual(s.candidates[0].brief,brief);});
 test('AI cannot record review decisions or recruitment events',()=>{assert.throws(()=>p.changeReview(saved(),'expert-a','qualification','reviewed-by-team',{actor:'ai'}));assert.throws(()=>p.recordEvent(saved(),'expert-a','contact-recorded','',{actor:'ai'}));});
 test('explicit team review leaves independence separate',()=>{const s=p.changeReview(saved(),'expert-a','qualification','reviewed-by-team',{actor:'user'});assert.equal(s.candidates[0].qualification,'reviewed-by-team');assert.equal(s.candidates[0].independence,'not-reviewed');assert.equal(s.candidates[0].decisions[0].actor,'user');});
@@ -71,7 +76,7 @@ test('malformed failed request operations cannot enter recovery through imported
 });
 
 test('review pack citations target exact owned evidence on the supplied origin and include all safe sources',()=>{
-  const project=saved();project.candidates[0].candidate.evidence[0].sources=[{sourceUrl:'https://second.example/record',sourceLabel:'Additional source'},{sourceUrl:'javascript:alert(1)',sourceLabel:'Unsafe'}];const html=p.exportHTML(project,{baseUrl:'https://preview.example'});assert.match(html,/https:\/\/preview\.example\/api\/expert\/sources\/expert-a\?evidence=e1#evidence-e1/);assert.match(html,/https:\/\/second\.example\/record/);assert.doesNotMatch(html,/javascript:/);assert.match(p.exportHTML(project),/https:\/\/docmap-expert-discovery-production\.up\.railway\.app\/api\/expert\/sources/);
+  const project=saved();project.candidates[0].candidate.evidence[0].sources=[{sourceUrl:'https://second.example/record',sourceLabel:'Additional source'},{sourceUrl:'javascript:alert(1)',sourceLabel:'Unsafe'}];const html=p.exportHTML(project,{baseUrl:'https://preview.example'});assert.match(html,/https:\/\/preview\.example\/api\/expert\/sources\/expert-a\?evidence=e1&amp;corpusVersion=corpus-v1#evidence-e1/);assert.match(html,/https:\/\/second\.example\/record/);assert.doesNotMatch(html,/javascript:/);assert.match(p.exportHTML(project),/https:\/\/docmap-expert-discovery-production\.up\.railway\.app\/api\/expert\/sources/);
 });
 
 test('review pack distinguishes listed interests, activities and complete essential/preferred gaps',()=>{
@@ -94,7 +99,7 @@ test('focus-only review pack shows relevance first and does not invent must-have
 test('related research export preserves exact source attribution and dates without creating a requirement',()=>{
   const person=structuredClone(candidate),scope={...brief,requirements:brief.requirements.map(r=>({...r,importance:'focus'}))},research={id:'research',candidateId:person.id,sourceRecordId:'study-record',field:'reviewed-study',type:'research',text:'Coauthored a 2010 cardiac imaging protocol.',reviewedParaphrase:true,sourceQuote:'A. Author',sourceUrl:'https://publisher.example/protocol',dates:{sourceDate:'2010-05-11'},review:{limitations:['Historical coauthorship only.']}};person.evidence.push(research);person.relatedEvidence=[{evidenceId:research.id,text:research.text,kind:'reviewed-summary',evidenceType:'research',sourceDate:'2010-05-11',limits:research.review.limitations,relatedToRequirementIds:['ct']}];
   const project=p.saveCandidate(p.createProject(),person,scope,'corpus-v1'),html=p.exportHTML(project,{baseUrl:'https://preview.example'}),intro=html.slice(html.indexOf('Relevance to your search'),html.indexOf('Saved rationale and search evidence'));
-  assert.match(intro,/Related research/);assert.match(intro,/Reviewed source summary/);assert.match(intro,/2010-05-11/);assert.match(intro,/api\/expert\/sources\/expert-a\?evidence=research#evidence-research/);assert.match(intro,/publisher\.example\/protocol/);assert.equal(project.activeBrief.requirements.length,1);assert.deepEqual(p.importJSON(p.exportJSON(project)).candidates[0].candidate.relatedEvidence,person.relatedEvidence);
+  assert.match(intro,/Related research/);assert.match(intro,/Reviewed source summary/);assert.match(intro,/2010-05-11/);assert.match(intro,/api\/expert\/sources\/expert-a\?evidence=research&amp;corpusVersion=corpus-v1#evidence-research/);assert.match(intro,/publisher\.example\/protocol/);assert.equal(project.activeBrief.requirements.length,1);assert.deepEqual(p.importJSON(p.exportJSON(project)).candidates[0].candidate.relatedEvidence,person.relatedEvidence);
 });
 
 test('a failed focus-priority edit can be restored without altering saved evidence',()=>{

@@ -44,7 +44,7 @@ function requirementQueries(r){
 // Exact metadata still participates in BM25 and structured requirement checks.
 // It should not spend vector capacity on registration/address/degree strings.
 function semanticEligible(p){if(p.type==='location'||p.qualifiers?.includes('publication-listing-link-not-authorship'))return false;if(p.type!=='professional-background')return true;if(/^(?:qualifications|detailed_qualifications)$/.test(p.field))return p.text.length>=100||Object.values(p.attributes||{}).some(values=>values.length>0);return !/^(?:specialty|specialty_alternatives|specialties|professional_memberships|nhs_posts|nhs_base|registration|locations)$/.test(p.field);}
-function negative(text){return /\b(?:does not|do not|doesn['’]t|don['’]t|not currently|no longer|no experience|without experience|never)\b/i.test(text);}
+function negative(text){return /\b(?:does not|do not|doesn['’]t|don['’]t|not currently|no longer|no experience|without experience|never)\b/i.test(text)||/(?:^|\n|[•*])\s*No\s*[:.!]?\s*(?=$|\n|[•*])/i.test(text);}
 // Imported biographies sometimes lose sentence spaces and bullet separators.
 // Recover only literal boundaries before deciding which activity a topic
 // belongs to; otherwise CT training can borrow an unrelated research verb.

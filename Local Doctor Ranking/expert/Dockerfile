@@ -14,7 +14,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=models --chown=node:node /app/demo/.cache/models ./demo/.cache/models
 COPY package.json package-lock.json ./
 COPY demo/models.cjs ./demo/models.cjs
-COPY expert/server.cjs expert/reader.cjs expert/data.cjs expert/brief.cjs expert/search.cjs expert/ai.cjs expert/transport.cjs expert/enrichments.cjs expert/identity-reviews.cjs expert/resume.cjs expert/sources.cjs expert/geo.cjs expert/profile.cjs expert/emdn-taxonomy.cjs expert/device-context.cjs ./expert/
+COPY expert/server.cjs expert/reader.cjs expert/releases.cjs expert/data.cjs expert/brief.cjs expert/search.cjs expert/ai.cjs expert/transport.cjs expert/enrichments.cjs expert/identity-reviews.cjs expert/resume.cjs expert/sources.cjs expert/geo.cjs expert/profile.cjs expert/emdn-taxonomy.cjs expert/device-context.cjs ./expert/
 COPY expert/data/emdn-2026.json ./expert/data/emdn-2026.json
 COPY expert/public/ ./expert/public/
 COPY public/fonts/inter-variable.ttf public/fonts/OFL-Inter.txt ./public/fonts/

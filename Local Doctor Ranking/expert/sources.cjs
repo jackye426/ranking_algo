@@ -1,5 +1,6 @@
 'use strict';
-const {sourceLinks,safeUrl,displayBlocks}=require('./public/evidence.js');
+const {sourceLinks,safeUrl,displayBlocks,volumeSummary}=require('./public/evidence.js');
+const {repairProvenance}=require('./data.cjs');
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const list=value=>Array.isArray(value)?value:[];
 const evidenceAnchor=id=>'evidence-'+id;
@@ -48,7 +49,7 @@ function provenance(p){
     if(!source||typeof source!=='object')continue;
     // Match the stored provenance schema, rather than aggregate passage
     // qualifiers which are not copied into each source by corpus preparation.
-    const entry={sourceRecordId:source.sourceRecordId||null,field:source.field||null,sourceLabel:sourceLabel(source),sourceUrl:safeUrl(source.sourceUrl),dates:source.dates||{},attribution:source.attribution||'Stored source record',identityBasis:source.identityBasis||source.review?.identityBasis||null,reviewedParaphrase:source.reviewedParaphrase===true,sourceQuote:source.sourceQuote||null,review:source.review||null,limits:[...new Set(list(source.review?.limitations).filter(v=>typeof v==='string'&&v.trim()))]};
+    const entry={sourceRecordId:source.sourceRecordId||null,field:source.field||null,sourceLabel:sourceLabel(source),sourceUrl:safeUrl(source.sourceUrl),dates:source.dates||{},attribution:source.attribution||'Stored source record',identityBasis:source.identityBasis||source.review?.identityBasis||null,reviewedParaphrase:source.reviewedParaphrase===true,sourceQuote:source.sourceQuote||null,review:source.review||null,...repairProvenance(source.repairProvenance),limits:[...new Set(list(source.review?.limitations).filter(v=>typeof v==='string'&&v.trim()))]};
     const key=stableKey(entry);if(seen.has(key))continue;seen.add(key);result.push(entry);
   }
   return result;
@@ -56,10 +57,11 @@ function provenance(p){
 function metadata(p,{evidenceId}={}){
   const rows=[...(evidenceId?[['Evidence identifier',evidenceId]]:[]),['Stored source record',p.sourceRecordId||'Not recorded'],['Source field',p.field||'Not recorded'],['Attribution',p.attribution||'Stored source record'],['Source date',p.dates?.sourceDate||'Not recorded'],['Retrieved or checked',p.dates?.observedAt||'Not recorded'],['Database processing date',p.dates?.mergeDate||'Not recorded']];
   if(p.identityBasis)rows.push(['Identity attribution',typeof p.identityBasis==='string'?p.identityBasis:JSON.stringify(p.identityBasis)]);
+  for(const [key,label]of Object.entries({releaseId:'Data release',baselineSha256:'Frozen baseline SHA-256',beforeHash:'Original field SHA-256',snapshotSha256:'Source snapshot SHA-256',parserVersion:'Source parser',reviewId:'Source comparison record',originalSourceField:'Original source field'}))if(p.repairProvenance?.[key])rows.push([label,p.repairProvenance[key]]);
   return `<dl class="source-reader-metadata">${rows.map(([label,value])=>`<dt>${escape(label)}</dt><dd>${escape(value)}</dd>`).join('')}</dl>`;
 }
 function renderLimits(limits){return limits.length?`<div class="source-reader-limits"><p><strong>What this evidence establishes</strong></p><ul>${limits.map(value=>`<li>${escape(value)}</li>`).join('')}</ul></div>`:'';}
-function renderSourcePage(candidate,facts,selected){
+function renderSourcePage(candidate,facts,selected,{corpusVersion,profileVersion,dataRelease,legacyCitation=false}={}){
   const seen=new Set(),owned=list(facts).filter(p=>p?.candidateId===candidate.id&&typeof p.id==='string'&&!seen.has(p.id)&&(seen.add(p.id),true));
   // Route validation returns 404 for invalid selections; also retain ownership
   // at this presentation boundary so detached claims cannot be rendered.
@@ -72,6 +74,7 @@ function renderSourcePage(candidate,facts,selected){
       ${p.reviewedParaphrase?`<div class="source-reader-summary"><p><strong>Reviewed source summary</strong></p>${formattedText(p.text,p.field)}</div>${p.sourceQuote?`<p class="source-reader-kicker">Exact source excerpt</p><div class="source-reader-quote">${formattedText(p.sourceQuote,p.field,{quote:true})}</div>`:'<p class="source-reader-summary">No literal excerpt was recorded; this is a reviewed summary.</p>'}`:`<p class="source-reader-kicker">Exact source excerpt</p><div class="source-reader-quote">${formattedText(p.text,p.field,{quote:true})}</div>`}
       <p class="source-reader-provider">Source: ${escape(sourceLabel(p))}</p>
       <p class="source-reader-date">Source date: ${escape(p.dates?.sourceDate||'Not recorded')}.</p>
+      ${volumeSummary(p).map(value=>`<p class="source-reader-volume">${escape(value)}</p>`).join('')}
       ${renderLimits(limits)}
       <div class="source-reader-links">${links.length?links.map(link=>`<a href="${escape(link.url)}" rel="noopener noreferrer" target="_blank">Open original page — ${escape(link.label)} ↗<span class="sr-only"> (opens in a new tab)</span></a>`).join(''):'<p>Original page link unavailable. This quotation comes from the stored record.</p>'}</div>
       <details class="source-reader-details"><summary>Record details</summary>${metadata(main||p,{evidenceId:p.id})}
@@ -90,6 +93,7 @@ function renderSourcePage(candidate,facts,selected){
     <main class="source-reader-main">${cited?`<section class="source-reader-selected" aria-label="Selected source passage">${article(cited,true)}</section>`:''}
       <section class="source-reader-collection" aria-labelledby="source-reader-collection-title"><h2 id="source-reader-collection-title">${cited?'Other stored evidence for this professional':'Stored evidence for this professional'}</h2>${collection?`<p class="source-reader-collection-note">Open a section to read the original passages and their source details.</p>${collection}`:`<p class="source-reader-empty">${cited?'No other passages are recorded for this professional.':'No source passages are available for this professional.'}</p>`}</section>
       <p class="source-reader-collection-note">To continue your existing search, switch back to its original tab.</p>
+      ${corpusVersion?`<details class="source-reader-record"><summary>Evidence version</summary><p>Corpus: ${escape(corpusVersion)}<br>Profile projection: ${escape(profileVersion||'Not recorded')}${dataRelease?.releaseId?`<br>Data release: ${escape(dataRelease.releaseId)}`:''}</p>${legacyCitation?'<p>This legacy link opens the current evidence collection. The saved project retains the evidence recorded when it was saved.</p>':''}</details>`:''}
       <p class="source-reader-collection-note">Source dates describe the available record, not confirmation of current practice. An unknown source date cannot establish when the activity occurred. Stored professional evidence does not establish current registration, availability, independence or assessment approval.</p>
     </main></body></html>`;
 }

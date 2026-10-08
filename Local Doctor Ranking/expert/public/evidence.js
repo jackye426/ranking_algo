@@ -17,11 +17,25 @@
   const activeRequirement=(row,brief)=>list(brief?.requirements).find(r=>r.id===row?.requirementId)||row||{};
   function safeUrl(value){try{const u=new URL(value);return /^https?:$/.test(u.protocol)&&!u.username&&!u.password?u.href:null;}catch{return null;}}
   const evidenceAnchor=id=>typeof id==='string'&&id?'evidence-'+id:null;
-  function recordUrl(candidateId,evidenceId,baseUrl){
+  function recordUrl(candidateId,evidenceId,baseUrl,{corpusVersion,profileVersion}={}){
     const base=safeUrl(baseUrl);if(!base||typeof candidateId!=='string'||!candidateId)return null;
     const url=new URL('/api/expert/sources/'+encodeURIComponent(candidateId),base);
     if(typeof evidenceId==='string'&&evidenceId){url.searchParams.set('evidence',evidenceId);url.hash=evidenceAnchor(evidenceId);}
+    if(typeof corpusVersion==='string'&&corpusVersion)url.searchParams.set('corpusVersion',corpusVersion);
+    if(typeof profileVersion==='string'&&profileVersion)url.searchParams.set('profileVersion',profileVersion);
     return url.href;
+  }
+  function volumeSummary(evidence){
+    const volumes=list(evidence?.volumes).length?evidence.volumes:evidence?.volume?[evidence.volume]:[];
+    const text=value=>typeof value==='string'?value.slice(0,500):'';
+    return volumes.map(v=>[
+      text(v.activity),v.reportedRange?'Reported range: '+text(v.reportedRange):null,
+      Number.isFinite(v.reportedAdmissions)?'Reported admissions: '+v.reportedAdmissions:null,
+      Number.isFinite(v.countNumeric)?'Derived estimate: '+v.countNumeric+' (not an observed count)':null,
+      'Reporting period: '+(text(v.reportingPeriod)||'not recorded'),
+      v.hospital?'Hospital: '+text(v.hospital):null,v.procedureCode?'Procedure code: '+text(v.procedureCode):null,
+      v.sourceDate?'Source date: '+text(v.sourceDate):null,'Not comparable across sources or periods'
+    ].filter(Boolean).join(' · '));
   }
   function sourceLinks(evidence){
     const links=new Map();
@@ -178,6 +192,6 @@
     }
     return {lead,secondary:secondaryLimit<=0?[]:secondary,gaps:gaps(candidate,brief)};
   }
-  const api={typeLabel,requirementLabel,outcome,supportFor,cardProofs,cardRelevance,relatedProofs,gaps,safeUrl,sourceLinks,recordUrl,evidenceAnchor,displayBlocks};
+  const api={typeLabel,requirementLabel,outcome,supportFor,cardProofs,cardRelevance,relatedProofs,gaps,safeUrl,sourceLinks,recordUrl,evidenceAnchor,displayBlocks,volumeSummary};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.DocMapEvidence=api;
 })(globalThis);

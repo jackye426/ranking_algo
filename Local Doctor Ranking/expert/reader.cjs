@@ -2,6 +2,7 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const CACHE=()=>process.env.EXPERT_CACHE_DIR||path.join(__dirname,'.cache');
 async function fetchRows({onProgress=()=>{}}={}){
+  if(Object.hasOwn(process.env,'EXPERT_DATA_RELEASE'))throw Error('Pinned expert releases cannot fetch live source rows.');
   const base=process.env.SUPABASE_URL,token=process.env.EXPERT_READER_TOKEN;
   if(!/^https:\/\/[a-z0-9]+\.supabase\.co\/?$/.test(base||'')||!/^[a-f0-9]{64}$/.test(token||''))throw Error('Expert reader credentials are not configured.');
   const rows=[],seen=new Set();let after=null,fetchedAt=null;
@@ -18,6 +19,8 @@ async function fetchRows({onProgress=()=>{}}={}){
   }throw Error('Expert reader safety limit exceeded');
 }
 async function loadRows(options={}){
+  // Release failures must never fall through to a mutable cache or network read.
+  if(Object.hasOwn(process.env,'EXPERT_DATA_RELEASE'))return require('./releases.cjs').loadDataRelease(process.env.EXPERT_DATA_RELEASE,{cacheDir:CACHE()});
   const maxAge=Number(process.env.EXPERT_SOURCE_MAX_AGE_HOURS||24)*3600000;
   if(process.env.EXPERT_REFRESH_DATA!=='1')try{const data=JSON.parse(await fs.readFile(path.join(CACHE(),'raw.json'),'utf8'));if(Array.isArray(data.rows)&&data.readerVersion===1&&Number.isFinite(Date.parse(data.fetchedAt))&&Date.now()-Date.parse(data.fetchedAt)<maxAge)return data;}catch{}
   return fetchRows(options);

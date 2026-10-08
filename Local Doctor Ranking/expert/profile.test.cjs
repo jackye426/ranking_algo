@@ -87,7 +87,7 @@ test('location deduplication preserves branches and merges missing details with 
 });
 test('profiles remain bounded and explicitly link to the complete owned record',()=>{
   const p=profileOf({procedures:Array.from({length:40},(_,n)=>({text:'Treatment procedure '+n,source:'Source '+n}))});
-  assert.equal(p.procedures.length,LIMITS.procedures);assert.equal(p.counts.procedures,40);assert.equal(p.truncated,true);assert.match(p.sourceUrl,/\/api\/expert\/sources\/expert-gmc-1234567$/);
+  assert.equal(p.procedures.length,LIMITS.procedures);assert.equal(p.counts.procedures,40);assert.equal(p.truncated,true);const link=new URL(p.sourceUrl,'https://example.invalid');assert.equal(link.pathname,'/api/expert/sources/expert-gmc-1234567');assert.equal(link.searchParams.get('corpusVersion'),p.corpusVersion);assert.equal(link.searchParams.get('profileVersion'),p.profileVersion);
 });
 test('negative list context is not converted into a positive preview',()=>{
   const p=profileOf({about:'I do not perform:* Radioactive brain implants* Brain stimulation'}),preview=profilePreview(p,{query:'brain implants'});
