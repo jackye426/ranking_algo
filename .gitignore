@@ -15,6 +15,7 @@ npm-debug.log*
 !tsconfig.json
 !**/insurance-aliases.json
 !Local Doctor Ranking/expert/data/emdn-2026.json
+!Local Doctor Ranking/expert/data/mdr-2017-2185.json
 
 # Specifically exclude large data files
 **/merged_*.json

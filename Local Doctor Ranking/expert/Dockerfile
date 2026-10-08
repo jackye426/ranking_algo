@@ -14,8 +14,8 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=models --chown=node:node /app/demo/.cache/models ./demo/.cache/models
 COPY package.json package-lock.json ./
 COPY demo/models.cjs ./demo/models.cjs
-COPY expert/server.cjs expert/reader.cjs expert/data.cjs expert/brief.cjs expert/search.cjs expert/ai.cjs expert/transport.cjs expert/enrichments.cjs expert/identity-reviews.cjs expert/resume.cjs expert/sources.cjs expert/geo.cjs expert/profile.cjs expert/emdn-taxonomy.cjs expert/device-context.cjs expert/clarifications.cjs ./expert/
-COPY expert/data/emdn-2026.json ./expert/data/emdn-2026.json
+COPY expert/server.cjs expert/reader.cjs expert/data.cjs expert/brief.cjs expert/search.cjs expert/ai.cjs expert/transport.cjs expert/enrichments.cjs expert/identity-reviews.cjs expert/resume.cjs expert/sources.cjs expert/geo.cjs expert/profile.cjs expert/emdn-taxonomy.cjs expert/device-context.cjs expert/device-context-set.cjs expert/device-context-legacy.cjs expert/mdr-taxonomy.cjs expert/classification-registry.cjs expert/clarifications.cjs ./expert/
+COPY expert/data/emdn-2026.json expert/data/mdr-2017-2185.json ./expert/data/
 COPY expert/public/ ./expert/public/
 COPY public/fonts/inter-variable.ttf public/fonts/OFL-Inter.txt ./public/fonts/
 COPY public/brand/docmap-logo.jpg ./public/brand/docmap-logo.jpg

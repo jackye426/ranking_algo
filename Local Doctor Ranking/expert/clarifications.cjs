@@ -6,7 +6,8 @@
 const QUESTIONS=Object.freeze({
   'ct-application':'That’s CT medical-device software. What will it be used for?',
   'device-purpose':'What does the software do?',
-  'device-clinical-subject':'Which clinical subject, procedure or modality does this purpose concern? Include that expertise with what the software does.',
+  'device-clinical-subject':'Which clinical subject, procedure or modality does this purpose concern?',
+  'device-relationship':'Do these codes describe one device with a shared clinical purpose, or separate devices?',
   expertise:'What expertise are you looking for? A specialty, clinical interest, procedure or research area is enough to start.',
   context:'What else should we know about the expertise you need?'
 });
@@ -23,7 +24,7 @@ const REPLIES=Object.freeze({
 });
 function createClarification(kind,{question,deviceCode}={}){
   if(!Object.hasOwn(QUESTIONS,kind))kind='context';
-  const reviewed=kind==='expertise'||kind==='ct-application'&&deviceCode==='Z11030692'||kind==='device-purpose'&&deviceCode==='V92';
+  const reviewed=kind==='expertise'||kind==='ct-application'&&deviceCode==='Z11030692'||kind==='device-purpose'&&['V92','MDA0315'].includes(deviceCode);
   return {kind,question:typeof question==='string'&&question.trim()?question:QUESTIONS[kind],quickReplies:(reviewed?REPLIES[kind]||[]:[]).map(([id,message])=>({id,message}))};
 }
 function withClarification(result,kind='expertise',options={}){

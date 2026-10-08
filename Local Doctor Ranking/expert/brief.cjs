@@ -128,8 +128,23 @@ function normalizeBrief(previous){
   const next={...blankBrief(),...(previous&&typeof previous==='object'?clone(previous):{})};
   next.requirements=Array.isArray(next.requirements)?next.requirements.filter(r=>r&&KINDS.has(r.kind)&&r.id&&r.text).map(r=>{const normalized={...r,importance:IMPORTANCES.has(r.importance)?r.importance:'essential',...(r.kind==='role'?{polarity:r.polarity==='exclude'?'exclude':'include',strictRole:r.strictRole===true}: {})};if(!MATCH_INTENTS.has(normalized.matchIntent)||r.kind==='role')delete normalized.matchIntent;return normalized;}):[];
   next.roleMode=next.roleMode==='only'?'only':null;
-  const seen=new Map();
-  next.requirements=next.requirements.filter(r=>{const key=canonicalKey(r.kind,r.text),old=seen.get(key);if(!old){seen.set(key,r);return true;}if(r.importance==='essential')old.importance='essential';return false;});
+  const seen=new Map(),aliases=new Map();
+  next.requirements=next.requirements.filter(r=>{const key=canonicalKey(r.kind,r.text),old=seen.get(key);if(!old){seen.set(key,r);return true;}if(r.importance==='essential')old.importance='essential';aliases.set(r.id,old.id);return false;});
+  if(next.deviceContext?.schemaVersion===2&&Array.isArray(next.deviceContext.concepts)){
+    const merged=new Map();
+    for(const c of next.deviceContext.concepts){
+      c.requirementId=aliases.get(c.requirementId)||c.requirementId;
+      const requirement=next.requirements.find(r=>r.id===c.requirementId);
+      if(requirement)c.key=canonicalKey(requirement.kind,requirement.label);
+      const old=merged.get(c.key);
+      if(!old){merged.set(c.key,c);continue;}
+      old.origins=[...new Set([...(old.origins||[]),...(c.origins||[])])].sort();
+      old.userOrigin=old.userOrigin||c.userOrigin;old.legacyOrigin=old.legacyOrigin||c.legacyOrigin;
+      if(c.state==='active'){old.state='active';old.requirementId=c.requirementId;}
+    }
+    next.deviceContext.concepts=[...merged.values()];
+    next.deviceContext.derivedRequirementIds=next.deviceContext.concepts.filter(c=>c.state==='active').map(c=>c.requirementId);
+  }
   return next;
 }
 function localClauseBefore(raw,index,window=65){
@@ -496,4 +511,4 @@ function createBriefInterpreter({client,model=process.env.OPENROUTER_QUERY_MODEL
   };
   interpret.configured=!!client;interpret.model=client?model:null;interpret.requiresAI=input=>!!client&&!input?.removeRequirementId&&!input?.patch&&!!clean(input?.message);return interpret;
 }
-module.exports={createBriefInterpreter,parseBrief,normalizeBrief,blankBrief,sufficient,CONCEPTS,KINDS,IMPORTANCES,MATCH_INTENTS,discoveryQuestion,idFor,removeRequirement};
+module.exports={createBriefInterpreter,parseBrief,normalizeBrief,blankBrief,sufficient,CONCEPTS,KINDS,IMPORTANCES,MATCH_INTENTS,discoveryQuestion,idFor,removeRequirement,canonicalKey};

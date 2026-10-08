@@ -203,7 +203,18 @@ function supportingSpan(requirement,passage,status,brief={requirements:[]}){
   const evidenceType=describedResearch?'research':scopedType,researchContext=['research','trial','publication'].includes(evidenceType)&&!describedResearch&&!researchAttributed({...passage,text});
   return {evidenceId:passage.id,text,kind:reviewedSummary?'reviewed-summary':'source-quote',evidenceType,...(researchContext?{evidenceScope:'research-context'}:{}),sourceQuote:passage.sourceQuote||null,sourceQuoteSupportsRequirement:literalSupports,limits:[...(passage.review?.limitations||[])],sourceDate:passage.dates?.sourceDate||null};
 }
-function deviceAssessment(text){return /\b(?:medical[- ]device|notified body|technical documentation|clinical evaluation reports?|\bMDR\b)\b/i.test(text)&&/\b(?:assess(?:ed|es|ing)|evaluat(?:ed|es|ing)|review(?:ed|s|ing)|(?:clinical|regulatory)\s+(?:assessor|evaluator|reviewer))\b/i.test(text);}
+function deviceAssessment(text,requirement,{activityRequired=true}={}){
+  // MDR alone also means multidrug-resistant disease. Classification labels
+  // and generic review work cannot establish a specialised assessment skill.
+  const context=/\b(?:medical[- ]devices?|notified body|medical device regulation|clinical evaluation reports?)\b/i.test(text);
+  const activity=/\b(?:assess(?:ed|es|ing)|evaluat(?:ed|es|ing)|review(?:ed|s|ing)|(?:clinical|regulatory)\s+(?:assessor|evaluator|reviewer))\b/i.test(text);
+  if(!context||!(activity||!activityRequired&&/\b(?:assessment|evaluation|regulatory review)\b/i.test(text)))return false;
+  const label=String(requirement?.text||requirement?.label||'');
+  if(!label||/^medical[- ]device assessment experience$/i.test(label))return true;
+  const specific=label.replace(/\b(?:medical[- ]devices?|regulatory|assessment|assessors?|evaluation|evaluators?|reviews?|reviewers?|experience|expertise|competence|clinical|for|of|in|with|and|the|a|an)\b/gi,' ').trim();
+  const wanted=tokens(specific),present=new Set(tokens(text));
+  return wanted.every(term=>present.has(term));
+}
 function directMatch(requirement,passage){
   const text=passage.text||'',label=requirement.label||requirement.text;
   if(requirement.kind==='activity'&&label==='Implanted cardiac device monitoring'){
@@ -221,7 +232,7 @@ function directMatch(requirement,passage){
     return /\b(?:ultrasound|echocardiograph\w*)\b/i.test(diagnosticText);
   }
   if(requirement.kind==='research'&&label==='Clinical research')return ['research','trial','publication'].includes(passage.type)&&/\b(?:research|trials?|stud(?:y|ies)|investigator|coauthor|authored|publications?)\b/i.test(text)&&!passage.qualifiers?.includes('publication-listing-link-not-authorship');
-  if(requirement.kind==='regulatory'&&deviceAssessment(text))return true;
+  if(requirement.kind==='regulatory')return deviceAssessment(text,requirement,{activityRequired:false});
   if(requirement.kind==='role'&&rolePattern(label)?.test(text))return true;
   const concept=CONCEPTS.find(([kind,name])=>kind===requirement.kind&&name.toLowerCase()===label.toLowerCase());
   const allAttributes=Object.values(passage.attributes||{}).flat().filter(x=>typeof x==='string');
@@ -269,7 +280,7 @@ function matrixFor(candidate,passages,brief){
         const anchors=brief.requirements.filter(r=>['modality','condition','procedure'].includes(r.kind));
         if(anchors.length&&!segments(p.text).some(text=>directMatch(requirement,{...p,text,attributes:{}})&&anchors.some(a=>directMatch(a,{...p,text,attributes:{}})))&&!populationDomainRelation(requirement,p,parent,passages,brief))return false;
       }
-      if(requirement.kind==='regulatory')return ['clinical-practice','research','relationship','professional-background'].includes(p.type)&&!p.qualifiers?.some(q=>/interest|training/.test(q))&&deviceAssessment(p.text);
+      if(requirement.kind==='regulatory')return ['clinical-practice','research','relationship','professional-background'].includes(p.type)&&!p.qualifiers?.some(q=>/interest|training/.test(q))&&deviceAssessment(p.text,requirement);
       if(requirement.kind==='research'){
         if(!['research','trial','publication'].includes(p.type)||/(?:interest in research|hopes to|plans to)/i.test(p.text))return false;
         if(requirement.label==='Diagnostic study evaluation')return /\b(?:evaluat(?:ed|es|ing)|apprais(?:ed|es|ing)|validat(?:ed|es|ing)|(?:principal|chief) investigator|led (?:the |a )?(?:diagnostic|validation) study)\b/i.test(p.text)&&!p.review?.limitations?.some(x=>/not a specific investigator task|not.*appraisal/i.test(x));

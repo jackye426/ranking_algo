@@ -1,0 +1,539 @@
+{
+  "metadata": {
+    "system": "MDR",
+    "release": "2017/2185",
+    "guidanceRelease": "MDCG 2019-14 (December 2019)",
+    "taxonomyVersion": "mdr-2017-2185:mdcg-2019-14:03a8b0921cd1357b",
+    "catalogueSha256": "03a8b0921cd1357bb97ac9c08c7832a47a7e2471f23ce2a574a28c0872635988",
+    "sourceSha256": "aaba13eb6865c3e84c3638bb7068471b492093bd8e39a3819d14276315cc44da",
+    "sourceUrl": "https://health.ec.europa.eu/document/download/6d75a830-9b9b-4e4a-a3b6-047329e9a104_en",
+    "regulationUrl": "https://eur-lex.europa.eu/legal-content/EN/ALL/?uri=CELEX%3A32017R2185",
+    "sourceTitle": "MDCG 2019-14 — Explanatory note on MDR codes",
+    "sourcePages": 23,
+    "sourceBytes": 184628,
+    "cataloguePages": [
+      8,
+      23
+    ],
+    "verifiedOn": "2026-10-08",
+    "codeCount": 71,
+    "familyCounts": {
+      "MDA": 26,
+      "MDN": 18,
+      "MDS": 14,
+      "MDT": 13
+    },
+    "labelSource": "Code and label columns of the pinned MDCG guidance, cross-checked against indexed official English Annex I to Regulation (EU) 2017/2185.",
+    "normalizations": [
+      "Whitespace joined within label cells",
+      "Slash spacing aligned to the English regulation",
+      "MDN1214: join line-wrapped non-active",
+      "MDS1004: separate footnote marker 1 from display label"
+    ],
+    "limitations": [
+      "Lookup validates catalogue membership, not assignment to a particular device.",
+      "These are designation-scope codes, not a device risk class or evidence of a professional's competence or authorisation.",
+      "Guidance examples and conditions are not exhaustive and are not imported as code definitions.",
+      "IVDR designation codes are not included in this MDR catalogue."
+    ]
+  },
+  "nodes": [
+    {
+      "code": "MDA0101",
+      "page": 8,
+      "family": "MDA",
+      "termRaw": "Active implantable devices for stimulation / inhibition / monitoring",
+      "term": "Active implantable devices for stimulation/inhibition/monitoring"
+    },
+    {
+      "code": "MDA0102",
+      "page": 8,
+      "family": "MDA",
+      "termRaw": "Active implantable devices delivering drugs or other substances",
+      "term": "Active implantable devices delivering drugs or other substances"
+    },
+    {
+      "code": "MDA0103",
+      "page": 8,
+      "family": "MDA",
+      "termRaw": "Active implantable devices supporting or replacing organ functions",
+      "term": "Active implantable devices supporting or replacing organ functions"
+    },
+    {
+      "code": "MDA0104",
+      "page": 8,
+      "family": "MDA",
+      "termRaw": "Active implantable devices utilising radiation and other active implantable devices",
+      "term": "Active implantable devices utilising radiation and other active implantable devices"
+    },
+    {
+      "code": "MDA0201",
+      "page": 9,
+      "family": "MDA",
+      "termRaw": "Active non-implantable imaging devices utilising ionizing radiation",
+      "term": "Active non-implantable imaging devices utilising ionizing radiation"
+    },
+    {
+      "code": "MDA0202",
+      "page": 9,
+      "family": "MDA",
+      "termRaw": "Active non-implantable imaging devices utilising non-ionizing radiation",
+      "term": "Active non-implantable imaging devices utilising non-ionizing radiation"
+    },
+    {
+      "code": "MDA0203",
+      "page": 9,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices for monitoring of vital physiological parameters",
+      "term": "Active non-implantable devices for monitoring of vital physiological parameters"
+    },
+    {
+      "code": "MDA0204",
+      "page": 9,
+      "family": "MDA",
+      "termRaw": "Other active non-implantable devices for monitoring and / or diagnosis",
+      "term": "Other active non-implantable devices for monitoring and/or diagnosis"
+    },
+    {
+      "code": "MDA0301",
+      "page": 10,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices utilising ionizing radiation",
+      "term": "Active non-implantable devices utilising ionizing radiation"
+    },
+    {
+      "code": "MDA0302",
+      "page": 10,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices utilising non-ionizing radiation",
+      "term": "Active non-implantable devices utilising non-ionizing radiation"
+    },
+    {
+      "code": "MDA0303",
+      "page": 10,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices utilising hyperthermia / hypothermia",
+      "term": "Active non-implantable devices utilising hyperthermia/hypothermia"
+    },
+    {
+      "code": "MDA0304",
+      "page": 10,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices for shock-wave therapy (lithotripsy)",
+      "term": "Active non-implantable devices for shock-wave therapy (lithotripsy)"
+    },
+    {
+      "code": "MDA0305",
+      "page": 10,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices for stimulation or inhibition",
+      "term": "Active non-implantable devices for stimulation or inhibition"
+    },
+    {
+      "code": "MDA0306",
+      "page": 11,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices for extra-corporal circulation, administration or removal of substances and haemapheresis",
+      "term": "Active non-implantable devices for extra-corporal circulation, administration or removal of substances and haemapheresis"
+    },
+    {
+      "code": "MDA0307",
+      "page": 11,
+      "family": "MDA",
+      "termRaw": "Active non-implantable respiratory devices",
+      "term": "Active non-implantable respiratory devices"
+    },
+    {
+      "code": "MDA0308",
+      "page": 11,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices for wound and skin care",
+      "term": "Active non-implantable devices for wound and skin care"
+    },
+    {
+      "code": "MDA0309",
+      "page": 11,
+      "family": "MDA",
+      "termRaw": "Active non-implantable ophthalmologic devices",
+      "term": "Active non-implantable ophthalmologic devices"
+    },
+    {
+      "code": "MDA0310",
+      "page": 11,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices for ear, nose and throat",
+      "term": "Active non-implantable devices for ear, nose and throat"
+    },
+    {
+      "code": "MDA0311",
+      "page": 11,
+      "family": "MDA",
+      "termRaw": "Active non-implantable dental devices",
+      "term": "Active non-implantable dental devices"
+    },
+    {
+      "code": "MDA0312",
+      "page": 11,
+      "family": "MDA",
+      "termRaw": "Other active non-implantable surgical devices",
+      "term": "Other active non-implantable surgical devices"
+    },
+    {
+      "code": "MDA0313",
+      "page": 12,
+      "family": "MDA",
+      "termRaw": "Active non-implantable prostheses, devices for rehabilitation and devices for patient positioning and transport",
+      "term": "Active non-implantable prostheses, devices for rehabilitation and devices for patient positioning and transport"
+    },
+    {
+      "code": "MDA0314",
+      "page": 12,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices for processing and preservation of human cells, tissues or organs including in vitro fertilisation (IVF) and assisted reproductive technologies (ART)",
+      "term": "Active non-implantable devices for processing and preservation of human cells, tissues or organs including in vitro fertilisation (IVF) and assisted reproductive technologies (ART)"
+    },
+    {
+      "code": "MDA0315",
+      "page": 12,
+      "family": "MDA",
+      "termRaw": "Software",
+      "term": "Software"
+    },
+    {
+      "code": "MDA0316",
+      "page": 12,
+      "family": "MDA",
+      "termRaw": "Medical gas supply systems and parts thereof",
+      "term": "Medical gas supply systems and parts thereof"
+    },
+    {
+      "code": "MDA0317",
+      "page": 12,
+      "family": "MDA",
+      "termRaw": "Active non-implantable devices for cleaning, disinfection and sterilisation",
+      "term": "Active non-implantable devices for cleaning, disinfection and sterilisation"
+    },
+    {
+      "code": "MDA0318",
+      "page": 12,
+      "family": "MDA",
+      "termRaw": "Other active non-implantable devices",
+      "term": "Other active non-implantable devices"
+    },
+    {
+      "code": "MDN1101",
+      "page": 13,
+      "family": "MDN",
+      "termRaw": "Non-active cardiovascular, vascular and neurovascular implants",
+      "term": "Non-active cardiovascular, vascular and neurovascular implants"
+    },
+    {
+      "code": "MDN1102",
+      "page": 13,
+      "family": "MDN",
+      "termRaw": "Non-active osteo- and orthopaedic implants",
+      "term": "Non-active osteo- and orthopaedic implants"
+    },
+    {
+      "code": "MDN1103",
+      "page": 14,
+      "family": "MDN",
+      "termRaw": "Non-active dental implants and dental materials",
+      "term": "Non-active dental implants and dental materials"
+    },
+    {
+      "code": "MDN1104",
+      "page": 15,
+      "family": "MDN",
+      "termRaw": "Non-active soft tissue and other implants",
+      "term": "Non-active soft tissue and other implants"
+    },
+    {
+      "code": "MDN1201",
+      "page": 15,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable devices for anaesthesia, emergency and intensive care",
+      "term": "Non-active non-implantable devices for anaesthesia, emergency and intensive care"
+    },
+    {
+      "code": "MDN1202",
+      "page": 16,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable devices for administration, channelling and removal of substances, including devices for dialysis",
+      "term": "Non-active non-implantable devices for administration, channelling and removal of substances, including devices for dialysis"
+    },
+    {
+      "code": "MDN1203",
+      "page": 16,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable guide catheters, balloon catheters, guidewires, introducers, filters, and related tools",
+      "term": "Non-active non-implantable guide catheters, balloon catheters, guidewires, introducers, filters, and related tools"
+    },
+    {
+      "code": "MDN1204",
+      "page": 16,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable devices for wound and skin care",
+      "term": "Non-active non-implantable devices for wound and skin care"
+    },
+    {
+      "code": "MDN1205",
+      "page": 16,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable orthopaedic and rehabilitation devices",
+      "term": "Non-active non-implantable orthopaedic and rehabilitation devices"
+    },
+    {
+      "code": "MDN1206",
+      "page": 17,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable ophthalmologic devices",
+      "term": "Non-active non-implantable ophthalmologic devices"
+    },
+    {
+      "code": "MDN1207",
+      "page": 17,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable diagnostic devices",
+      "term": "Non-active non-implantable diagnostic devices"
+    },
+    {
+      "code": "MDN1208",
+      "page": 17,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable instruments",
+      "term": "Non-active non-implantable instruments"
+    },
+    {
+      "code": "MDN1209",
+      "page": 17,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable dental materials",
+      "term": "Non-active non-implantable dental materials"
+    },
+    {
+      "code": "MDN1210",
+      "page": 17,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable devices used for contraception or prevention of the transmission of sexually transmitted diseases",
+      "term": "Non-active non-implantable devices used for contraception or prevention of the transmission of sexually transmitted diseases"
+    },
+    {
+      "code": "MDN1211",
+      "page": 17,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable devices for disinfecting, cleaning and rinsing",
+      "term": "Non-active non-implantable devices for disinfecting, cleaning and rinsing"
+    },
+    {
+      "code": "MDN1212",
+      "page": 17,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable devices for processing and preservation of human cells, tissue or organs including in vitro fertilisation (IVF) and assisted reproductive technologies (ART)",
+      "term": "Non-active non-implantable devices for processing and preservation of human cells, tissue or organs including in vitro fertilisation (IVF) and assisted reproductive technologies (ART)"
+    },
+    {
+      "code": "MDN1213",
+      "page": 18,
+      "family": "MDN",
+      "termRaw": "Non-active non-implantable devices composed of substances to be introduced into the human body via a body orifice or the dermal route",
+      "term": "Non-active non-implantable devices composed of substances to be introduced into the human body via a body orifice or the dermal route"
+    },
+    {
+      "code": "MDN1214",
+      "page": 18,
+      "family": "MDN",
+      "termRaw": "General non-active non-implantable devices used in health care and other non- active non-implantable devices",
+      "term": "General non-active non-implantable devices used in health care and other non-active non-implantable devices"
+    },
+    {
+      "code": "MDS1001",
+      "page": 19,
+      "family": "MDS",
+      "termRaw": "Devices incorporating medicinal substances",
+      "term": "Devices incorporating medicinal substances"
+    },
+    {
+      "code": "MDS1002",
+      "page": 19,
+      "family": "MDS",
+      "termRaw": "Devices manufactured utilising tissues or cells of human origin, or their derivatives",
+      "term": "Devices manufactured utilising tissues or cells of human origin, or their derivatives"
+    },
+    {
+      "code": "MDS1003",
+      "page": 19,
+      "family": "MDS",
+      "termRaw": "Devices manufactured utilising tissues or cells of animal origin, or their derivatives",
+      "term": "Devices manufactured utilising tissues or cells of animal origin, or their derivatives"
+    },
+    {
+      "code": "MDS1004",
+      "page": 19,
+      "family": "MDS",
+      "termRaw": "Devices which are also machinery as defined in point (a) of the second paragraph of Article 2 of Directive 2006/42/EC of the European Parliament and of the Council1",
+      "term": "Devices which are also machinery as defined in point (a) of the second paragraph of Article 2 of Directive 2006/42/EC of the European Parliament and of the Council"
+    },
+    {
+      "code": "MDS1005",
+      "page": 19,
+      "family": "MDS",
+      "termRaw": "Devices in sterile condition",
+      "term": "Devices in sterile condition"
+    },
+    {
+      "code": "MDS1006",
+      "page": 20,
+      "family": "MDS",
+      "termRaw": "Reusable surgical instruments",
+      "term": "Reusable surgical instruments"
+    },
+    {
+      "code": "MDS1007",
+      "page": 20,
+      "family": "MDS",
+      "termRaw": "Devices incorporating or consisting of nanomaterial",
+      "term": "Devices incorporating or consisting of nanomaterial"
+    },
+    {
+      "code": "MDS1008",
+      "page": 20,
+      "family": "MDS",
+      "termRaw": "Devices utilising biologically active coatings and / or materials or being wholly or mainly absorbed or locally dispersed in the human body or are intended to undergo a chemical change in the body",
+      "term": "Devices utilising biologically active coatings and/or materials or being wholly or mainly absorbed or locally dispersed in the human body or are intended to undergo a chemical change in the body"
+    },
+    {
+      "code": "MDS1009",
+      "page": 20,
+      "family": "MDS",
+      "termRaw": "Devices incorporating software / utilising software / controlled by software, including devices intended for controlling, monitoring or directly influencing the performance of active or active implantable devices",
+      "term": "Devices incorporating software/utilising software/controlled by software, including devices intended for controlling, monitoring or directly influencing the performance of active or active implantable devices"
+    },
+    {
+      "code": "MDS1010",
+      "page": 20,
+      "family": "MDS",
+      "termRaw": "Devices with a measuring function",
+      "term": "Devices with a measuring function"
+    },
+    {
+      "code": "MDS1011",
+      "page": 20,
+      "family": "MDS",
+      "termRaw": "Devices in systems or procedure packs",
+      "term": "Devices in systems or procedure packs"
+    },
+    {
+      "code": "MDS1012",
+      "page": 20,
+      "family": "MDS",
+      "termRaw": "Products without an intended medical purpose listed in Annex XVI to Regulation (EU) 2017/745",
+      "term": "Products without an intended medical purpose listed in Annex XVI to Regulation (EU) 2017/745"
+    },
+    {
+      "code": "MDS1013",
+      "page": 21,
+      "family": "MDS",
+      "termRaw": "Class III custom-made implantable devices",
+      "term": "Class III custom-made implantable devices"
+    },
+    {
+      "code": "MDS1014",
+      "page": 21,
+      "family": "MDS",
+      "termRaw": "Devices incorporating as an integral part an in vitro diagnostic device",
+      "term": "Devices incorporating as an integral part an in vitro diagnostic device"
+    },
+    {
+      "code": "MDT2001",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices manufactured using metal processing",
+      "term": "Devices manufactured using metal processing"
+    },
+    {
+      "code": "MDT2002",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices manufactured using plastic processing",
+      "term": "Devices manufactured using plastic processing"
+    },
+    {
+      "code": "MDT2003",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices manufactured using non-metal mineral processing (e.g. glass, ceramics)",
+      "term": "Devices manufactured using non-metal mineral processing (e.g. glass, ceramics)"
+    },
+    {
+      "code": "MDT2004",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices manufactured using non-metal non-mineral processing (e.g. textiles, rubber, leather, paper)",
+      "term": "Devices manufactured using non-metal non-mineral processing (e.g. textiles, rubber, leather, paper)"
+    },
+    {
+      "code": "MDT2005",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices manufactured using biotechnology",
+      "term": "Devices manufactured using biotechnology"
+    },
+    {
+      "code": "MDT2006",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices manufactured using chemical processing",
+      "term": "Devices manufactured using chemical processing"
+    },
+    {
+      "code": "MDT2007",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices which require knowledge regarding the production of pharmaceuticals",
+      "term": "Devices which require knowledge regarding the production of pharmaceuticals"
+    },
+    {
+      "code": "MDT2008",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices manufactured in clean rooms and associated controlled environments",
+      "term": "Devices manufactured in clean rooms and associated controlled environments"
+    },
+    {
+      "code": "MDT2009",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices manufactured using processing of materials of human, animal, or microbial origin",
+      "term": "Devices manufactured using processing of materials of human, animal, or microbial origin"
+    },
+    {
+      "code": "MDT2010",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices manufactured using electronic components including communication devices",
+      "term": "Devices manufactured using electronic components including communication devices"
+    },
+    {
+      "code": "MDT2011",
+      "page": 22,
+      "family": "MDT",
+      "termRaw": "Devices which require packaging, including labelling",
+      "term": "Devices which require packaging, including labelling"
+    },
+    {
+      "code": "MDT2012",
+      "page": 23,
+      "family": "MDT",
+      "termRaw": "Devices which require installation, refurbishment",
+      "term": "Devices which require installation, refurbishment"
+    },
+    {
+      "code": "MDT2013",
+      "page": 23,
+      "family": "MDT",
+      "termRaw": "Devices which have undergone reprocessing",
+      "term": "Devices which have undergone reprocessing"
+    }
+  ]
+}
