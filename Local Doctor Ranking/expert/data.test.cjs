@@ -281,6 +281,31 @@ test('explicit patient care and procedures are retained without equating learned
   assert.equal(classifyPassage('His fellowship taught him how to undertake endoscopic surgical procedures.','about'),'training');
 });
 
+test('degree-derived knowledge and insight do not establish clinical practice',()=>{
+  const examples=[
+    'More recently, I obtained a Diploma in Sport and Exercise Medicine, which broadened my knowledge of treating and rehabilitating sports injuries around the knee.',
+    "Achieving a Master's degree in sports medicine, exercise and health at University College London allows a greater insight into the unique care involved in treating and rehabilitating athletes and those with greater demands on their manual dexterity.",
+    "Additionally, Dr Example has a Master's degree in sports medicine, exercise, and health, which has given her a greater insight into treating and rehabilitating athletes.",
+    'I completed a diploma which improved my understanding of reporting cardiac CT.',
+  ];
+  for(const text of examples){
+    assert.equal(classifyPassage(text,'about'),'training');
+    const c=buildCorpus([row({about:text})]),p=c.passages.find(p=>p.field==='about');
+    assert.equal(p.text,text);assert.equal(p.type,'training');assert.ok(p.qualifiers.includes('training-not-practice'));
+    assert.ok(!p.attributes.activity.includes('clinical practice'));assert.ok(!p.attributes.activity.includes('image interpretation'));
+  }
+});
+
+test('a separate explicit clinical assertion survives credential capability framing',()=>{
+  for(const text of [
+    'My diploma allows me to report cardiac CT. I routinely report cardiac CT in adults.',
+    'My diploma allows me to report cardiac CT but I routinely report cardiac CT in adults.',
+    'My diploma allows me to report cardiac CT and I routinely report cardiac CT in adults.',
+    'She obtained a diploma that broadened her knowledge and she regularly treats sports injuries.',
+    'I hold a Diploma in Sport and Exercise Medicine and I treat knee injuries.',
+  ])assert.equal(classifyPassage(text,'about'),'clinical-practice',text);
+});
+
 test('all named provider profiles, including HCA and Ramsay, are checked within an upstream row',()=>{
   for(const sourceUrl of ['https://www.ramsayhealth.co.uk/specialists/mr-alex-exemplar','https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/mr-alex-exemplar']) {
     const c=buildCorpus([row({profile_urls:{provider:sourceUrl}})]);
@@ -390,4 +415,30 @@ test('therapeutic ultrasound in cataract procedures is distinct from diagnostic 
   assert.ok(mixed.modality.includes('therapeutic ultrasound'));assert.ok(mixed.modality.includes('ultrasound'));
   const c=buildCorpus([row({procedures:['Ultrasound phacoemulsification of cataracts, with lens implant - bilateral']})]);
   const p=c.passages.find(p=>p.field==='procedures');assert.match(p.text,/Ultrasound phacoemulsification/);assert.deepEqual(p.attributes.modality,['therapeutic ultrasound']);
+});
+
+test('credential capability keeps ordinary degree wording and separate appointments distinct',()=>{
+  const choice='I allow my patients the opportunity to choose to what degree they want to engage in decision making about the treatment available for them at that time.';
+  assert.equal(classifyPassage(choice,'about'),'professional-background');
+  const appointment='He achieved his Certificate of Completion of Training in 2006, and was appointed as a Consultant General and Colorectal Surgeon at York and Scarborough Teaching Hospitals NHS Foundation Trust the same year.';
+  assert.deepEqual(extractAttributes(appointment,{field:'about',type:classifyPassage(appointment,'about')}).setting,['teaching hospital','NHS']);
+});
+
+test('a board qualification for performing imaging is not a record of performed imaging',()=>{
+  const text='I am Level III qualified by both the American and the European Boards for performing advanced Heart MRI scans in adults.';
+  const type=classifyPassage(text,'about');assert.equal(type,'training');
+  assert.deepEqual(extractAttributes(text,{field:'about',type}).activity,[]);
+  const actual=text+' I routinely perform cardiac MRI scans in adults.';
+  assert.equal(classifyPassage(actual,'about'),'clinical-practice');
+  assert.ok(extractAttributes(actual,{field:'about',type:'clinical-practice'}).activity.includes('clinical practice'));
+});
+
+test('credential knowledge belongs to its recipient and clause, not course contributors or neighbouring statements',()=>{
+  for(const text of [
+    'Dr Example contributes to an oral cancer diploma programme designed to provide knowledge about treating cancer.',
+    'Operative work gave him extensive knowledge. The centre was accredited nine years ago.',
+    "The nutrition research followed a Master's in Public Health. Being fluent in French allows personalised care.",
+    'She is an accredited menopause specialist. NHS GP work gives her an understanding of primary care.',
+    'Her clinical background enhances her understanding of genital tract diseases. As a certified colposcopist she manages abnormal smear tests.',
+  ])assert.notEqual(classifyPassage(text,'about'),'training',text);
 });

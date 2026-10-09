@@ -165,11 +165,21 @@ const ATTRIBUTES={
 const PURE_METADATA_FIELDS=/^(?:locations|registration|qualifications|detailed_qualifications|professional_memberships|nhs_posts|nhs_base|professional_role|specialty|specialties|specialty_alternatives|publications)$/;
 const emptyAttributes=()=>Object.fromEntries(Object.keys(ATTRIBUTES).map(key=>[key,[]]));
 const aspirationalActivity=text=>/\b(?:hopes? to|plans? to|would like to|aims? to|interested in becoming|aspir(?:e|es|ing) to)\b/i.test(text);
-const activityClauses=text=>sourceStatements(text).flatMap(part=>part.split(/\s+(?=(?:but|however|whereas)\b)|\s+and\s+(?=(?:(?:routinely|regularly|currently|weekly)\s+)?(?:holds?|reports|performs|lectures|teaches)\b)/i)).filter(Boolean);
+const activityClauses=text=>sourceStatements(text).flatMap(part=>part.split(/\s+(?=(?:but|however|whereas)\b)|\s+and\s+(?=(?:(?:(?:routinely|regularly|currently|weekly)\s+)?(?:holds?|reports|performs|lectures|teaches)\b|(?:I|he|she)\s+(?:(?:routinely|regularly|currently|weekly|personally)\s+)?(?:holds?|reports?|performs?|treats?|manages?|diagnoses?|lectures|teaches)\b))/i)).filter(Boolean);
 const degreeStatement=text=>/\b(?:MSc|MClinRes|BSc|MBBS|MBChB|Master[’']?s|Bachelor[’']?s|Research MD|PhD|doctorate|degree|diploma|certificates?)\b/i.test(text)&&/\b(?:complet(?:ed|ing|es)|stud(?:y|ied|ying)|hold(?:s|ing)?|has|have|obtain(?:ed|ing)|award(?:ed)?|graduat(?:ed|ing)|undertook|pursu(?:ed|ing))\b/i.test(text);
 // A credential may permit an activity without saying it has been performed.
 // Evaluate within each source clause so a separate reporting statement survives.
-const credentialCapability=text=>/\b(?:accreditation|certification|certificate|credential|accredited|certified|qualified|authori[sz]ed|licensed)\b/i.test(text)&&/\b(?:enabl(?:e|es|ing)|permit(?:s|ting)?|allow(?:s|ing)?|eligible|entitl(?:e|es|ed|ing)|qualified\s+to|certified\s+to|accredited\s+to|authori[sz]ed\s+to|licensed\s+to)\b/i.test(text);
+// Knowledge or insight gained from a degree remains training evidence even
+// when its subject uses action words such as "treating" or "reporting".
+const credentialCapability=text=>activityClauses(text).some(clause=>{
+  const permission=/\b(?:enabl(?:e|es|ing)|permit(?:s|ting)?|allow(?:s|ing)?|eligible|entitl(?:e|es|ed|ing)|qualified\s+to|certified\s+to|accredited\s+to|authori[sz]ed\s+to|licensed\s+to)\b/i.test(clause);
+  const certified=/\b(?:accreditation|certification|certificate|credential|accredited|certified|qualified|authori[sz]ed|licensed)\b/i.test(clause);
+  if(certified&&(permission||/\b(?:qualified|certified|accredited)\b.{0,100}\b(?:for|in)\s+(?:performing|reporting|interpreting|treating)\b/i.test(clause)))return true;
+  const academic=/\b(?:diploma|MSc|Master[’']?s|(?:academic|medical|engineering|postgraduate|undergraduate)\s+degree|degree\s+in)\b/i.test(clause);
+  const recipient=degreeStatement(clause)||/\b(?:achiev(?:e|ed|ing)|gain(?:ed|ing)|attain(?:ed|ing))\b.{0,70}\b(?:diploma|MSc|Master[’']?s|degree)\b|\b(?:my|his|her|their)\s+(?:(?:previous|academic|medical|engineering|postgraduate|undergraduate)\s+){0,3}(?:diploma|MSc|Master[’']?s|degree)\b/i.test(clause);
+  const knowledge=/\b(?:broaden(?:ed|s|ing)?|expand(?:ed|s|ing)?|enhanc(?:e|es|ed|ing)|deepen(?:ed|s|ing)?|improv(?:e|es|ed|ing)|gain(?:ed|s|ing)?|giv(?:e|es|en|ing)|gave|provid(?:e|es|ed|ing))\b.{0,70}\b(?:knowledge|insight|understanding)\b/i.test(clause);
+  return academic&&recipient&&(permission||knowledge);
+});
 const interestScoped=text=>/\b(?:interests?\s+(?:is|are|was|were|in|to|includes?|involves?)|interested in|interest\s+is\s+to|expertise\s+in)\b/i.test(text);
 const personalActivity=text=>/\b(?:marathon runner|triathlete|keen runner|amateur athlete|my\s+(?:wife|husband|children|family)|spare\s+time|outside\s+(?:of\s+)?(?:work|medicine|my professional life)|hobbies|golf club|married with)\b|\benjoys?\s+(?:running|strength training|playing|skiing|golf|tennis|travel|music|cycling|walking)\b/i.test(text);
 function teachingActivity(text) {

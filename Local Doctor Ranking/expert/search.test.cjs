@@ -31,6 +31,15 @@ test('unavailable interpreter keeps direct known requirements with notice',async
 test('BM25 computes nonzero inverse frequency and length normalization',()=>{const index=new BM25Index([{text:'cardiac cardiac CT'},{text:'cardiac'},{text:'skin lesions'}]);const result=index.search('CT');assert.equal(result.length,1);assert.equal(result[0].index,0);const expected=Math.log((3-1+.5)/(1+.5)+1)*(1*2.5)/(1+1.5*(.25+.75*3/2));assert(Math.abs(result[0].score-expected)<1e-10);});
 test('BM25 is case-insensitive and retains short CT term',()=>{const index=new BM25Index([{text:'Cardiac CT'},{text:'Cardiac MRI'}]);assert.equal(index.search('ct')[0].index,0);});
 test('training mentions cannot fulfil clinical modality requirement',()=>{const c=corpus(),b=parsed().brief;const matrix=matrixFor(c.candidates[1],c.passages.filter(p=>p.candidateId==='b'),b);assert.equal(matrix.find(r=>r.kind==='modality').status,'potential');});
+
+for(const text of ['I obtained a diploma that broadened my knowledge of reporting cardiac CT.','I am Level III qualified by both the American and the European Boards for performing advanced Heart MRI scans in adults.'])test('credential capability stays training throughout requirement evidence and sources: '+text,()=>{
+ const {buildCorpus}=require('./data.cjs'),{buildProfile}=require('./profile.cjs'),{renderSourcePage}=require('./sources.cjs');
+ const c=buildCorpus([{id:'training-source',name:'Dr Alex Example',gmc_number:'1234567',specialty:'Cardiology',about:text}]);
+ const candidate=c.candidates[0],facts=c.passages.filter(p=>p.field==='about'),b=parseBrief({message:text.includes('MRI')?'Cardiac MRI reporting is essential.':'Cardiac CT reporting is essential.'}).brief;
+ const matrix=matrixFor(candidate,facts,b);assert(matrix.length>0);assert(matrix.every(r=>r.status!=='documented'));
+ const profile=buildProfile(candidate,c.passages,{corpusVersion:c.version}),savedPassage=profile.about.find(p=>p.text===text);assert(savedPassage);assert.equal(savedPassage.type,'training');assert(savedPassage.qualifiers.includes('training-not-practice'));
+ const html=renderSourcePage(candidate,facts,facts[0]);assert(html.includes('Recorded training'));assert(!html.includes('Recorded clinical activity'));assert(html.includes(text));
+});
 test('current practice remains unknown despite listed practice',()=>{const c=corpus();const matrix=matrixFor(c.candidates[0],c.passages,parsed().brief);assert.equal(matrix.find(r=>r.kind==='currentPractice').status,'unknown');});
 test('research does not establish regulatory assessment',()=>{const c=corpus();const matrix=matrixFor(c.candidates[0],c.passages,parsed().brief);assert.equal(matrix.find(r=>r.kind==='regulatory').status,'unknown');});
 test('explicit negative source produces documented mismatch rather than support',()=>{const p=passage('no','a','I do not interpret cardiac CT.','clinical-practice');assert.equal(matrixFor(person('a','A'),[p],parsed().brief).find(r=>r.kind==='modality').status,'mismatch');});
