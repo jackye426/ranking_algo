@@ -23,3 +23,11 @@ test('short modalities and standalone degree abbreviations retain their recorded
  for(const text of ['CT','MR']){const {passage,profile}=prepare(text,'clinical_interests');assert.equal(passage.text,text);assert.equal(passage.type,'clinical-interest');assert(!passage.qualifiers.includes(flag));assert(profile.clinicalInterests.some(p=>p.text===text));}
  for(const text of ['MD','BSc','PhD']){const {passage,profile}=prepare(text,'qualifications');assert.equal(passage.text,text);assert.deepEqual(passage.attributes.activity,[]);assert(profile.qualifications.some(p=>p.text===text));}
 });
+test('separate FCPS and FHEA source entries both survive packing, profile and saved export',()=>{
+ const entries=['MBBS','MRCOG RCOG, London 2009','FRCOG RCOG London 2022','MBBS University of Punjab Pakistan 1998','FCPS','MRCOG','FHEA','FCPS CPSP, Pakistan 2006','FHEA HEA,UK 2021','PG-cert Clinical education University of Leicester, Leicester 2026'],row={id:'credential-source',name:'Dr Alex Example',gmc_number:'1234567',specialty:'Medicine',qualifications:[...entries]},before=structuredClone(row);
+ const corpus=buildCorpus([row]),candidate=corpus.candidates[0],passages=corpus.passages.filter(p=>p.field==='qualifications'),profile=buildProfile(candidate,corpus.passages,{corpusVersion:corpus.version});
+ assert.deepEqual(row,before);assert.equal(passages.map(p=>p.text).join('\n'),entries.join('\n'));assert(passages.every(p=>!p.qualifiers.includes(flag)&&p.attributes.activity.length===0));assert.equal(profile.qualifications.map(p=>p.text).join('\n'),entries.join('\n'));
+ const saved=P.saveCandidate(P.createProject(),{...candidate,requirementMatrix:[],evidence:[],profileBackground:profile},{version:1,requirements:[]},corpus.version),restored=P.importJSON(P.exportJSON(saved)),html=P.exportHTML(restored);assert.deepEqual(restored.candidates[0].candidate.profileBackground.qualifications,profile.qualifications);for(const entry of entries)assert(html.includes(entry));
+ // The same letters are not an unconditional exemption outside the typed field.
+ assert(prepare('FHEA HEA,UK 2021','publications').passage.qualifiers.includes(flag));assert(prepare('FHEA HEA,UK 2021 doi:10.1234/fixture','qualifications').passage.qualifiers.includes(flag));
+});

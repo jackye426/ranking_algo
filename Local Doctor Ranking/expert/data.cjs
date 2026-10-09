@@ -214,7 +214,7 @@ function bibliographicReference(text,field='') {
   // sequence, not surname MB followed by author initials BAO. Preserve only
   // explicit credential-leading forms; the field alone proves nothing.
   const qualificationField=/^(?:qualifications|detailed_qualifications|professional_context\.qualification)$/.test(field);
-  const credentialLead=/^(?:(?:MBBSM?|MB|MFDSRCS|FFPMRCA|FCPS|FRCS|FRCP|MCh|FRCOG|MD|BAO|BSc|MRCP|MRCOG|DFSRH|MSc|BMedSci|FRCA|FIPP|MRCS|BM|CCDS|DAvMed|PhD|MS|FRCR|MA)\b|Final[ \t]+F\.R\.C\.S\.|Post[ \t]+M\.Sc\.(?:[ \t]*Diploma\b)|Dip[ \t]+SEM\.|Cert[ \t]+LRS\.)/.test(text.trim());
+  const credentialLead=/^(?:(?:MBBSM?|MB|MFDSRCS|FFPMRCA|FCPS|FHEA|FRCS|FRCP|MCh|FRCOG|MD|BAO|BSc|MRCP|MRCOG|DFSRH|MSc|BMedSci|FRCA|FIPP|MRCS|BM|CCDS|DAvMed|PhD|MS|FRCR|MA)\b|Final[ \t]+F\.R\.C\.S\.|Post[ \t]+M\.Sc\.(?:[ \t]*Diploma\b)|Dip[ \t]+SEM\.|Cert[ \t]+LRS\.)/.test(text.trim());
   if(qualificationField&&credentialLead)return false;
   return /^(?:(?!Dr\b|Mr\b|Mrs\b|Ms\b|Prof\b)[A-Z][A-Za-z’'-]+\s+[A-Z]{1,4}[.,])/.test(text.trim());
 }
