@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "contractId": "expert-enriched-evaluation-v2",
+  "frozenAt": "2026-10-08",
+  "purpose": "Source-supported expert discovery, not clinical credential assessment, current availability or clinical superiority.",
+  "families": [
+    "broad-discovery",
+    "granular-expertise",
+    "populations-settings",
+    "research",
+    "dated-activity",
+    "location-language-services",
+    "combined-refinements",
+    "insufficient-conflicting"
+  ],
+  "split": {
+    "developmentPerFamily": 4,
+    "heldoutPerFamily": 8
+  },
+  "grades": {
+    "0": "No relevant owned evidence, documented incompatible central role/expertise, wrong-person attribution, or only an unsupported inference.",
+    "1": "Adjacent topic or professional background only; direct evidence for the central request is absent. It may be honestly displayed as indirect, but is not counted as a useful answer to that request.",
+    "2": "Direct source evidence supports the central expertise, with clearly identifiable unconfirmed secondary or essential requirements. The candidate is useful to investigate, not represented as fully qualified.",
+    "3": "Direct source evidence supports the central requested expertise and all explicitly essential requested criteria. The evidence category must match the request: an interest is enough for an interest request, not for performed activity. Historical evidence is sufficient only if the request does not demand current activity.",
+    "null": "Not yet judged, disputed attribution/meaning, or insufficient review material. Never counted as irrelevant. Blocks scored-pool completion."
+  },
+  "thresholds": {
+    "simpleInterpretation": 0.95,
+    "usefulPrecisionAt5": 0.9,
+    "familyUsefulPrecisionAt5": 0.8,
+    "knownRecallAt20": 0.9,
+    "ndcgAt10": 0.85,
+    "maximumBaselineDrop": 0.02,
+    "criticalFailures": 0
+  },
+  "metrics": {
+    "usefulPrecisionAt5": "Grade >=2, divided by the first min(5, returned candidates). Empty answerable rankings score 0. Report result count and useful coverage at five separately to expose underfilling; a run must not omit useful pool candidates while reporting a perfect one-result precision.",
+    "usefulCoverageAt5": "Useful candidates returned in first five / min(5, useful candidates in the complete judged pool). Zero when the judged pool has useful candidates but the run returns none; null only for no useful pool candidate.",
+    "ndcgAt10": "DCG using gain 2^grade-1 and log2(rank+1), divided by the ideal ranking in the same completely judged union pool. Pool-relative, not exhaustive corpus relevance. Null when no positive graded candidate exists; report separately as insufficient evidence.",
+    "knownRecallAt20": "Only for bounded scenarios with independently accepted source-reviewed anchors. Missing or held anchors remain visible; no automatic denominator removal. Broad scenarios have no corpus-recall claim.",
+    "aggregation": "Macro average per brief, then by family. Report paired baseline differences, denominators and deterministic brief-level bootstrap intervals. Unknown judgements or incomplete top-ten judgements invalidate metrics rather than being filled with zeros."
+  },
+  "review": {
+    "independentReviewers": 2,
+    "blind": [
+      "release label",
+      "retrieval mode",
+      "ranking position",
+      "candidate name and identifier"
+    ],
+    "visible": [
+      "exact professional source text",
+      "evidence category",
+      "source field",
+      "provider",
+      "source and observation date",
+      "qualifiers",
+      "source URL when available",
+      "brief and explicit requirements"
+    ],
+    "pool": "Union top 10 from BM25, semantic and hybrid for every release plus independently accepted source anchors, preserving evidence-version differences. Every scored top ten and every ideal-pool item must have a resolved dual review before final metrics. Exact rank positions through twenty remain available separately for known-reference recall. Rank11-20 non-anchor candidates are not assigned relevance labels.",
+    "disagreement": "Keep both independent judgements. A third source-based adjudication records the chosen grade and reason; unresolved meaning or attribution blocks that item. Never average conflicting grades into an accepted claim.",
+    "minimumRationale": "State why the central request is or is not supported, name the supporting evidence tokens, distinguish interests from activity, and enumerate material requested gaps."
+  },
+  "holdout": {
+    "location": "private evaluation directory outside Git",
+    "access": "Runner and independent reviewers only; ranking implementer receives development cases and aggregate held-out gates, not held-out labels before the implementation is frozen.",
+    "contamination": "If a held-out failure is disclosed for development, mark that case consumed, preserve the first report, and create a fresh sealed confirmation set before signoff."
+  },
+  "invariants": [
+    "Never grade a candidate by regex alone.",
+    "Never infer present practice from ingestion timestamps.",
+    "Never infer independence or regulatory approval from missing fields.",
+    "Never turn unknown essential requirements into confirmed support.",
+    "Never count interests, training or language proficiency as performed clinical activity.",
+    "Never silently rewrite the original 98 cases.",
+    "No external model calls are made by this harness."
+  ],
+  "poolDepth": 10,
+  "amendment": {
+    "id": "pool-depth-amendment-v2",
+    "priorContractId": "expert-enriched-evaluation-v1",
+    "priorContractSha256": "57501b76651b8912e0760052bc6d190a06320197d71d23257b6b1c60ea2f7378",
+    "recordedBeforeHeldout": true,
+    "briefsGradesAndThresholdsUnchanged": true
+  }
+}

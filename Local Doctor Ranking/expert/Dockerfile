@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
-FROM node:22-bookworm-slim AS base
+FROM node:22.23.3-bookworm-slim AS base
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3100 EXPERT_CACHE_DIR=/data/expert
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libgomp1 gosu && rm -rf /var/lib/apt/lists/*
 FROM base AS dependencies
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json deployment-manifest.json ./
 RUN ONNXRUNTIME_NODE_INSTALL=skip npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 FROM dependencies AS models
 COPY demo/models.cjs ./demo/models.cjs
@@ -12,9 +12,9 @@ RUN node -e "require('./demo/models.cjs').embed(['Professional evidence search']
 FROM base AS runtime
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=models --chown=node:node /app/demo/.cache/models ./demo/.cache/models
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json deployment-manifest.json Dockerfile ./
 COPY demo/models.cjs ./demo/models.cjs
-COPY expert/server.cjs expert/reader.cjs expert/data.cjs expert/brief.cjs expert/search.cjs expert/ai.cjs expert/transport.cjs expert/enrichments.cjs expert/identity-reviews.cjs expert/resume.cjs expert/sources.cjs expert/geo.cjs expert/profile.cjs expert/emdn-taxonomy.cjs expert/device-context.cjs expert/device-context-set.cjs expert/device-context-legacy.cjs expert/mdr-taxonomy.cjs expert/classification-registry.cjs expert/clarifications.cjs ./expert/
+COPY expert/server.cjs expert/reader.cjs expert/releases.cjs expert/cache-release.cjs expert/inference-runtime.cjs expert/practice-cache.cjs expert/data.cjs expert/reviewed-segmentation.cjs expert/brief.cjs expert/brief-context.cjs expert/search.cjs expert/ai.cjs expert/transport.cjs expert/enrichments.cjs expert/identity-reviews.cjs expert/resume.cjs expert/sources.cjs expert/geo.cjs expert/profile.cjs expert/emdn-taxonomy.cjs expert/device-context.cjs expert/device-context-set.cjs expert/device-context-legacy.cjs expert/mdr-taxonomy.cjs expert/classification-registry.cjs expert/clarifications.cjs ./expert/
 COPY expert/data/emdn-2026.json expert/data/mdr-2017-2185.json ./expert/data/
 COPY expert/public/ ./expert/public/
 COPY public/fonts/inter-variable.ttf public/fonts/OFL-Inter.txt ./public/fonts/

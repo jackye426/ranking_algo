@@ -1,0 +1,693 @@
+{
+  "schemaVersion": 1,
+  "version": "expert-enriched-prospective-v1",
+  "split": "development",
+  "createdBeforeRankingTuning": true,
+  "scenarios": [
+    {
+      "id": "dev-broad-discovery-01",
+      "split": "development",
+      "family": "broad-discovery",
+      "message": "Find cardiologists.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Cardiology role; broad discovery, no forced assessment project.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-broad-discovery-02",
+      "split": "development",
+      "family": "broad-discovery",
+      "message": "Find dietitians.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Recorded dietitian professional role; do not infer doctor/GMC status.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-broad-discovery-03",
+      "split": "development",
+      "family": "broad-discovery",
+      "message": "Find physiotherapists.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Recorded physiotherapy role; do not infer doctor/GMC status.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-broad-discovery-04",
+      "split": "development",
+      "family": "broad-discovery",
+      "message": "Find sports and exercise medicine specialists.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Sports and exercise medicine expertise.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-granular-expertise-01",
+      "split": "development",
+      "family": "granular-expertise",
+      "message": "Find clinicians who report adult cardiac CT.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Explicit reporting of adult cardiac or coronary CT.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "bounded",
+      "sourceReferenceKeys": [
+        "kandiyil-adult-ct"
+      ]
+    },
+    {
+      "id": "dev-granular-expertise-02",
+      "split": "development",
+      "family": "granular-expertise",
+      "message": "Find dermatologists with an interest in dermoscopy.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "A listed dermoscopy interest is sufficient for this interest request.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "performed dermoscopy if only interest recorded"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-granular-expertise-03",
+      "split": "development",
+      "family": "granular-expertise",
+      "message": "Find experts with interests in exercise guidance & prescription.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Exercise guidance and prescription interest.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "bounded",
+      "sourceReferenceKeys": [
+        "gillett-exercise"
+      ]
+    },
+    {
+      "id": "dev-granular-expertise-04",
+      "split": "development",
+      "family": "granular-expertise",
+      "message": "Find gynaecologists with recorded laparoscopic excision of endometriosis.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Specific laparoscopic excision expertise, not generic gynaecology.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "procedure expertise from semantic similarity alone"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-populations-settings-01",
+      "split": "development",
+      "family": "populations-settings",
+      "message": "Find cardiac imaging experts with adult patient experience.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Cardiac imaging and explicitly recorded adult population.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "bounded",
+      "sourceReferenceKeys": [
+        "kandiyil-adult-ct"
+      ]
+    },
+    {
+      "id": "dev-populations-settings-02",
+      "split": "development",
+      "family": "populations-settings",
+      "message": "Find gastroenterologists who work with children.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Gastroenterology and explicitly recorded child population.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "paediatric practice from generic gastroenterology"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-populations-settings-03",
+      "split": "development",
+      "family": "populations-settings",
+      "message": "Find dermoscopy experts with primary-care research experience.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Dermoscopy plus research set in primary care, distinct from current GP clinical practice.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "current primary-care practice from historical study"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-populations-settings-04",
+      "split": "development",
+      "family": "populations-settings",
+      "message": "Find skin-lesion imaging experts for a device intended for home use.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Skin-lesion imaging plus supplied intended setting.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "home-use device expertise from home chemotherapy or online consultation"
+        ],
+        "context": [
+          "home use is device context"
+        ]
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-research-01",
+      "split": "development",
+      "family": "research",
+      "message": "Find experts with research interests in fatty liver disease.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Explicit fatty liver research interests, not proof of study conduct.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "bounded",
+      "sourceReferenceKeys": [
+        "pericleous-fatty-liver"
+      ]
+    },
+    {
+      "id": "dev-research-02",
+      "split": "development",
+      "family": "research",
+      "message": "Find experts with research interests in liver cirrhosis and its complications.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Explicit liver-cirrhosis research interests.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "bounded",
+      "sourceReferenceKeys": [
+        "pericleous-cirrhosis"
+      ]
+    },
+    {
+      "id": "dev-research-03",
+      "split": "development",
+      "family": "research",
+      "message": "Find experts with research interests in autoimmune liver diseases.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Explicit autoimmune-liver research interests.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "bounded",
+      "sourceReferenceKeys": [
+        "pericleous-autoimmune"
+      ]
+    },
+    {
+      "id": "dev-research-04",
+      "split": "development",
+      "family": "research",
+      "message": "Find experts with research interests in liver cancers.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Explicit liver-cancer research interests.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "bounded",
+      "sourceReferenceKeys": [
+        "pericleous-cancer"
+      ]
+    },
+    {
+      "id": "dev-dated-activity-01",
+      "split": "development",
+      "family": "dated-activity",
+      "message": "Find cataract surgeons with recorded procedure activity. Show any period attached to the figures.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Cataract surgery plus recorded activity with period preserved.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "derived midpoint as observed count",
+          "undated record as current practice"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-dated-activity-02",
+      "split": "development",
+      "family": "dated-activity",
+      "message": "Find knee surgeons with reported low-volume procedure ranges, including records of seven or fewer.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Knee surgery with exact published range retained.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "range midpoint as observed count"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-dated-activity-03",
+      "split": "development",
+      "family": "dated-activity",
+      "message": "Find cardiac CT reporters. Current clinical practice is essential.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Cardiac CT reporting; current practice explicitly essential.",
+        "essential": [
+          "current clinical practice"
+        ],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "recent processing date as current practice"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-dated-activity-04",
+      "split": "development",
+      "family": "dated-activity",
+      "message": "Find physiotherapists and show their recorded qualifications even if no GMC number is present.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Physiotherapy role and independently recorded qualifications.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "missing GMC as absence of qualification"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-location-language-services-01",
+      "split": "development",
+      "family": "location-language-services",
+      "message": "Find clinicians who speak Portuguese fluently.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Recorded Portuguese language with recorded fluent proficiency.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "language proficiency as clinical activity"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "bounded",
+      "sourceReferenceKeys": [
+        "portuguese-fluent"
+      ]
+    },
+    {
+      "id": "dev-location-language-services-02",
+      "split": "development",
+      "family": "location-language-services",
+      "message": "Find cardiologists in London who speak French.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Cardiology and explicit French language; London geography.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": [
+          "London location"
+        ]
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-location-language-services-03",
+      "split": "development",
+      "family": "location-language-services",
+      "message": "Find dietitians who offer food-industry services.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Recorded dietitian role and food-industry professional services.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "medical regulatory approval from industry services"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-location-language-services-04",
+      "split": "development",
+      "family": "location-language-services",
+      "message": "Find oncology clinicians with a recorded home chemotherapy service.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Specific recorded service offering, distinct from expertise in home-use software.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "current service availability without dated confirmation"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-combined-refinements-01",
+      "split": "development",
+      "family": "combined-refinements",
+      "message": "Find cardiac CT reporting experts in the UK. Research is useful but optional.",
+      "followups": [
+        "Research should stay optional.",
+        "Anywhere is fine."
+      ],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Cardiac CT reporting retained; research optional; geography removed.",
+        "essential": [],
+        "preferred": [
+          "research"
+        ],
+        "removed": [
+          "UK geographic restriction"
+        ],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-combined-refinements-02",
+      "split": "development",
+      "family": "combined-refinements",
+      "message": "Find skin-lesion imaging experts with research experience.",
+      "followups": [
+        "Remove research from the requirements."
+      ],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Skin-lesion imaging remains after removal of research.",
+        "essential": [],
+        "preferred": [],
+        "removed": [
+          "research requirement"
+        ],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-combined-refinements-03",
+      "split": "development",
+      "family": "combined-refinements",
+      "message": "Find skin-lesion imaging experts for home use.",
+      "followups": [
+        "Remove home use from the requirements."
+      ],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Skin-lesion imaging retained after explicit home-use removal.",
+        "essential": [],
+        "preferred": [],
+        "removed": [
+          "home-use requirement"
+        ],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-combined-refinements-04",
+      "split": "development",
+      "family": "combined-refinements",
+      "message": "Find cardiologists who report cardiac CT.",
+      "followups": [
+        "Clinical reporting is essential.",
+        "Only options where every essential requirement is documented."
+      ],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Cardiac CT reporting remains; documented-essentials-only is a filter.",
+        "essential": [
+          "clinical reporting"
+        ],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": [
+          "documented essentials only"
+        ]
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-insufficient-conflicting-01",
+      "split": "development",
+      "family": "insufficient-conflicting",
+      "message": "I need an expert.",
+      "followups": [],
+      "expectation": {
+        "outcome": "clarify",
+        "centralRequest": "No role, expertise or clinical question supplied.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-insufficient-conflicting-02",
+      "split": "development",
+      "family": "insufficient-conflicting",
+      "message": "Find someone in the UK who is available next week.",
+      "followups": [],
+      "expectation": {
+        "outcome": "clarify",
+        "centralRequest": "Location and timing alone do not specify expertise.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "availability from public biography"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-insufficient-conflicting-03",
+      "split": "development",
+      "family": "insufficient-conflicting",
+      "message": "Find experts with experience of radioactive brain implants in the UK.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Preserve unfamiliar requested expertise verbatim; adjacent profiles must not be declared direct.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "implant experience from radiology or neurosurgery alone"
+        ],
+        "context": []
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    },
+    {
+      "id": "dev-insufficient-conflicting-04",
+      "split": "development",
+      "family": "insufficient-conflicting",
+      "message": "Find cardiac CT experts. Manufacturer: Example Device Company. Do not infer independence from a missing company mention.",
+      "followups": [],
+      "expectation": {
+        "outcome": "discover",
+        "centralRequest": "Cardiac CT and manufacturer retained; independence stays unreviewed.",
+        "essential": [],
+        "preferred": [],
+        "removed": [],
+        "mustNotInfer": [
+          "independence from absent relationship evidence"
+        ],
+        "context": [
+          "Example Device Company"
+        ]
+      },
+      "simpleInterpretationEligible": true,
+      "recallScope": "not-exhaustive",
+      "sourceReferenceKeys": []
+    }
+  ]
+}

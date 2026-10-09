@@ -1,0 +1,23 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),http=require('node:http');
+const {createApp}=require('./server.cjs');
+const password='test-only-private-preview-password';
+async function fixture(t,{configured=true}={}){
+ const names=['EXPERT_PREVIEW_PASSWORD','EXPERT_PREVIEW_USERNAME'],saved=Object.fromEntries(names.map(k=>[k,process.env[k]]));if(configured)process.env.EXPERT_PREVIEW_PASSWORD=password;else delete process.env.EXPERT_PREVIEW_PASSWORD;delete process.env.EXPERT_PREVIEW_USERNAME;
+ const engine={ready:true,corpus:{version:'fixture-corpus',candidates:[],passages:[]},dataRelease:{releaseId:'private-fixture'},publicCounts:{sourceRows:42}},app=createApp(engine,{interpret:async()=>{throw Error('Unexpected interpretation');},generate:async()=>{throw Error('Unexpected generation');}}),server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(async()=>{await new Promise(resolve=>server.close(resolve));for(const key of names)if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];});
+ return {engine,base:'http://127.0.0.1:'+server.address().port,authorization:'Basic '+Buffer.from('docmap:'+password).toString('base64')};
+}
+test('private preview protects every application, asset and evidence route before parsing input',async t=>{
+ const h=await fixture(t);for(const endpoint of ['/expert-discovery','/expert-assets/app.js','/api/expert/sources/anyone','/brand/docmap-logo.jpg','/unknown']){const response=await fetch(h.base+endpoint);assert.equal(response.status,401);assert.match(response.headers.get('www-authenticate'),/^Basic /);assert.equal(response.headers.get('cache-control'),'no-store');}
+ for(const endpoint of ['/api/expert/profile','/api/expert/search','/api/expert/explain']){const response=await fetch(h.base+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:'{invalid'});assert.equal(response.status,401);assert.deepEqual(await response.json(),{error:'Authentication required.'});}
+ for(const endpoint of ['/api/health','/api/expert/health'])assert.deepEqual(await(await fetch(h.base+endpoint)).json(),{ready:true});h.engine.ready=false;const unavailable=await fetch(h.base+'/api/expert/health');assert.equal(unavailable.status,503);assert.deepEqual(await unavailable.json(),{ready:false});
+});
+test('valid authentication exposes complete normal routes and health without returning the credential',async t=>{
+ const h=await fixture(t),headers={Authorization:h.authorization},response=await fetch(h.base+'/api/expert/health',{headers}),health=await response.json();assert.equal(response.status,200);assert.equal(health.dataReleaseId,'private-fixture');assert.equal(health.counts.sourceRows,42);assert.equal(JSON.stringify(health).includes(password),false);assert.equal((await fetch(h.base+'/expert-discovery',{headers})).status,200);assert.equal((await fetch(h.base+'/expert-assets/app.js',{headers})).status,200);assert.equal((await fetch(h.base+'/api/expert/sources/absent',{headers})).status,404);
+});
+test('bad, oversized, ambiguous or duplicate authorization fails closed',async t=>{
+ const h=await fixture(t);for(const Authorization of ['Bearer anything','Basic !!!','Basic '+Buffer.from('docmap:wrong').toString('base64'),h.authorization+', '+h.authorization,'Basic '+Buffer.alloc(6200,65).toString('base64'),'Basic '+Buffer.from('docmap:'+password).toString('base64').replace(/=+$/,'')]){if(Authorization===h.authorization)continue;assert.equal((await fetch(h.base+'/expert-discovery',{headers:{Authorization}})).status,401);}
+ const status=await new Promise((resolve,reject)=>{const request=http.request(h.base+'/expert-discovery',{headers:['Host',new URL(h.base).host,'Authorization',h.authorization,'Authorization',h.authorization]},response=>{response.resume();resolve(response.statusCode);});request.on('error',reject);request.end();});assert.equal(status,401);
+});
+test('unset authentication retains ordinary expert behavior',async t=>{const h=await fixture(t,{configured:false});const health=await(await fetch(h.base+'/api/expert/health')).json();assert.equal(health.dataReleaseId,'private-fixture');assert.equal((await fetch(h.base+'/expert-discovery')).status,200);});
+test('an explicitly empty password cannot silently disable the private gate',()=>{const prior=process.env.EXPERT_PREVIEW_PASSWORD;process.env.EXPERT_PREVIEW_PASSWORD='';try{assert.throws(()=>createApp({ready:false}),/Invalid private preview authentication configuration/);}finally{if(prior===undefined)delete process.env.EXPERT_PREVIEW_PASSWORD;else process.env.EXPERT_PREVIEW_PASSWORD=prior;}});
