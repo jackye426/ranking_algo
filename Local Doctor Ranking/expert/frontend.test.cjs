@@ -1105,6 +1105,25 @@ test('native Escape saves profile reading position before the browser can close 
   cards(h)[0].querySelector('.card-open').click();assert.equal(dialog.open,true);assert.equal(region.scrollTop,570);assert.equal(section(content,'About').open,false);assert.equal(section(content,'Clinical interests').open,true);assert.equal(section(content,'Sources and search checks').open,true);assert.equal(requestsFor(h,'profile').length,1);assert.equal(requestsFor(h,'explain').length,0);
 });
 
+test('closing a saved profile restores the same candidate action after project cards are rebuilt',async t=>{
+  let p=P.createProject('Saved focus assessment');
+  for(const id of ['first-saved','second-saved']){const c=person(id);c.profileBackground=background(c);p=P.saveCandidate(p,c,brief,'corpus-test');}
+  const h=await setup(t,{initialProjects:[p],pathname:'/expert-discovery/project',healthCorpusVersion:'later-corpus'}),before=structuredClone(h.savedProjects.get(p.id));
+  assert.ok(before.candidates.every(c=>c.needsReview),'A newer corpus marks existing decisions for review before profile navigation');
+  const opener=()=>[...h.$('project-candidates').children].find(c=>c.dataset.candidateId==='second-saved').querySelector('.saved-profile-open');
+  for(const close of ['escape','button','back']){
+    const original=opener();original.click();assert.equal(h.$('profile-dialog').open,true);
+    if(close==='escape')h.$('profile-dialog').emit('cancel',{cancelable:true});
+    else if(close==='button')h.$('profile-close').click();else h.history.back();
+    await h.flush();assert.equal(h.$('profile-dialog').open,false);assert.equal(original.isConnected,false);
+    assert.equal(h.document.activeElement,opener(),'Focus returns to the same saved candidate, not the first card or hidden results');
+    h.history.forward();await h.flush();assert.equal(h.$('profile-dialog').open,true);assert.match(h.$('profile-identity').textContent,/second saved/);
+    h.history.back();await h.flush();assert.equal(h.document.activeElement,opener());
+  }
+  assert.equal(h.requests.length,0,'Historical saved profiles require neither live background nor AI');
+  assert.deepEqual(h.savedProjects.get(p.id).candidates,before.candidates);
+});
+
 test('saving a result fetches matching full background without opening a profile or using AI',async t=>{
   const h=await setup(t),c=person(),dataReleaseId='r0-safe-20261008-v2';await ready(h,'save-background',[c],{profileVersion:'expert-profile-v2',dataReleaseId});
   action(cards(h)[0],'Save').click();await h.flush();assert.equal(h.$('profile-dialog').open,false);assert.equal(requestsFor(h,'profile').length,1);assert.equal(requestsFor(h,'explain').length,0);
