@@ -206,10 +206,17 @@ function relationshipActivity(text) {
     return RELATIONSHIP_ACTIVE.test(clean)||RELATIONSHIP_FUNDING.test(clean)||(!recognition&&RELATIONSHIP_DIRECT.test(clean));
   });
 }
-function bibliographicReference(text) {
+function bibliographicReference(text,field='') {
   // Author-initials/title listings are searchable references; a title about a
   // training model does not describe training received by the profile owner.
-  return /^(?:(?!Dr\b|Mr\b|Mrs\b|Ms\b|Prof\b)[A-Z][A-Za-z’'-]+\s+[A-Z]{1,4}[.,])/.test(text.trim())||/\bdoi\s*:\s*10\.\d{4,9}\//i.test(text);
+  if(/\bdoi\s*:\s*10\.\d{4,9}\//i.test(text))return true;
+  // In a typed qualification field, e.g. 'MB BAO.BCh.' is a credential
+  // sequence, not surname MB followed by author initials BAO. Preserve only
+  // explicit credential-leading forms; the field alone proves nothing.
+  const qualificationField=/^(?:qualifications|detailed_qualifications|professional_context\.qualification)$/.test(field);
+  const credentialLead=/^(?:(?:MBBSM?|MB|MFDSRCS|FFPMRCA|FCPS|FRCS|FRCP|MCh|FRCOG|MD|BAO|BSc|MRCP|MRCOG|DFSRH|MSc|BMedSci|FRCA|FIPP|MRCS|BM|CCDS|DAvMed|PhD|MS|FRCR|MA)\b|Final[ \t]+F\.R\.C\.S\.|Post[ \t]+M\.Sc\.(?:[ \t]*Diploma\b)|Dip[ \t]+SEM\.|Cert[ \t]+LRS\.)/.test(text.trim());
+  if(qualificationField&&credentialLead)return false;
+  return /^(?:(?!Dr\b|Mr\b|Mrs\b|Ms\b|Prof\b)[A-Z][A-Za-z’'-]+\s+[A-Z]{1,4}[.,])/.test(text.trim());
 }
 function directClinicalActivity(text) {
   return activityClauses(text).some(clause=>{
@@ -251,7 +258,7 @@ function extractAttributes(text,context={}) {
   return output;
 }
 function classifyPassage(text,field='') {
-  if(bibliographicReference(text))return 'professional-background';
+  if(bibliographicReference(text,field))return 'professional-background';
   if(/publication/i.test(field)) return 'publication';
   if(/trial|isrctn/i.test(field)) return 'trial';
   if(/research/i.test(field)) return researchActivity(text)?'research':'clinical-interest';
@@ -279,12 +286,12 @@ function classifyPassage(text,field='') {
   if(/interest|specialis|specializ|expertise/i.test(text)||/interests|areas_of_interest/i.test(field)) return 'clinical-interest';
   return 'professional-background';
 }
-function qualifiers(text,type) {
+function qualifiers(text,type,field='') {
   const output=[];
   if(/\b(?:previously|formerly|retired|until\s+\d{4}|was\s+a|used\s+to)\b/i.test(text)) output.push('historical');
   if(type==='clinical-interest'||/developing\s+interest|interested\s+in|interests?\s+in/i.test(text)) output.push('stated-interest');
   if(type==='clinical-interest'&&/research|trial|stud(?:y|ies)/i.test(text))output.push('research-interest-not-study-experience');
-  if(bibliographicReference(text))output.push('bibliographic-reference-not-training-or-authorship');
+  if(bibliographicReference(text,field))output.push('bibliographic-reference-not-training-or-authorship');
   if(/\b(?:medico[ -]?legal|expert witness|legal firms?)\b/i.test(text))output.push('legal-work-not-clinical-care');
   if(type==='training') output.push('training-not-practice');
   if(/\b(?:currently|routinely|regularly|weekly|full[ -]time)\b/i.test(text)&&type==='clinical-practice') output.push('reported-current-practice');
@@ -502,7 +509,7 @@ function rowEvidence(row) {
   const packed=[];let previousKey=null;
   for(const entry of output) {
     const type=entry.type||classifyPassage(entry.text,entry.field);
-    const qs=unique([...(entry.qualifiers||[]),...qualifiers(entry.text,type),...(entry.field==='research_interests'&&type!=='research'?['stated-interest','research-interest-not-study-experience']:[])]);
+    const qs=unique([...(entry.qualifiers||[]),...qualifiers(entry.text,type,entry.field),...(entry.field==='research_interests'&&type!=='research'?['stated-interest','research-interest-not-study-experience']:[])]);
     const key=JSON.stringify([entry.field,entry.sourceUrl,entry.sourceLabel,entry.dates,type,qs,entry.repairProvenance||null]);
     // Only adjacent statements may share a chunk. Reusing a bucket after an
     // intervening activity moved later training/limitations out of source order.
@@ -591,7 +598,7 @@ function buildCorpus(input,{enrichments=[],identityReviews=[]}={}) {
   const groups=new Map(); for(let i=0;i<prepared.length;i++) {const k=find(i);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(prepared[i]);}
   const candidates=[],passages=[]; const passageByKey=new Map(); const candidateById=new Map();const sourceToCandidate=new Map();
   function addPassage(candidate,entry) {
-    const type=entry.type||classifyPassage(entry.text,entry.field),entryQualifiers=unique([...(entry.qualifiers||[]),...qualifiers(entry.text,type)]).sort();
+    const type=entry.type||classifyPassage(entry.text,entry.field),entryQualifiers=unique([...(entry.qualifiers||[]),...qualifiers(entry.text,type,entry.field)]).sort();
     const key=JSON.stringify([candidate.id,entry.text,type,entryQualifiers,entry.dates||{},entry.reviewedParaphrase===true,entry.sourceQuote||null]);
     const source={sourceRecordId:entry.sourceRecordId,field:entry.field,sourceUrl:entry.sourceUrl,sourceLabel:entry.sourceLabel,dates:entry.dates,attribution:entry.attribution,
       ...(entry.reviewedParaphrase?{reviewedParaphrase:true,sourceQuote:entry.sourceQuote||null}:{}),...(entry.review?{review:entry.review}:{}),...(entry.identityBasis?{identityBasis:entry.identityBasis}:{}),...repairProvenance(entry.repairProvenance)};
@@ -604,7 +611,7 @@ function buildCorpus(input,{enrichments=[],identityReviews=[]}={}) {
         if(old.volumes.length===1) old.volume=old.volumes[0];else delete old.volume;
       }
       const weight={'source-record':0,'linked-source':1,'verified-source':2};
-      if(weight[entry.attribution]>weight[old.attribution]) Object.assign(old,source,{type,attributes:extractAttributes(entry.text,{field:entry.field,type}),qualifiers:unique([...(old.qualifiers||[]),...(entry.qualifiers||[]),...qualifiers(entry.text,type)])});
+      if(weight[entry.attribution]>weight[old.attribution]) Object.assign(old,source,{type,attributes:extractAttributes(entry.text,{field:entry.field,type}),qualifiers:unique([...(old.qualifiers||[]),...(entry.qualifiers||[]),...qualifiers(entry.text,type,entry.field)])});
       return;
     }
     const passage={id:`evidence-${hash(key)}`,candidateId:candidate.id,...entry,type,attributes:extractAttributes(entry.text,{field:entry.field,type}),qualifiers:entryQualifiers,sources:[source]};
