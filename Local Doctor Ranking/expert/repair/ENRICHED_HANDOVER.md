@@ -2,9 +2,9 @@
 
 **Status: validation in progress; not approved for main-product activation.**
 
-**9 October checkpoint:** the package identifiers and corpus measurements below are historical v12 preparation references. V13 source cleanup passed compilation, but inherited provider ownership requires further source-bound disposition. Neither is approved for deployment. The final forward and rollback packages must both contain the latest 66 mandatory holds and all final exclusions; do not execute this runbook with the older three-hold packages.
+**9 October checkpoint:** source preparation v15 is frozen and source-reviewed. Corrected-code v16 corpus preparation, retrieval evaluation and exact hosted packaging are in progress. Both forward and rollback targets must contain all 67 mandatory identity holds and 2,890 field exclusions. Earlier v12–v15 corpus/cache outputs are historical measurements, not final deployment receipts.
 
-This runbook covers the integrated broader release, `enriched-r3-20261008`, and its compatible fallback, `enriched-safe-r1-20261008`. The previous `RELEASE-ROLLBACK.md` records the earlier R1/R0 rehearsal. Its old packages do not contain the newer field exclusions and are not fallback targets for this release.
+This runbook covers the integrated broader release, `enriched-r3-20261009-v3`, and its compatible fallback, `enriched-safe-r1-20261009-v3`. The previous `RELEASE-ROLLBACK.md` records the earlier R1/R0 rehearsal. Its old packages do not contain the newer field exclusions and are not fallback targets for this release. These release IDs identify the frozen source packets; a deployable package additionally needs the final runtime, cache and dependency manifests below.
 
 ## Deployment boundary
 
@@ -20,9 +20,15 @@ The main Expert Discovery service (`b3f468f3-5b43-4d9e-9159-af6445429d33`) and p
 
 ## What the release contains
 
-Both packages use the same frozen 40,876-row professional projection, identity decisions, three additional whole-identity holds and 2,524 source-bound field exclusions. The safe R1 is a compatible narrower corpus with those same safety decisions; rollback must never remove them. Raw baseline fields remain private and are not evidence available to the application after exclusion.
+Both packages use the same frozen 40,876-row professional projection, identity decisions, 67 whole-identity holds and 2,890 source-bound field exclusions. The safe R1 is a compatible narrower corpus with those same safety decisions; rollback must never remove them. Raw baseline fields remain private and are not evidence available to the application after exclusion.
 
-The broader source packet contains 248,281 accepted source-field items: 80,826 inherited items and 167,455 newly recovered items. These are not counts of unique facts, new people or qualified experts. The two replayed corpora contain 584,121 and 300,372 passages respectively. Searchable populations differ by four existing identities whose attributable professional material becomes available; no new identities were admitted.
+The broader source packet contains 243,651 source-field context items across 17,565 existing rows, plus 42,300 field corrections. The compatible safe packet contains 206 reviewed context items across 126 rows and 24,861 corrections. Held identities remain excluded from both corpora. These counts are not unique facts, new people or qualified experts. Final indexed counts are recorded separately after the corrected runtime replay; no new identity is admitted.
+
+Frozen source packet SHA-256 values:
+
+- Forward: `10af49d27cbe8b4e37453e75acbdb444c6bd8cc9241ba70aa3eca1a21a85b5fa`.
+- Safe fallback: `c9ac88422af04e5609e134162ba26603667337fe390f26175c85df8395cc6be9`.
+- Professional baseline: `69ed571e67c79d8ed1327b74e23dd999ea5b39c53bd20553f23f34afae9c3a8e`.
 
 Every deployable package must bind:
 
@@ -36,7 +42,7 @@ Every deployable package must bind:
 
 The installed-dependency receipt additionally binds the actual Node executable/ABI and every installed runtime file (excluding npm `.bin` aliases). Strict readiness rehashes this inventory, validates the model/cache and performs a real normalized 384-dimensional query inference before reporting ready. A lockfile alone is insufficient. Pin the verified Node version in the Docker base; a different executable or installed dependency must fail rather than be accepted by version name alone.
 
-Final deployment-manifest and cache checksums are recorded only after packaging. Earlier preparation receipts cannot stand in for the exact deployed package. The v12 source review has produced additional scope findings; its counts above are a preparation baseline, not a deployable signoff. The final handover must supersede them with the corrected package's receipts.
+Final deployment-manifest and cache checksums are recorded only after packaging. Earlier preparation receipts cannot stand in for the exact deployed package. The full-context source check accounts for deliberate omissions and confirms no unexplained character or ordering loss; it does not establish retrieval quality or hosted compatibility.
 
 ## Prepare and verify the private package
 
@@ -82,7 +88,7 @@ The original 98-case results and the prospective first-run reports remain immuta
 ## Rollback rehearsal
 
 1. While R3 is active, save a project containing its brief, rationale, background, notes and an explicit user decision. Export its JSON and readable review pack; record checksums privately.
-2. Switch the preview to `enriched-safe-r1-20261008` with its matching manifest, cache and compatible build. Keep strict mode, authentication and all current field/identity exclusions enabled.
+2. Switch the preview to `enriched-safe-r1-20261009-v3` with its matching manifest, cache and compatible build. Keep strict mode, authentication and all current field/identity exclusions enabled.
 3. Verify exact health pins, expected narrower counts and all hold/exclusion checks. Run representative API and browser workflows.
 4. Reopen the saved R3 project. Its stored wording, versions, notes and decisions must remain unchanged. A current-scope change may flag a decision for review; it must not fabricate a new decision. Old live citations must return a clear unavailable/changed response, never replacement wording. Resume creates a new search using the chosen release.
 5. Restore the exact R3 package. Recheck health, citations, saved projects and representative searches. Preserve distinct operation IDs, deployment IDs, timestamps and report hashes for both directions.

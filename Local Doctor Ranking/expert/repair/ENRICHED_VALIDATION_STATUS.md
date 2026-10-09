@@ -52,7 +52,27 @@ utility examples, exact private deployment/cache packaging, hosted verification
 and rollback rehearsal. No held-out acceptance, ranking-quality pass or
 main-service activation is claimed.
 
-## Historical checkpoint — superseded by the current section
+## Source-formatting checkpoint — 9 October, 18:40 UTC
+
+The exhaustive preparation check found four additional runtime defects: a
+case-insensitive title boundary split ordinary words and names; sentence
+chunking dropped a generated short tail; a career date range was mistaken
+for a contact number; and inline navigation wording discarded substantive
+clinical text. The corrected runtime passes 1,637 application checks. The
+30 source-parser and 86 enriched-preparation Python checks also pass.
+
+All 243,651 source-context items have been accounted for: 242,935 retain
+complete token coverage; 130 absent and 586 partial items have explicit
+source-bound dispositions, including 64 differences consisting only of
+whitespace at real glued title boundaries. There is no unexplained character
+or ordering loss after those deliberate omissions. Original failed proofs
+remain preserved. This is not a claim that every raw word is indexed.
+
+Source packets remain unchanged. The earlier v15 corpus/cache/surface results
+are now historical; corrected-code v16 corpora and fresh acceptance receipts
+are required. No held-out results have been used for ranking development.
+
+## Historical checkpoint — superseded by the current sections
 
 The application now includes the subsequent main-product changes from `714d5a587d60b581028e89228e4f06fa7a492ed0` (editable project names and aligned card actions). The integrated Node regression run passes 1,573 checks. A subsequent narrow population-wording correction passes 56 focused checks; a final complete run is still required. Final packaging, current-main compatibility and hosted checks remain outstanding; the older measurements below are historical checkpoints.
 

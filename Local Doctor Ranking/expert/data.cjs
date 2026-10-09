@@ -301,7 +301,10 @@ function sourceStatements(value) {
   // Several source bios omit the space between complete sentences. Split at
   // recognised sentence starts without rewriting any supporting words. Share
   // these boundaries with activity classification and the requirement matrix.
-  const parts=text.split(/(?<=[a-z])(?=(?:Dr|Mr|Mrs|Ms|Miss|Professor)\s+[A-Z][a-z’'-]+\s+(?:is|has|provides|performs|reports)\b)|(?<=\.)(?=(?:Dr |Mr |Mrs |Ms |Miss |Prof |Professor |He |She |His |Her |I |My |Aside |After |During |Currently\b|Presently\b|Previously\b|Today\b|Now\b|At present\b|[A-Z][a-z]{2,} (?:enjoys?|is |has |was )))|(?<=;)\s*(?=(?:I|he|she|we|they|currently|presently|at present)\b)|\n+(?=(?:Currently|Presently|Previously|Today|Now|At present)\b)|\s+(?=(?:and|but)\s+(?:I|he|she|we|they)\b)/i);
+  // The glued professional-title boundary is deliberately case-sensitive:
+  // /i would read the tail of "problems and has" as "Ms And has", changing
+  // the original word. Other sentence/pronoun boundaries remain insensitive.
+  const parts=text.split(/(?<=[a-z])(?=(?:Dr|Mr|Mrs|Ms|Miss|Professor)\s+[A-Z][a-z’'-]+\s+(?:is|has|provides|performs|reports)\b)/).flatMap(part=>part.split(/(?<=\.)(?=(?:Dr |Mr |Mrs |Ms |Miss |Prof |Professor |He |She |His |Her |I |My |Aside |After |During |Currently\b|Presently\b|Previously\b|Today\b|Now\b|At present\b|[A-Z][a-z]{2,} (?:enjoys?|is |has |was )))|(?<=;)\s*(?=(?:I|he|she|we|they|currently|presently|at present)\b)|\n+(?=(?:Currently|Presently|Previously|Today|Now|At present)\b)|\s+(?=(?:and|but)\s+(?:I|he|she|we|they)\b)/i));
   const sentenceSegments=parts.flatMap(part=>{
     // Intl treats every newline as a sentence boundary, including soft wraps
     // inside "running\ninjuries" and "Chris is\npassionate". Segment a
@@ -331,6 +334,9 @@ function splitPassages(value) {
   for(const sentence of sentenceSegments) {
     let rest=sentence.trim(); while(rest.length>900) {
       let at=rest.lastIndexOf('; ',900); if(at<200) at=rest.lastIndexOf(' ',900); if(at<1) at=900;
+      // A boundary created here must not leave a tiny tail that the biography
+      // noise filter would discard. Rebalance using an original word boundary.
+      if(rest.slice(at).trim().length<15){const earlier=rest.lastIndexOf(' ',rest.length-16);if(earlier>0&&earlier<at)at=earlier;}
       output.push(rest.slice(0,at).trim()); rest=rest.slice(at).trim();
     }
     if(rest) output.push(rest);
@@ -394,7 +400,10 @@ function administrativeText(text){
 function contactDetails(text){
   // Keep a contact label attached to its value. 'Medical Contact Lens' with
   // role dates and 'mobile-bearing' with reference numbers are clinical text.
-  return /\b(?:(?:telephone|phone|tel\.?|mobile)(?:\s+(?:number|telephone|phone))?|contact(?:\s+(?:us|me|our team))?|(?:for\s+)?(?:bookings?|appointments?))\s*(?:(?:us|me)\s+)?(?:(?:on|at|via|is)\s*)?[:=]?\s*\+?\d[\d ()-]{8,}\d/i.test(text)||/\b(?:contact\s+(?:us|me)|book(?:\s+an?)?\s+(?:appointment|consultation)|booking(?:\s+page|\s+link)?)\s*(?:on|at|via)?\s*:?\s*https?:\/\//i.test(text);
+  // A career-appointment year range is not a phone number. Use this shadow
+  // only for privacy detection; other contacts still trigger withholding.
+  const contactText=text.replace(/\b(?:previous|past|clinical|academic|hospital|professional|training)\s+appointments?\s*:\s*(?:19|20)\d{2}\s*[-–]\s*(?:19|20)\d{2}\b/gi,match=>match.replace(/appointments?/i,'posts'));
+  return /\b(?:(?:telephone|phone|tel\.?|mobile)(?:\s+(?:number|telephone|phone))?|contact(?:\s+(?:us|me|our team))?|(?:for\s+)?(?:bookings?|appointments?))\s*(?:(?:us|me)\s+)?(?:(?:on|at|via|is)\s*)?[:=]?\s*\+?\d[\d ()-]{8,}\d/i.test(contactText)||/\b(?:contact\s+(?:us|me)|book(?:\s+an?)?\s+(?:appointment|consultation)|booking(?:\s+page|\s+link)?)\s*(?:on|at|via)?\s*:?\s*https?:\/\//i.test(text);
 }
 function useful(text,field,{reviewedContext=false,reviewedShort=false}={}) {
   if(text.length<2||/^(?:null|none|unknown|n\/?a|not available|undefined)$/i.test(text)) return false;
@@ -403,7 +412,7 @@ function useful(text,field,{reviewedContext=false,reviewedShort=false}={}) {
   if(/\b(?:my\s+(?:wife|husband|children|family)|spare\s+time|outside\s+(?:of\s+)?(?:work|medicine|my professional life)|hobbies|enjoy\s+(?:golf|ski|travel|music)|married\s+with|golf\s+club)\b/i.test(text)) return false;
   if(/\benjoys?\s+(?:running|strength training|playing|skiing|golf|tennis|travel|music|cycling|walking)\b/i.test(text))return false;
   if(/about/.test(field)&&/^(?:(?:I|he|she)\s+(?:was|am|is)\s+)?(?:born|brought up)\b|\b(?:I was|he was|she was)\s+born\b|^(?:(?:Dr\.?|Mr\.?|Mrs\.?|Ms\.?)\s+)?[A-Z][A-Za-z’'-]+(?:\s+[A-Z][A-Za-z’'-]+){0,2}\s+was\s+born\b|\b(?:I am|he is|she is)\s+(?:married|a (?:mother|father) of)\b|\b(?:I|he|she)\s+ha(?:ve|s)\s+(?:one|two|three|four|five|\d+)\s+children\b/i.test(text)&&!directClinicalActivity(text)&&!researchActivity(text)&&!receivedTraining(text))return false;
-  if(/\b(?:please see|refer to|see)\s+(?:the\s+)?(?:list|below|above|website)\b/i.test(text)&&!/[;:]/.test(text))return false;
+  if(/^(?:please see|refer to|see)\s+(?:the\s+)?(?:list|below|above|website)\b/i.test(text)&&!/[;:]/.test(text))return false;
   if(/\b(?:we hope|you (?:may|will)|please)\b.{0,70}\b(?:find|view|read)\b.{0,80}\b(?:information|pages|website)\b/i.test(text))return false;
   if(/^(?:clinical|research|specialist|personal|professional)\s+(?:interests?|experience|background|memberships?)\s*:?\s*$/i.test(text))return false;
   if(/\b(?:renowned globally|globally renowned|world renowned|world[- ]leading)\b/i.test(text)&&/\b(?:pioneer in the field|not just a|leading light)\b/i.test(text)&&!researchActivity(text)&&!Object.values(extractAttributes(text)).some(values=>values.length))return false;
