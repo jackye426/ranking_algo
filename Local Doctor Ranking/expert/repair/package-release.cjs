@@ -24,9 +24,13 @@ async function validateBaselineCommit({baselineCode,frozen,baselineCommit,baseli
  for(const name of ['identity-reviews.cjs','enrichments.cjs','data.cjs']){
   const reference=baselineCommit+':Local Doctor Ranking/expert/'+name;
   let committed;try{committed=execFileSync('git',['-c','safe.directory='+baselineRepository,'show',reference],{cwd:baselineRepository,stdio:['ignore','pipe','pipe'],maxBuffer:25*1024*1024});}catch{throw Error('Cannot verify baseline code against committed repository content: '+name);}
-  const exported=await fs.readFile(path.join(baselineCode,'expert',name)),matches=name==='data.cjs'?committed.toString('utf8').replace(/\r\n/g,'\n')===exported.toString('utf8').replace(/\r\n/g,'\n'):hash(committed)===hash(exported);
-  if(!matches)throw Error('Baseline export does not match the explicitly selected Git commit: '+name);
-  files[name]={gitReference:reference,gitSha256:hash(committed),exportedSha256:hash(exported)};
+  // Git may store LF while the frozen, exported and running Windows modules
+  // retain CRLF. This lineage check permits only that transport difference;
+  // latin1 preserves every byte, including invalid UTF-8, without replacement.
+  // Frozen/current/staged identity checks below remain byte-identical.
+  const exported=await fs.readFile(path.join(baselineCode,'expert',name)),byteIdentical=committed.equals(exported),normalizedLineEndingsEqual=committed.toString('latin1').replace(/\r\n/g,'\n')===exported.toString('latin1').replace(/\r\n/g,'\n');
+  if(!normalizedLineEndingsEqual)throw Error('Baseline export does not match the explicitly selected Git commit: '+name);
+  files[name]={gitReference:reference,gitSha256:hash(committed),exportedSha256:hash(exported),byteIdentical,normalizedLineEndingsEqual};
  }
  return {baselineCommit,files};
 }

@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),{execFileSync}=require('node:child_process');
-const {buildPackage,validateBaselineCommit,validateRuntimeManifest}=require('./package-release.cjs'),{MANDATORY_HOLDS,REQUIRED_RUNTIME_FILES}=require('../releases.cjs');
+const {buildPackage,validateFrozenCode,validateBaselineCommit,validateRuntimeManifest}=require('./package-release.cjs'),{MANDATORY_HOLDS,REQUIRED_RUNTIME_FILES}=require('../releases.cjs');
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
 async function fixture(t){
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'docmap-package-proof-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const repository=path.join(dir,'repository'),baselineCode=path.join(repository,'Local Doctor Ranking'),baselineDir=path.join(dir,'baseline');await fs.mkdir(path.join(baselineCode,'expert'),{recursive:true});await fs.mkdir(baselineDir);
@@ -22,6 +22,26 @@ test('packaging accepts any explicitly verified full baseline commit instead of 
 test('missing, abbreviated or false baseline references cannot package source exports',async t=>{
   const f=await fixture(t);for(const baselineCommit of [undefined,f.baselineCommit.slice(0,7),'f'.repeat(40)])await assert.rejects(buildPackage({...f,baselineCommit}),/exact full baseline commit/);
   await fs.appendFile(path.join(f.baselineCode,'expert','data.cjs'),'\n// uncommitted substitute');await assert.rejects(buildPackage(f),/does not match the explicitly selected Git commit/);await assert.rejects(fs.stat(f.output),{code:'ENOENT'});
+});
+test('Git lineage accepts only CRLF-to-LF equivalence for all three exported baseline modules',async t=>{
+ const f=await fixture(t),names=['identity-reviews.cjs','enrichments.cjs','data.cjs'],original={};
+ const git=args=>execFileSync('git',['-c','safe.directory='+f.baselineRepository,'-c','core.autocrlf=false',...args],{cwd:f.baselineRepository,stdio:['ignore','pipe','pipe']});
+ for(const name of names){const file=path.join(f.baselineCode,'expert',name),bytes=await fs.readFile(file);original[name]=Buffer.from(bytes.toString('latin1').replace(/\r\n/g,'\n'),'latin1');await fs.writeFile(file,original[name]);}
+ git(['add','Local Doctor Ranking']);git(['-c','user.name=DocMap Test','-c','user.email=test@example.invalid','commit','--allow-empty','-m','Synthetic LF Git blobs']);f.baselineCommit=git(['rev-parse','HEAD']).toString().trim();f.frozen.codeCommit=f.baselineCommit;
+ for(const name of names)await fs.writeFile(path.join(f.baselineCode,'expert',name),Buffer.from(original[name].toString('latin1').replace(/\n/g,'\r\n'),'latin1'));
+ const proof=await validateBaselineCommit(f);for(const name of names){assert.equal(proof.files[name].byteIdentical,false);assert.equal(proof.files[name].normalizedLineEndingsEqual,true);assert.equal(proof.files[name].gitSha256,hash(original[name]));assert.equal(proof.files[name].exportedSha256,hash(await fs.readFile(path.join(f.baselineCode,'expert',name))));}
+ // Neither a real source edit, extra whitespace, lone CR nor malformed bytes
+ // are line-ending conversion. Exercise each module, not just data.cjs.
+ for(const name of names){const file=path.join(f.baselineCode,'expert',name),approved=await fs.readFile(file);for(const change of [b=>Buffer.concat([b,Buffer.from('\n// changed claim')]),b=>Buffer.concat([b,Buffer.from(' ')]),b=>Buffer.from(b.toString('latin1').replace(/\r\n/,'\r'),'latin1'),b=>Buffer.concat([Buffer.from([0xff]),b])]){await fs.writeFile(file,change(approved));await assert.rejects(validateBaselineCommit(f),error=>error.message.endsWith(name)&&/does not match/.test(error.message));}await fs.writeFile(file,approved);}
+});
+test('Git line-ending tolerance does not weaken frozen or staged identity byte pins',async t=>{
+ const f=await runtimeFixture(t);
+ for(const name of ['identity-reviews.cjs','enrichments.cjs']){
+  const file=path.join(f.baselineCode,'expert',name),original=await fs.readFile(file),text=original.toString('latin1'),altered=Buffer.from(text.includes('\r\n')?text.replace(/\r\n/g,'\n'):text.replace(/\n/g,'\r\n'),'latin1');assert.notEqual(hash(altered),hash(original));
+  await fs.writeFile(file,altered);assert.equal((await validateBaselineCommit(f)).files[name].normalizedLineEndingsEqual,true);await assert.rejects(validateFrozenCode(f.baselineDir,f.baselineCode,f.frozen),error=>error.message.endsWith(name)&&/differs from committed baseline/.test(error.message));await fs.writeFile(file,original);
+  const staged=path.join(f.runtime,'expert',name),manifest=JSON.parse(await fs.readFile(f.runtimeManifest,'utf8'));await fs.writeFile(staged,altered);const item=manifest.files.find(x=>x.file==='expert/'+name);item.sha256=hash(altered);item.bytes=altered.length;await fs.writeFile(f.runtimeManifest,JSON.stringify(manifest));await assert.rejects(buildPackage(f),/Staged runtime identity decisions or enrichments differ/);await assert.rejects(fs.stat(f.output),{code:'ENOENT'});
+  await fs.writeFile(staged,original);item.sha256=hash(original);item.bytes=original.length;await fs.writeFile(f.runtimeManifest,JSON.stringify(manifest));
+ }
 });
 test('version-two package records its verified runtime pin without modifying frozen source manifests',async t=>{
   const f=await runtimeFixture(t),before=await fs.readFile(path.join(f.baselineDir,'baseline-manifest.json')),summary=await buildPackage(f),manifest=JSON.parse(await fs.readFile(path.join(f.output,'manifest.json'),'utf8'));
