@@ -1,0 +1,11 @@
+'use strict';
+const U=require('./util.cjs'),R=require('./reader.cjs');
+async function capture(db,pin,{candidateId,evidenceIds},options={}){
+  const r=await R.release(db,pin,options);if(!Array.isArray(evidenceIds)||evidenceIds.length>500||new Set(evidenceIds).size!==evidenceIds.length)throw Error('Exact bounded evidence selection required');
+  const member=(await db.query('select held,payload_json,payload_sha256 from docmap_professional.members where release_id=$1 and professional_id=$2',[pin.releaseId,candidateId])).rows[0];if(!member||member.held)throw Error('Held/unavailable professional cannot supply new saved evidence');const candidate=JSON.parse(member.payload_json);if(U.hash(candidate)!==member.payload_sha256)throw Error('Candidate integrity failed');
+  const evidence=[];for(const evidenceId of evidenceIds){const result=await R.historicalCitation(db,pin,{candidateId,evidenceId},options);if(result.status!==200)throw Error('Selected evidence unavailable');evidence.push(result.evidence);}
+  const snapshot={schemaVersion:1,format:'docmap-db-saved-evidence-v1',versions:{...R.versions(r),approvalSha256:pin.approvalSha256||null},candidate,evidence};return {snapshot,snapshotSha256:U.hash(snapshot)};
+}
+function restore(envelope){if(!envelope||envelope.snapshot?.schemaVersion!==1||envelope.snapshot?.format!=='docmap-db-saved-evidence-v1'||U.hash(envelope.snapshot)!==envelope.snapshotSha256)throw Error('Saved evidence envelope integrity failed');const s=envelope.snapshot;for(const k of ['dataReleaseId','manifestSha256','corpusVersion','projectionVersion','profileVersion','bindingSha256','safetySha256'])if(!s.versions[k])throw Error('Saved evidence lacks a full version tuple');if(!Array.isArray(s.evidence)||s.evidence.some(p=>p.candidateId!==s.candidate.id))throw Error('Saved evidence owner mismatch');return structuredClone(s);}
+function explanationCacheKey(snapshot,{model,runtimeSha256,promptSha256}){restore({snapshot,snapshotSha256:U.hash(snapshot)});if(!model||!/^[a-f0-9]{64}$/.test(runtimeSha256||'')||!/^[a-f0-9]{64}$/.test(promptSha256||''))throw Error('Explanation cache model/runtime/prompt pins required');return U.hash({versions:snapshot.versions,evidenceSha256:U.hash(snapshot.evidence),model,runtimeSha256,promptSha256});}
+module.exports={capture,restore,explanationCacheKey};

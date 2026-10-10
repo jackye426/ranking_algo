@@ -1,0 +1,2 @@
+create index publication_events_latest_release
+on docmap_professional.publication_events(release_id,created_at desc,event_id desc);

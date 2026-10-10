@@ -1,0 +1,4 @@
+'use strict';
+const {connect,migrate}=require('./db.cjs');
+async function main(){const [command,...args]=process.argv.slice(2),db=await connect();try{if(command==='migrate'){await migrate(db);console.log('Private professional-data migrations applied to configured database');}else if(command==='import'){const [bindingFile,bindingSha256,reportFile]=args;console.log(JSON.stringify(await require('./importer.cjs').importRelease(db,{bindingFile,bindingSha256,reportFile,onProgress:x=>console.log(JSON.stringify(x))})));}else if(command==='publish'){const [receiptFile,receiptSha256]=args;console.log(JSON.stringify(await require('./reader.cjs').publish(db,{receiptFile,receiptSha256})));}else throw Error('Unknown database command');}finally{await db.end();}}
+if(require.main===module)main().catch(e=>{console.error(e.message);process.exitCode=1;});
