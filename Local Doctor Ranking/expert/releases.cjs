@@ -77,9 +77,12 @@ function applyRepairs(rows,packet,{baselineSha256,releaseId}={}){
   for(const decision of suppressions){
     keys(decision,['sourceRecordId','field','beforeHash','reason','reviewId','sourceEvidence','approved'],'suppression');
     const parts=typeof decision.field==='string'?decision.field.split('.'):[];
-    if(decision.approved!==true||!bounded(decision.sourceRecordId,160)||!SUPPRESSIBLE_FIELDS.includes(parts[0])||parts.length>2||parts.length===2&&(parts[0]!=='about_alternatives'||!/^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/.test(parts[1])||['constructor','prototype','__proto__'].includes(parts[1]))||!DIGEST.test(decision.beforeHash)||!bounded(decision.reason,2000)||!bounded(decision.reviewId,240))fail('unapproved suppression or protected field');
+    const publicationEntry=parts.length===2&&parts[0]==='publications'&&/^(?:0|[1-9]\d{0,4})$/.test(parts[1]);
+    const alternativeEntry=parts.length===2&&parts[0]==='about_alternatives'&&/^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/.test(parts[1])&&!['constructor','prototype','__proto__'].includes(parts[1]);
+    if(decision.approved!==true||!bounded(decision.sourceRecordId,160)||!SUPPRESSIBLE_FIELDS.includes(parts[0])||parts.length>2||parts.length===2&&!publicationEntry&&!alternativeEntry||!DIGEST.test(decision.beforeHash)||!bounded(decision.reason,2000)||!bounded(decision.reviewId,240))fail('unapproved suppression or protected field');
     const record=byId.get(decision.sourceRecordId);if(!record)fail('unknown suppression source record');
-    let original=record;for(const part of parts){if(!object(original)||!Object.hasOwn(original,part))fail('missing suppression field');original=original[part];}
+    if(publicationEntry&&(!Array.isArray(record.publications)||Number(parts[1])>=record.publications.length))fail('missing publication entry');
+    let original=record;for(const part of parts){if(!(object(original)||publicationEntry&&Array.isArray(original))||!Object.hasOwn(original,part))fail('missing suppression field');original=original[part];}
     if(hashValue(original)!==decision.beforeHash)fail('suppression before-value hash mismatch');
     if(!Array.isArray(decision.sourceEvidence)||!decision.sourceEvidence.length||decision.sourceEvidence.length>20)fail('missing suppression source evidence');
     for(const proof of decision.sourceEvidence){keys(proof,['snapshotSha256','sourceField','sourceRecordId'],'suppression evidence');if(!DIGEST.test(proof.snapshotSha256)||!bounded(proof.sourceField,200)||proof.sourceRecordId!==decision.sourceRecordId)fail('invalid suppression ownership or provenance');}
@@ -87,7 +90,11 @@ function applyRepairs(rows,packet,{baselineSha256,releaseId}={}){
     if([...seen].some(other=>other===key||other.startsWith(key+'.')||key.startsWith(other+'.')))fail('conflicting field patch or suppression');seen.add(key);
     const row=mutable(decision.sourceRecordId);
     if(['nhs_base','specialty'].includes(decision.field))row._expertEvidenceExclusions={...row._expertEvidenceExclusions,[decision.field]:{beforeHash:decision.beforeHash,reviewId:decision.reviewId,releaseId,approved:true}};
-    else if(parts.length===1)row[parts[0]]=null;else{row[parts[0]]={...row[parts[0]]};delete row[parts[0]][parts[1]];}
+    else if(parts.length===1)row[parts[0]]=null;
+    // Preserve source positions and all unreviewed sibling entries. The raw
+    // baseline and exact suppressed value remain in the immutable history.
+    else if(publicationEntry){row.publications=[...row.publications];row.publications[Number(parts[1])]=null;}
+    else{row[parts[0]]={...row[parts[0]]};delete row[parts[0]][parts[1]];}
   }
   const holdIds=new Set();
   for(const hold of packet.holds){keys(hold,['sourceRecordId','reason'],'hold');if(!MANDATORY_HOLDS.includes(hold.sourceRecordId)||!bounded(hold.reason,1000)||holdIds.has(hold.sourceRecordId))fail('unapproved or duplicate hold');holdIds.add(hold.sourceRecordId);mutable(hold.sourceRecordId).requires_review=true;}

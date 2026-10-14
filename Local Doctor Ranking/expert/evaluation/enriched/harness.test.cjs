@@ -51,7 +51,26 @@ test('profile fingerprints are passage-order insensitive but retain differing pr
   assert.equal(profileFingerprint([a,b]),profileFingerprint([b,a]));assert.notEqual(profileFingerprint([a]),profileFingerprint([{...a,sourceLabel:'Another source'}]));
   assert.notEqual(profileFingerprint([{...a,sourceRecordId:'one'}]),profileFingerprint([{...a,sourceRecordId:'two'}]));
   assert.notEqual(profileFingerprint([{...a,repairProvenance:{snapshotSha256:'one'}}]),profileFingerprint([{...a,repairProvenance:{snapshotSha256:'two'}}]));
-  assert.equal(profileFingerprint([{...a,repairProvenance:{releaseId:'one',snapshotSha256:'same'}}]),profileFingerprint([{...a,repairProvenance:{releaseId:'two',snapshotSha256:'same'}}]));
+  assert.notEqual(profileFingerprint([{...a,repairProvenance:{releaseId:'one',snapshotSha256:'same'}}]),profileFingerprint([{...a,repairProvenance:{releaseId:'two',snapshotSha256:'same'}}]));
+});
+test('strict private fingerprints preserve all secondary provenance and ownership decisions',()=>{
+ const passage={id:'same-id',candidateId:'same-owner',text:'MR training',type:'training',field:'about',sources:[{sourceRecordId:'source-1',field:'about',dates:{sourceDate:null},repairProvenance:{releaseId:'release-1',snapshotSha256:'snapshot-1',parserVersion:'parser-1',reviewId:'review-1'},identityBasis:{kind:'reviewed-owner',reviewId:'owner-review-1'}}]};
+ for(const key of ['releaseId','snapshotSha256','parserVersion','reviewId']){const changed=structuredClone(passage);changed.sources[0].repairProvenance[key]+='-changed';assert.notEqual(profileFingerprint([passage]),profileFingerprint([changed]),key);}
+ const changed=structuredClone(passage);changed.sources[0].identityBasis.reviewId='another-owner-review';assert.notEqual(profileFingerprint([passage]),profileFingerprint([changed]));
+ const missing=structuredClone(passage);delete missing.sources[0].repairProvenance;assert.notEqual(profileFingerprint([passage]),profileFingerprint([missing]));
+});
+test('strict fingerprints detect changed meaning and source qualification even with unchanged evidence IDs',()=>{
+ const original={id:'same-id',text:'Recorded MR experience',type:'professional-background',attributes:{scope:{activity:'unknown'}},identityBasis:{kind:'typed-registration'},review:{limitations:['Current activity not recorded']},sources:[{sourceRecordId:'source-1',sourceQuote:'Literal source',reviewedParaphrase:false,review:{limitations:['Historical']}}]};
+ for(const change of [p=>p.type='clinical-practice',p=>p.attributes.scope.activity='performed',p=>p.identityBasis.kind='name-only',p=>p.review.limitations=[],p=>p.sources[0].sourceQuote='Different literal source',p=>p.sources[0].reviewedParaphrase=true,p=>p.sources[0].review.limitations=[]]){const modified=structuredClone(original);change(modified);assert.notEqual(profileFingerprint([original]),profileFingerprint([modified]));}
+});
+test('canonical private fingerprints ignore object-key insertion order but preserve arrays, absence and unknown properties',()=>{
+ const a={text:'CT',attributes:{b:2,a:1},sources:[{field:'about',sourceRecordId:'one'},{field:'about',sourceRecordId:'two'}]};
+ const reordered={sources:[{sourceRecordId:'one',field:'about'},{sourceRecordId:'two',field:'about'}],attributes:{a:1,b:2},text:'CT'};
+ assert.equal(profileFingerprint([a]),profileFingerprint([reordered]));
+ assert.notEqual(profileFingerprint([a]),profileFingerprint([{...a,sources:[...a.sources].reverse()}]));
+ assert.notEqual(profileFingerprint([a]),profileFingerprint([{...a,newSourceMeaning:{qualified:true}}]));
+ assert.notEqual(profileFingerprint([a]),profileFingerprint([{...a,review:null}]));
+ assert.notEqual(profileFingerprint([a]),profileFingerprint([a,a]));
 });
 function fixtures(){
   const scenario={id:'case-1',family:'broad-discovery',message:'Find CT experts.',followups:[],expectation:{centralRequest:'CT'}};

@@ -5,7 +5,7 @@ const path=require('node:path');
 const {createHash}=require('node:crypto');
 const {embed,EMBEDDING_MODEL}=require('../demo/models.cjs');
 const {CONCEPTS,sufficient}=require('./brief.cjs');
-const {activityClauses,classifyPassage}=require('./data.cjs');
+const {activityClauses,classifyPassage,trainingExperienceScope}=require('./data.cjs');
 const clean=value=>String(value||'').replace(/\s+/g,' ').trim();
 const STOP=new Set('a an the and or to of in for with we us our their this that these those is are be been have has had would could should find need help expert experts specialist specialists clinical assessment assess software device purpose question current previous experience documented only useful optional essential practice outputs relevant relevance effects consequences incorrect results support supporting'.split(' '));
 const aliases={computed:'computed',tomography:'tomography',scans:'scan',images:'image',imaging:'image',studies:'study',researcher:'research',researchers:'research',radiologists:'radiologist',cardiologists:'cardiologist',adults:'adult',lesions:'lesion'};
@@ -75,7 +75,9 @@ function baseScopes(passage,source=passage.text){
   if(slot&&cached[slot])return cached[slot];
   const reviewedResearch=passage.attribution==='verified-source'&&passage.reviewedParaphrase&&['research','trial','publication'].includes(passage.type)&&source===passage.text;
   const clauses=reviewedResearch?[source]:segments(source);
-  const descriptors=clauses.map(text=>{
+  const descriptors=clauses.flatMap(text=>{
+    const placement=trainingExperienceScope(text);
+    if(placement&&passage.type==='clinical-practice')return [{text:placement.trainingText,type:'training'},{text:placement.clinicalText,type:'clinical-practice'}];
     let type=passage.type;
     if(type==='clinical-practice'){
       const localType=classifyPassage(text,passage.field||'about');
@@ -86,7 +88,7 @@ function baseScopes(passage,source=passage.text){
       if(['training','clinical-interest'].includes(localType)||(clauses.length>1&&passage.attribution!=='verified-source'))type=localType;
     }
     if(['research','trial','publication'].includes(type)&&clauses.length>1&&passage.attribution!=='verified-source')type=classifyPassage(text,'about');
-    return {text,type};
+    return [{text,type}];
   });
   if(slot)cached[slot]=descriptors;
   return descriptors;
@@ -135,6 +137,7 @@ function populationModalityConflict(requirement,parent,individualPassages,brief)
   });
 }
 function rolePattern(label){
+  if(label==='Dietitian')return /\bdieti(?:ti|ci)ans?\b/i;
   const known={Radiologist:/\bradiolog(?:ists?|y)\b/i,Cardiologist:/\bcardiolog(?:ists?|y)\b/i,Dermatologist:/\bdermatolog(?:ists?|y)\b/i,Haematologist:/\bh(?:ae|e)matolog(?:ists?|y)\b/i,Oncologist:/\boncolog(?:ists?|y)\b/i,Ophthalmologist:/\bophthalmolog(?:ists?|y)\b/i,Gastroenterologist:/\bgastroenterolog(?:ists?|y)\b/i,Gynaecologist:/\bgyn(?:ae|e)colog(?:ists?|y)\b/i,'General practitioner':/\b(?:general practi(?:tioners?|ce)|family (?:medicine|physicians?)|GPs?)\b/i,'Clinical researcher':/\b(?:clinical researchers?|research specialists?)\b/i}[label];
   if(known)return known;
   const words=clean(label).split(/\s+/).filter(Boolean);if(!words.length)return null;
@@ -146,6 +149,10 @@ function rolePattern(label){
 }
 function explicitRole(requirement,passage,candidate={},parent=passage){
   const pattern=rolePattern(requirement.label);if(!pattern)return false;
+  // Names of professional bodies and qualifications are background evidence.
+  // A plural job word in an organisation title does not identify its member's
+  // profession. Retain the passage for discovery without certifying the role.
+  if(/professional_context\.(?:professional-body|membership|qualification|academic-background)$|(?:^|[._])(?:memberships?|qualifications?|awards?|publications?)(?:$|[._])/i.test(passage.field||''))return false;
   // Specialty metadata can use a discipline noun (Cardiology). In prose and
   // explicit profession fields, that discipline may instead modify a different
   // profession: a gastroenterology dietitian is not a gastroenterologist.
@@ -158,13 +165,17 @@ function explicitRole(requirement,passage,candidate={},parent=passage){
   // establish the profile owner's role. Keep generic mentions as potential.
   const preceding=parent.text.slice(0,Math.max(0,parent.text.indexOf(passage.text)));
   if(/^(?:and\s+)?(?:he|she|they|his|her|their)\b/i.test(passage.text)&&(/\b(?:my|his|her|their)\s+(?:colleague|wife|husband|partner|assistant)/i.test(preceding)||/\b(?:alongside|with)\s+(?:(?:Dr|Mr|Ms|Professor)\.?\s+)?[A-Z][a-z]+\s+[A-Z][a-z]+/.test(preceding)))return false;
-  const before=passage.text.slice(0,match.index).trimStart(),modifiers='(?:(?:an?|consultant|general|adult|paediatric|pediatric|clinical|practising|practicing|senior|registered|chartered|licensed|(?:multi[ -])?award[ -]winning)\\s+){0,5}';
+  const before=passage.text.slice(0,match.index).trimStart(),modifiers='(?:(?:an?|consultant|general|adult|paediatric|pediatric|clinical|practising|practicing|senior|registered|chartered|licensed|knowledgeable|experienced|HCPC|and|(?:multi[ -])?award[ -]winning)\\s+){0,9}';
+  if(!before&&/s$/i.test(match[0]))return false;
+  if(new RegExp('^and\\s+I am\\s+'+modifiers+'$','iu').test(before))return true;
   // Anchor the subject. A trailing "consultant" inside "with Jamie Brown,
   // consultant physiotherapist" is the collaborator's title, not the owner.
   if(new RegExp('^(?:(?:I am|he is|she is|(?:I |he |she )?works? as|(?:I |he |she )?practi[cs](?:e|es) as|(?:my|his|her|their) (?:professional )?role is)\\s+)?'+modifiers+'$','i').test(before))return true;
   const owner=String(candidate.name||'').replace(/^(?:(?:Dr|Mr|Mrs|Ms|Miss|Prof|Professor|Sir)\.?\s+)+/i,'').trim();
   if(!owner||owner.split(/\s+/).length<2)return false;
   const escaped=owner.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+');
+  const namedSelfIntro=new RegExp('^My name is '+escaped+'\\s*\\n(?:and\\s+)?I am\\s+'+modifiers+'$','iu');
+  if(namedSelfIntro.test(before))return true;
   // A literal role/name apposition in a founded-by clause identifies the
   // named owner's profession, not every member's activity at that service.
   // Require the exact owner immediately after the role; a collaborator's
@@ -244,6 +255,12 @@ function deviceAssessment(text,requirement,{activityRequired=true}={}){
   return wanted.every(term=>present.has(term));
 }
 const reportedActivityRequest=r=>r.kind==='activity'&&['Reported procedure activity','Reported range of seven or fewer'].includes(r.label);
+function literalServiceOffer(passage){
+  if(!/^(?:about|about_alternatives|professional_context\.biography)$/.test(passage.field||''))return null;
+  // Require an explicit personal offering in its own clause. A research topic,
+  // colleague, team, training goal or intention cannot supply this assertion.
+  return activityClauses(passage.text).find(text=>/^(?:I|he|she)\s+(?:(?:also|currently|regularly)\s+)?(?:offer(?:s)?|provid(?:e|es))\s+/i.test(text.trim())&&!negative(text))||null;
+}
 function reportedVolumes(p,requirement){
   if(!['procedure','activity-volume'].includes(p.type)||!/^(?:procedures(?:_completed)?|procedure_volumes_phin|professional_context\.reported-activity)$/.test(p.field||''))return [];
   return (p.volumes||(p.volume?[p.volume]:[])).filter(v=>{
@@ -260,9 +277,10 @@ function reportedVolumes(p,requirement){
 function directMatch(requirement,passage){
   if(reportedActivityRequest(requirement))return reportedVolumes(passage,requirement).length>0;
   if(['language','service'].includes(requirement.kind)){
-    if(passage.field!=='professional_context.'+requirement.kind)return false;
+    const offering=requirement.kind==='service'?literalServiceOffer(passage):null;
+    if(passage.field!=='professional_context.'+requirement.kind&&!offering)return false;
     const normalize=value=>tokens(value).map(token=>({services:'service',consultations:'consultation',speaking:'speak',speaks:'speak',fluently:'fluent'}[token]||token));
-    const wanted=normalize(requirement.text||requirement.label).filter(token=>!['service','speak','recorded','documented'].includes(token)),present=new Set(normalize(passage.text));
+    const wanted=normalize(requirement.text||requirement.label).filter(token=>!['service','speak','recorded','documented'].includes(token)),present=new Set(normalize(offering||passage.text));
     return wanted.length>0&&wanted.every(token=>present.has(token));
   }
   const text=passage.text||'',label=requirement.label||requirement.text;
@@ -334,7 +352,7 @@ function matrixFor(candidate,passages,brief){
     }
     if(requirement.kind==='role'&&requirement.label==='Practising clinician')return {...base,status:'unknown',note:'The panel needs a practising clinical perspective; current activity must be confirmed directly.'};
     if(['language','service'].includes(requirement.kind)){
-      const field='professional_context.'+requirement.kind,proof=individualPassages.filter(p=>p.field===field&&!negative(p.text)&&directMatch(requirement,p));
+      const field='professional_context.'+requirement.kind,proof=individualPassages.filter(p=>(p.field===field||requirement.kind==='service'&&literalServiceOffer(p))&&!negative(p.text)&&directMatch(requirement,p));
       return {...base,status:proof.length?'documented':'unknown',evidenceIds:proof.slice(0,3).map(p=>p.id),note:proof.length?(requirement.kind==='language'?'Recorded language and any stated proficiency; this is not clinical expertise.':'Recorded service offering; present availability is not established.'):'Not established in the attributable professional records.'};
     }
     const scoped=new Map(),scopes=p=>{if(!scoped.has(p))scoped.set(p,requirementScopes(requirement,p));return scoped.get(p);};

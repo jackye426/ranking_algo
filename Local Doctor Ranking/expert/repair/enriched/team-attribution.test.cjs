@@ -32,6 +32,22 @@ test('a separately attributable individual clinical statement remains usable bes
  assert.equal(matrix[0].status,'documented');
 });
 
+test('an explicitly individual clinical practice is not a team merely because it says practice',()=>{
+ const text='My clinical practice incorporates ear conditions including hearing loss, tinnitus and cochlear implants.';
+ const corpus=buildCorpus([{id:'fictional-ear-owner',name:'Alex Example',gmc_number:'1234567',about:text}]);
+ const source=corpus.passages.find(p=>p.text===text);assert.ok(source);
+ assert.ok(!source.qualifiers.includes('team-context-not-individual-activity'));
+});
+
+test('individual leadership does not make a we-treatment clause individually performed activity',()=>{
+ const text="I am the Clinical Director of the hospital's Gamma Knife Unit where we treat benign and malignant tumours with focused radiation.";
+ const corpus=buildCorpus([{id:'fictional-team-director',name:'Alex Example',gmc_number:'1234567',about:text}]);
+ const source=corpus.passages.find(p=>p.text===text);assert.ok(source);
+ assert.ok(source.qualifiers.includes('team-context-not-individual-activity'));assert.equal(source.type,'professional-background');
+ const m=matrixFor(corpus.candidates[0],corpus.passages,{requirements:[{id:'treatment',kind:'condition',label:'Cancer',text:'Cancer',importance:'essential',matchIntent:'activity'}]});
+ assert.notEqual(m[0].status,'documented');
+});
+
 const roleMatrix=about=>{
  const corpus=buildCorpus([{id:'fictional-founder',name:'Alex Example',profile_urls:{example:'https://example.org/alex-example'},about}]);
  return matrixFor(corpus.candidates[0],corpus.passages,{requirements:[{id:'profession',kind:'role',label:'Dietitian',text:'Dietitian',importance:'focus'},{id:'diabetes',kind:'condition',label:'Diabetes',text:'Diabetes',importance:'essential',matchIntent:'activity'}]});

@@ -367,6 +367,14 @@ function parseBriefCore(input={}){
   // Preserve literally supplied service names. These are offerings, not new
   // clinical qualifications or inferred synonyms for a broad industry brief.
   for(const match of raw.matchAll(/\b(?:food[- ]industry services?|product development|recipe development|cooking demos?|content creation|writing and editing|home chemotherapy(?:\s+service)?|video consultations?|telephone consultations?|remote consultations?)\b/gi))upsert(brief,{kind:'service',label:match[0],text:match[0],importance:wordingImportance(raw,match.index,match.index+match[0].length)||'focus',evidence:match[0]});
+  // These literal coaching requests refer to an offered service. A research
+  // topic mentioning the same words must retain its research intent instead.
+  for(const match of raw.matchAll(/\b(?:ongoing|nutrition)\s+coaching\b/gi)){
+    const prefix=raw.slice(Math.max(0,match.index-120),match.index);
+    if(!/\b(?:offer(?:s|ing)?|provid(?:e|es|ing))\b[^.!?;]*$/i.test(prefix)&&clean(raw).toLowerCase()!==match[0].toLowerCase())continue;
+    if(brief.requirements.some(r=>r.kind==='research'&&r.text?.toLowerCase().includes(match[0].toLowerCase())))continue;
+    upsert(brief,{kind:'service',label:match[0],text:match[0],importance:wordingImportance(raw,match.index,match.index+match[0].length)||'focus',evidence:match[0]});
+  }
   // A priority sentence can refer to a criterion first introduced in this
   // message. Reapply remaining commands after those explicit criteria exist.
   const lateEdits=instructionEdits(brief,raw);raw=lateEdits.text;edits.text=raw;edits.blocked.push(...lateEdits.blocked);edits.unresolved.push(...lateEdits.unresolved);edits.question=edits.question||lateEdits.question;

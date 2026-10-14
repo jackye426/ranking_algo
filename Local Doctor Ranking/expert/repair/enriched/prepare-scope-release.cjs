@@ -7,6 +7,7 @@ const {validatePolicy}=require('../../reviewed-segmentation.cjs');
 const {retainedSpans}=require('./source-spans.cjs');
 const sha=s=>createHash('sha256').update(s).digest('hex');
 const clone=v=>structuredClone(v);
+const RECOVERABLE_KINDS=new Set(['qualification','academic-background','research-background','treatment-listing','biography']);
 function fail(message){throw Error('Scope release rejected: '+message);}
 function at(value,parts){for(const part of parts){if(value==null||!Object.hasOwn(value,part))return undefined;value=value[part];}return value;}
 function exactSpans(text,spans,label){let end=0;for(const s of spans||[]){if(!Number.isSafeInteger(s.start)||!Number.isSafeInteger(s.end)||s.start<end||s.end<=s.start||s.end>text.length||text.slice(s.start,s.end)!==s.text)fail(label+' bounds or wording');end=s.end;}return spans||[];}
@@ -17,6 +18,10 @@ function normalizedDecision(target,entry){
   // Some reviewers omit whitespace-only gaps; no substantive character may go missing.
   if(kept.map(s=>s.text).join('').replace(/\s/g,'')!==recorded.map(s=>s.text).join('').replace(/\s/g,''))fail('retained spans are not the omission complement');
   if(!d.reason?.trim())fail('missing review rationale');
+  if(d.recoveredSpans!==undefined){
+    if(!Array.isArray(d.recoveredSpans))fail('recovered fragments');
+    for(const s of exactSpans(target.sourceText,d.recoveredSpans,'recovered fragment'))if(!RECOVERABLE_KINDS.has(s.kind)||!omissions.some(o=>o.start<=s.start&&o.end>=s.end)||!s.text.trim()||s.text.length>5000)fail('recovery must be an independently reviewed literal fragment within an omission');
+  }
   return {reviewer:entry.reviewer,decision:d,decisionSha256:hashValue(d),omissions,retainedSpans:kept,text:kept.map(s=>s.text).join('')};
 }
 function provenanceFor(target,origin,baselineSha256,reviewId){
@@ -58,19 +63,41 @@ function prepareScopeRelease({baselineRows,baselineSha256,priorPacket,referenceR
     const record={targetId:target.targetId,sourceRecordId:target.sourceRecordId,field:target.field,path:target.path,sourceTextSha256:target.sourceTextSha256,expectedCurrentFieldHash:target.expectedCurrentFieldHash,baselineFieldHash:target.baselineFieldHash,primaryDecisionSha256:review.decisionSha256,primaryReviewer:entry.reviewer,secondaryReviewId:second.reviewId,secondaryReviewer:second.reviewer,omissions:review.omissions,retainedSpans:review.retainedSpans,origins:clone(target.origins),reason:review.decision.reason};
     if(!review.omissions.length){record.outcome='retained-without-mutation';sourceHistory.push(record);continue;}
     const reviewId='scope-'+sha(target.targetId+'|'+review.decisionSha256+'|'+second.reviewId).slice(0,32);
+    const recoverReviewedFragments=()=>{if(review.decision.recoveredSpans!==undefined){
+      const recovered=exactSpans(target.sourceText,review.decision.recoveredSpans,'recovered fragment');
+      for(const span of recovered){
+        if(!RECOVERABLE_KINDS.has(span.kind)||!review.omissions.some(o=>o.start<=span.start&&o.end>=span.end)||!span.text.trim()||span.text.length>5000)fail('recovery must be an independently reviewed literal fragment within an omission');
+        for(const origin of target.origins){
+          const item={kind:span.kind,text:span.text,provenance:provenanceFor(target,origin,baselineSha256,reviewId)};
+          // Narrative fragments remain searchable, but cannot acquire performed
+          // activity from a detached predicate or a removed promotional claim.
+          if(span.kind==='biography'){
+            const start=span.text.search(/\S/u),end=span.text.trimEnd().length;
+            item.segmentationPolicy={schemaVersion:1,reviewId,textSha256:sha(span.text),spans:[{start,end,text:span.text.slice(start,end),mode:'source-context'}]};
+            validatePolicy(item.text,reviewId,item.segmentationPolicy);
+          }
+          addContext(target.sourceRecordId,item);
+        }
+      }
+      record.recoveredSpans=clone(recovered);
+    }};
     if(target.field==='professional_context'){
       const cp=patchMap.get(target.sourceRecordId+'|professional_context'),source=at(ref,target.path.slice(0,-1));
       const indexes=(cp?.value||[]).flatMap((item,i)=>item.text===target.sourceText&&item.kind===source.kind&&item.provenance.reviewId===source.repairProvenance.reviewId?[i]:[]);
       if(!indexes.length){record.outcome='source-item-absent-from-this-release';sourceHistory.push(record);continue;}
       if(indexes.length!==1)fail('ambiguous context ownership');
+      recoverReviewedFragments();
       const index=indexes[0],key=target.sourceRecordId+'|context|'+index;if(pending.has(key))fail('conflicting context correction');
       const item=clone(cp.value[index]);const policy=rebindPolicy(item.text,review.text,item.segmentationPolicy,review.omissions,reviewId);record.segmentation=policy.status;
       if(!review.text.trim()){if(!contextRemovals.has(target.sourceRecordId))contextRemovals.set(target.sourceRecordId,new Set());contextRemovals.get(target.sourceRecordId).add(index);record.outcome='withheld-source-item';}
       else{item.text=review.text;item.provenance={...item.provenance,parserVersion:'professional-scope-source-spans-v1',reviewId};if(policy.policy)item.segmentationPolicy=policy.policy;else delete item.segmentationPolicy;cp.value[index]=item;record.outcome='replaced-with-exact-retained-spans';record.newTextSha256=sha(item.text);}
       pending.set(key,true);sourceHistory.push(record);continue;
     }
-    const field=target.field,suppressionField=field==='about_alternatives'?target.path.slice(0,2).join('.'):field;
+    const field=target.field;
+    if(field==='publications'&&(target.path.length!==2||target.path[0]!==field||!Number.isSafeInteger(target.path[1])||target.path[1]<0||target.path[1]>99999||!Array.isArray(original[field])))fail('unsupported publication leaf path');
+    const suppressionField=field==='about_alternatives'||field==='publications'?target.path.slice(0,2).join('.'):field;
     if(at(row,target.path)!==target.sourceText)fail('source version differs in this release for '+target.targetId);
+    recoverReviewedFragments();
     if(EVIDENCE_FIELDS.includes(field)){
       // Ordinary text replacements keep the original field provenance. Multiple
       // reviewed leaves in an array share one final baseline-bound field patch.

@@ -167,12 +167,20 @@ function sourceView(p){
   return {text:p.text,type:p.type,field:p.field,provider:p.sourceLabel||null,sourceUrl:p.sourceUrl||null,sourceQuote:p.sourceQuote||null,dates:p.dates?{sourceDate:p.dates.sourceDate||null,observedAt:p.dates.observedAt||null}:null,qualifiers:p.qualifiers||[],attribution:p.attribution||null,limitations:p.review?.limitations||[],sources:(p.sources||[]).map(s=>({field:s.field,provider:s.sourceLabel||null,sourceUrl:s.sourceUrl||null,dates:s.dates?{sourceDate:s.dates.sourceDate||null,observedAt:s.dates.observedAt||null}:null,attribution:s.attribution||null})),...(Array.isArray(p.volumes)&&p.volumes.length?{volumes:structuredClone(p.volumes)}:{})};
 }
 function profileFingerprint(passages){
-  // Differences in owned evidence, source origin or snapshot must not disappear
-  // merely because the visible quotation happens to be identical. Arbitrary
-  // release names are excluded, allowing genuinely identical evidence to reuse
-  // a judgement without revealing the release to reviewers.
-  const proof=p=>({evidenceId:p.id||null,sourceRecordId:p.sourceRecordId||null,view:sourceView(p),origins:(p.sources||[]).map(s=>({sourceRecordId:s.sourceRecordId||null,field:s.field||null,sourceUrl:s.sourceUrl||null,dates:s.dates||null})),snapshot:p.repairProvenance?{snapshotSha256:p.repairProvenance.snapshotSha256||null,originalSourceField:p.repairProvenance.originalSourceField||null,parserVersion:p.repairProvenance.parserVersion||null,reviewId:p.repairProvenance.reviewId||null}:null});
-  return hash(JSON.stringify(passages.map(proof).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))));
+  // Private equality proof, not the deliberately reduced blinded source view.
+  // Keep every owned passage property, including secondary-source provenance,
+  // classification attributes, identity basis and package bindings. An identical
+  // quotation/evidence ID cannot establish that those properties are unchanged.
+  // Release-only differences also fail strict equality: any permitted transfer
+  // needs a separate lossless diff and explicit reviewer acknowledgement.
+  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+  const proofs=passages.map(p=>JSON.stringify(canonical(p))).sort();
+  return hash(JSON.stringify({version:'complete-owned-passage-v2',proofs}));
+}
+function releaseNeutralFingerprint(passages){
+  const canonical=(value,parent='')=>Array.isArray(value)?value.map(item=>canonical(item,parent)):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(key=>!(parent==='repairProvenance'&&key==='releaseId')).map(key=>[key,canonical(value[key],key)])):value;
+  const proofs=passages.map(p=>JSON.stringify(canonical(p))).sort();
+  return hash(JSON.stringify({version:'release-neutral-owned-passage-v1',proofs}));
 }
 function hmac(key,text){return createHmac('sha256',key).update(text).digest('hex').slice(0,24);}
 function seededOrder(items,key){return [...items].sort((a,b)=>hmac(key,JSON.stringify(a)).localeCompare(hmac(key,JSON.stringify(b))));}
@@ -206,7 +214,7 @@ function createPool({pack,runs,corpora,key,anchorLedger={}}){
           const sorted=owned.map(p=>({p,view:sourceView(p)})).sort((a,b)=>JSON.stringify(a.view).localeCompare(JSON.stringify(b.view)));
           const evidence=sorted.map(({view},i)=>({token:'E'+String(i+1).padStart(3,'0'),...view}));
           profiles.set(opaque,{profileToken:opaque,evidence});
-          mapping.profiles[opaque]={caseId:scenario.id,candidateId:id,evidenceFingerprint:fingerprint,sourceRecordIds:candidate.sourceRecordIds||[],evidenceTokens:Object.fromEntries(sorted.map(({p},i)=>['E'+String(i+1).padStart(3,'0'),{evidenceId:p.id,sourceRecordId:p.sourceRecordId,textSha256:hash(p.text)}]))};
+          mapping.profiles[opaque]={caseId:scenario.id,candidateId:id,evidenceFingerprint:fingerprint,releaseNeutralFingerprint:releaseNeutralFingerprint(owned),sourceRecordIds:candidate.sourceRecordIds||[],evidenceTokens:Object.fromEntries(sorted.map(({p},i)=>['E'+String(i+1).padStart(3,'0'),{evidenceId:p.id,sourceRecordId:p.sourceRecordId,textSha256:hash(p.text)}]))};
         }
       }
       mapping.runs[runIndex].caseMappings[scenario.id]={candidateTokens:idMap,byMode:Object.fromEntries(Object.entries(result.byMode).map(([mode,data])=>[mode,{...data,results:data.results.map(r=>({id:r.id,profileToken:idMap[r.id]||'unpooled-'+hmac(key,scenario.id+'|'+r.id)})),diagnostics:undefined}]))};
@@ -336,4 +344,4 @@ async function main(){
   console.log(JSON.stringify(result));
 }
 if(require.main===module)main().catch(e=>{console.error(e.stack);process.exitCode=1;});
-module.exports={verifyFrozenPack,loadCorpus,loadSelectedCorpus,sourceView,profileFingerprint,createPool,mergeReviews,rankingMetrics,bootstrap,summarize,score,collect,blind,offlineInterpretation,validatePreparedQueries,applyPreparedPractices};
+module.exports={verifyFrozenPack,loadCorpus,loadSelectedCorpus,sourceView,profileFingerprint,releaseNeutralFingerprint,createPool,mergeReviews,rankingMetrics,bootstrap,summarize,score,collect,blind,offlineInterpretation,validatePreparedQueries,applyPreparedPractices};

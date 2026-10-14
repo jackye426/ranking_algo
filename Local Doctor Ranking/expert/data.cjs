@@ -165,27 +165,47 @@ const ATTRIBUTES={
 const PURE_METADATA_FIELDS=/^(?:locations|registration|qualifications|detailed_qualifications|professional_memberships|nhs_posts|nhs_base|professional_role|specialty|specialties|specialty_alternatives|publications)$/;
 const emptyAttributes=()=>Object.fromEntries(Object.keys(ATTRIBUTES).map(key=>[key,[]]));
 const aspirationalActivity=text=>/\b(?:hopes? to|plans? to|would like to|aims? to|interested in becoming|aspir(?:e|es|ing) to)\b/i.test(text);
-const activityClauses=text=>sourceStatements(text).flatMap(part=>part.split(/\s+(?=(?:but|however|whereas)\b)|\s+and\s+(?=(?:(?:(?:routinely|regularly|currently|weekly)\s+)?(?:holds?|reports|performs|lectures|teaches)\b|(?:I|he|she)\s+(?:(?:routinely|regularly|currently|weekly|personally)\s+)?(?:holds?|reports?|performs?|treats?|manages?|diagnoses?|lectures|teaches)\b))/i)).filter(Boolean);
+const genericClinicalDescription=text=>{
+  // A subordinate definition does not cancel separately stated owner work.
+  if(/\b(?:I|he|she|we)\s+(?:(?:routinely|regularly|currently|also|personally)\s+)?(?:undertak(?:e|es)|perform(?:s)?|provid(?:e|es)|offer(?:s)?|report(?:s)?|interpret(?:s)?|treat(?:s)?|diagnos(?:e|es)|run(?:s)?)\b/i.test(text))return false;
+  return /^(?!(?:I|he|she|we|they|Dr|Mr|Ms|Mrs|Professor)\b)[^.!?\n]{1,80}\b(?:is|are)\s+(?:a|an)\s+(?:(?:non[- ]invasive|diagnostic|medical|imaging|screening|specialised|specialized|magnified|polarised|polarized)\s+){0,4}(?:test|scan|technique|procedure|method|lens)\b/i.test(text.trim());
+};
+const reportedProcedureTotals=text=>/\b(?:I|he|she)\s+(?:have|has|had)\s+performed\b.{0,500}(?:\b\d[\d,]*\s+(?:gastroscop(?:y|ies)|colonoscop(?:y|ies)|surger(?:y|ies)|procedures?|operations?)\b|\b(?:gastroscopy|colonoscopy|sigmoidoscopy|endoscopy)\s*\(\s*>?\s*\d[\d,]*\s*\))/i.test(text);
+const activityClauses=text=>sourceStatements(text).flatMap(part=>part.split(/\s+(?=(?:but|however|whereas)\b)|\s+and\s+(?=(?:(?:(?:routinely|regularly|currently|weekly)\s+)?(?:holds?|reports|performs|lectures|teaches)\b|(?:have|has|had)\s+performed\b|(?:I|he|she)\s+(?:(?:routinely|regularly|currently|weekly|personally)\s+)?(?:holds?|reports?|performs?|treats?|manages?|diagnoses?|lectures|teaches)\b))/i)).filter(Boolean);
 const degreeStatement=text=>/\b(?:MSc|MClinRes|BSc|MBBS|MBChB|Master[’']?s|Bachelor[’']?s|Research MD|PhD|doctorate|degree|diploma|certificates?)\b/i.test(text)&&/\b(?:complet(?:ed|ing|es)|stud(?:y|ied|ying)|hold(?:s|ing)?|has|have|obtain(?:ed|ing)|award(?:ed)?|graduat(?:ed|ing)|undertook|pursu(?:ed|ing))\b/i.test(text);
 // A credential may permit an activity without saying it has been performed.
 // Evaluate within each source clause so a separate reporting statement survives.
 // Knowledge or insight gained from a degree remains training evidence even
 // when its subject uses action words such as "treating" or "reporting".
 const credentialCapability=text=>activityClauses(text).some(clause=>{
-  const permission=/\b(?:enabl(?:e|es|ing)|permit(?:s|ting)?|allow(?:s|ing)?|eligible|entitl(?:e|es|ed|ing)|qualified\s+to|certified\s+to|accredited\s+to|authori[sz]ed\s+to|licensed\s+to)\b/i.test(clause);
+  const permission=/\b(?:enabl(?:e|es|ed|ing)|permit(?:s|ted|ting)?|allow(?:s|ed|ing)?|eligible|entitl(?:e|es|ed|ing))\b|\b(?:qualified|certified|accredited|authori[sz]ed|licensed)\s+(?:\([^()]{1,50}\)\s+)?to\b|\b(?:accreditation|certification|certificate|credential|licence|license)(?:\s+of\s+(?:competency|competence|proficiency))?\s+to\s+(?:perform|report|interpret|treat)\b/i.test(clause);
   const certified=/\b(?:accreditation|certification|certificate|credential|accredited|certified|qualified|authori[sz]ed|licensed)\b/i.test(clause);
-  if(certified&&(permission||/\b(?:qualified|certified|accredited)\b.{0,100}\b(?:for|in)\s+(?:performing|reporting|interpreting|treating)\b/i.test(clause)))return true;
-  const academic=/\b(?:diploma|MSc|Master[’']?s|(?:academic|medical|engineering|postgraduate|undergraduate)\s+degree|degree\s+in)\b/i.test(clause);
+  // Bind 'for/in performing' to the credential itself. An arbitrary span can
+  // consume a separate 'with experience in performing' assertion of practice.
+  const credentialPerformance=/\b(?:qualified|certified|accredited)\s+(?:by\s+(?:(?!(?:with|experience|experienced|who|which|that|performing|reporting|interpreting|treating)\b)[\p{L}\p{N}&’'().-]+\s+){1,18})?(?:for|in)\s+(?:performing|reporting|interpreting|treating)\b/iu.test(clause);
+  const competencyAssessment=/\b(?:assessed|deemed|recognised|recognized)\s+as\s+competent\b.{0,160}\bto\s+(?:perform|report|interpret|treat)\b/i.test(clause);
+  if(competencyAssessment||certified&&(permission||credentialPerformance))return true;
+  const academic=/\b(?:PhD|doctorate|diploma|MSc|Master[’']?s|(?:academic|medical|engineering|postgraduate|undergraduate)\s+degree|degree\s+in)\b/i.test(clause);
   const recipient=degreeStatement(clause)||/\b(?:achiev(?:e|ed|ing)|gain(?:ed|ing)|attain(?:ed|ing))\b.{0,70}\b(?:diploma|MSc|Master[’']?s|degree)\b|\b(?:my|his|her|their)\s+(?:(?:previous|academic|medical|engineering|postgraduate|undergraduate)\s+){0,3}(?:diploma|MSc|Master[’']?s|degree)\b/i.test(clause);
   const knowledge=/\b(?:broaden(?:ed|s|ing)?|expand(?:ed|s|ing)?|enhanc(?:e|es|ed|ing)|deepen(?:ed|s|ing)?|improv(?:e|es|ed|ing)|gain(?:ed|s|ing)?|giv(?:e|es|en|ing)|gave|provid(?:e|es|ed|ing))\b.{0,70}\b(?:knowledge|insight|understanding)\b/i.test(clause);
   return academic&&recipient&&(permission||knowledge);
 });
+const statedCapability=text=>/\b(?:am|is|are)\s+(?:(?:particularly|highly|especially)\s+)?(?:capable\s+of|skilled\s+in|competent\s+in)\s+(?:treating|performing|reporting|interpreting|diagnosing|managing)\b/i.test(text);
 const interestScoped=text=>/\b(?:interests?\s+(?:is|are|was|were|in|to|includes?|involves?)|interested in|interest\s+is\s+to|expertise\s+in)\b/i.test(text);
 const personalActivity=text=>/\b(?:marathon runner|triathlete|keen runner|amateur athlete|my\s+(?:wife|husband|children|family)|spare\s+time|outside\s+(?:of\s+)?(?:work|medicine|my professional life)|hobbies|golf club|married with)\b|\benjoys?\s+(?:running|strength training|playing|skiing|golf|tennis|travel|music|cycling|walking)\b/i.test(text);
+// Preserve the complete source sentence, but distinguish a fellowship's subject
+// from the separately named clinical experience gained at that placement.
+function trainingExperienceScope(text) {
+  const match=/\bwhere\s+((?:I|he|she)\s+(?:have|has)\s+(?:also\s+)?gained\s+experience\s+in\s+(?:treating|performing|reporting|interpreting|managing)\b)/i.exec(text);
+  if(!match)return null;
+  const training=text.slice(0,match.index);
+  if(!/\b(?:have|has)\s+(?:also\s+)?(?:done|completed|undertaken)\s+(?:a|an)\s+fellowship\b/i.test(training))return null;
+  return {trainingText:training.trimEnd(),clinicalText:text.slice(match.index+match[0].indexOf(match[1]))};
+}
 function teachingActivity(text) {
   // A training placement or a teaching-hospital name identifies the learner or
   // institution. Require delivery, supervision or an explicit educator role.
-  return activityClauses(text).some(clause=>!aspirationalActivity(clause)&&/\b(?:teach(?:es|ing)?|train(?:s|ing|ed)?|educat(?:e|es|ing)|supervis(?:e|es|ing))\s+(?:(?:many|numerous|several|medical|junior|trainee|surgical|hospital|undergraduate|postgraduate|other)\s+)*(?:students?|doctors?|surgeons?|colleagues|nurses?|GPs?|residents?|trainees?|techniques)\b|\b(?:clinical teacher|lectur(?:er|ing|es|ed)|accredited trainer|teaching awards?|faculty member|training program(?:me)? director|lead for education)\b|\b(?:provid(?:e|es|ed|ing)|deliver(?:s|ed|ing)?|leads?)\s+(?:clinical |medical |surgical )?(?:teaching|training|education)\b|\b(?:run(?:s)?|direct(?:s|ed)?|develop(?:s|ed)?)\b.{0,100}\b(?:teaching programme|educational courses?|courses?|symposium)\b|\bfaculty\s+on\b.{0,45}\b(?:teaching|training|educational)\b|\bteach(?:es|ing)?\b.{0,100}\bto\s+(?:other\s+)?(?:doctors?|surgeons?|students?)\b|\b(?:national |clinical )?lead for\b.{0,45}\b(?:training|education)\b|\b(?:teaching|training|education)\s+of\s+(?:future\s+)?(?:medical professionals|doctors|surgeons|students|trainees)\b|\b(?:provid(?:e|es|ed|ing)|deliver(?:s|ed|ing)?)\b.{0,45}\bsupervision\s+for\b.{0,70}\b(?:trainees|students|doctors|surgeons)\b|\b(?:co[- ]?organiser|organizer|organises|organizes|organised|organized)\b.{0,80}\b(?:training events?|teaching courses?|educational courses?)\b/i.test(clause));
+  return activityClauses(text).some(clause=>!aspirationalActivity(clause)&&/\b(?:teach(?:es|ing)?|train(?:s|ing)?|(?:I|he|she|we)\s+(?:(?:have|has|had)\s+)?trained|educat(?:e|es|ing)|supervis(?:e|es|ing))\s+(?:(?:many|numerous|several|general|medical|junior|trainee|surgical|hospital|undergraduate|postgraduate|other)\s+)*(?:students?|doctors?|surgeons?|colleagues|nurses?|GPs?|residents?|trainees?|techniques)\b|\b(?:clinical teacher|lectur(?:er|ing|es|ed)|accredited trainer|teaching awards?|faculty member|training program(?:me)? director|lead for education)\b|\b(?:provid(?:e|es|ed|ing)|deliver(?:s|ed|ing)?|leads?)\s+(?:clinical |medical |surgical )?(?:teaching|training|education)\b|\b(?:run(?:s)?|direct(?:s|ed)?|develop(?:s|ed)?)\b.{0,100}\b(?:teaching programme|educational courses?|courses?|symposium)\b|\bfaculty\s+on\b.{0,45}\b(?:teaching|training|educational)\b|\bteach(?:es|ing)?\b.{0,100}\bto\s+(?:other\s+)?(?:doctors?|surgeons?|students?)\b|\b(?:national |clinical )?lead for\b.{0,45}\b(?:training|education)\b|\b(?:teaching|training|education)\s+of\s+(?:future\s+)?(?:medical professionals|doctors|surgeons|students|trainees)\b|\b(?:provid(?:e|es|ed|ing)|deliver(?:s|ed|ing)?)\b.{0,45}\bsupervision\s+for\b.{0,70}\b(?:trainees|students|doctors|surgeons)\b|\b(?:co[- ]?organiser|organizer|organises|organizes|organised|organized)\b.{0,80}\b(?:training events?|teaching courses?|educational courses?)\b/i.test(clause));
 }
 function receivedTraining(text) {
   return degreeStatement(text)||credentialCapability(text)||/\b(?:trained|graduated|qualified|studied|learnt|learned)\b|\btaught\s+(?:me|him|her|them)\b|\b(?:received|complet(?:ed|ing)|undertook|underwent|pursued)\b.{0,65}\b(?:education|training|fellowship)\b|\bconducted\s+(?:sub[- ]specialty\s+|specialist\s+)?fellowship\s+training\b|\b(?:my|his|her|their)\s+(?:(?:specialist|medical|surgical)\s+)?(?:training|fellowship)\b|\btraining\s+(?:in|at|under)\b|\b(?:completed|undertook|awarded)\s+(?:an?\s+)?fellowships?\b/i.test(text);
@@ -193,7 +213,12 @@ function receivedTraining(text) {
 function researchActivity(text) {
   return activityClauses(text).some(clause=>{
     if(aspirationalActivity(clause))return false;
+    // These literal study roles are research claims, not proof of performed
+    // clinical diagnosis or independently verified publication authorship.
+    if(/\b(?:I|he|she)\s+(?:now\s+)?leads?\s+a\s+major\s+clinical\s+trial\b/i.test(clause))return true;
+    if(/\b(?:I|he|she)\s+provided\s+Core\s*[–-]\s*Lab\s+function\s+for\s+MRC\s+sponsored\s+study\b/i.test(clause))return true;
     const source=clause.replace(/\b(?:undergraduate|postgraduate|medical|university)\s+studies\b/gi,'education');
+    if(/\b(?:am|is|was|appointed)\s+(?:the\s+)?lead\s+consultant\s+for\s+(?:(?:clinical|urology|cardiology|dermatology|surgical)\s+)?research\b/i.test(source))return true;
     const role=/\b(?:principal|chief|co[- ]?)\s*investigator\b|\b(?:am|is|was|appointed|became)\b.{0,45}\bresearch\s+(?:lead|fellow|director|associate|coordinator)\b|\b(?:director|head|lead)\s+(?:of|for)\s+research\b|\b(?:my|his|her|our|their)\s+(?:clinical |translational )?research\b.{0,70}\b(?:focus(?:s?ed|es)|investigat\w*|examin\w*|programme|program)\b|\b(?:active\s+)?contributor\s+to\s+(?:clinical\s+)?research\b/i.test(source);
     const work=/\b(?:lead(?:s|ing)?|led|conduct(?:s|ed|ing)?|undertak(?:e|es|en|ing)|undertook|complet(?:e|es|ed|ing))\s+(?:(?:a|an|the|my|his|her|our|their|several|many|multicentre|clinical|diagnostic|translational|programme|program|of|systematic)\s+){0,8}(?:research(?!\s+(?:MD|MSc|degree|Master))|trials?|stud(?:y|ies))\b|\b(?:involv(?:ed|ement)|engaged|participat(?:e|es|ed|ing|ion)|recruit(?:ed|s|ing))\s+(?:actively\s+)?(?:in|to|for)\b.{0,65}\b(?:research|trials?|stud(?:y|ies))\b|\b(?:co-?author(?:ed)?|authored|published|presented)\b.{0,85}\b(?:research|papers?|articles?|stud(?:y|ies)|protocol|findings|results|publications?)\b/i.test(source);
     return role||work;
@@ -228,16 +253,49 @@ function bibliographicReference(text,field='') {
   if(qualificationField&&credentialLead)return false;
   return /^(?:(?!Dr\b|Mr\b|Mrs\b|Ms\b|Prof\b)[A-Z][A-Za-z’'-]+\s+[A-Z]{1,4}[.,])/.test(text.trim());
 }
+const performedTotalActivity=text=>/\b(?:have|has|had)\s+performed\s+(?:(?:over|more than|approximately|around)\s+)?\d[\d,]*\b.{0,220}\b(?:hysterectomies|hysteroscopies|gastroscopies|colonoscopies|laparoscopic procedures|surgical procedures|operations)\b/i.test(text);
+const annualJointReplacements=text=>/\b(?:I|he|she)\s+perform(?:s)?\s+(?:(?:over|more than|around|approximately)\s+)?\d[\d,]*\s+(?:(?:total|partial|primary|revision)\s+)?(?:hip and knee|hip|knee|joint)\s+replacements?\s+(?:each|per)\s+year\b/i.test(text);
+const supervisedPerformance=text=>/\b(?:between|during)\s+(?:19|20)\d{2}\s+(?:and|[-–])\s+(?:19|20)\d{2}\b.{0,350}\bwhere\s+I\s+assisted\s+and\s+performed\b.{0,100}\b(?:THR|TKR|total hip|total knee)\b/i.test(text);
+const explicitOwnerCareScope=text=>/^(?:my|his|her)\s+clinical\s+practice\s+includes?\s+the\s+(?:(?:surgical\s+and\s+non[- ]surgical)|surgical|non[- ]surgical)\s+treatment\s+of\s+[^.;]{3,150}/i.test(text.trim());
+// A practice description, an invitation, or "able to offer" names a service.
+// Only a finite owner verb states that this clinician performed the work.
+const ownerFinitePerformance=text=>/\b(?:I|he|she)\s+(?:(?:also|regularly|routinely|currently|personally|now|only)\s+){0,4}(?:perform(?:s|ed)?|treat(?:s|ed)?|manag(?:e|es|ed)|diagnos(?:e|es|ed)|see(?:s)?|undertak(?:e|es)|run(?:s)?|offer(?:s)?|report(?:s)?|interpret(?:s)?)\b/i.test(text)||/\b(?:Dr|Mr|Mrs|Ms|Miss|Professor)\.?\s+(?:[A-Z][\p{L}’'-]+\s+){1,3}(?:(?:also|regularly|routinely|currently|personally|now)\s+)?(?:performs?|treats?|manages?|diagnoses?|sees?|undertakes?|runs?|offers?|reports?|interprets?)\b/u.test(text)||/\b(?:I|he|she)\s+(?:was|is)\s+fortunate\s+to\s+have\s+performed\b/i.test(text)||/\b(?:have|has|had)\s+performed\b/i.test(text);
 function directClinicalActivity(text) {
+  // A stated online support service is activity evidence without implying
+  // treatment methods, credentials, or independently verified delivery.
+  if(/^(?:I|he|she)\s+provid(?:e|es)\s+online\s+1:1\s+support\b.{0,220}\bdiagnosed\s+eating\s+disorders\b/i.test(text.trim()))return true;
+  if(supervisedPerformance(text)||explicitOwnerCareScope(text)||annualJointReplacements(text))return true;
   return activityClauses(text).some(clause=>{
+    if(genericClinicalDescription(clause))return false;
+    if(statedCapability(clause))return false;
     if(aspirationalActivity(clause)||interestScoped(clause)||credentialCapability(clause)||teachingActivity(clause)||/\btrained\s+(?:in|using|with)\b/i.test(clause)||/\b(?:learnt|learned|taught (?:me|him|her|them)|trained to|training to|learn(?:ing)? to)\b|\b(?:undertak\w*|undertook|complet\w*)\b.{0,40}\b(?:training|fellowship|education|courses?)\b/i.test(clause))return false;
     if(/\b(?:I|he|she)\s+(?:only\s+)?see(?:s)?\s+(?:adult|paediatric|pediatric)\s+(?:(?:cardiology|cardiovascular|dermatology|respiratory|neurology|gastroenterology|ophthalmology)\s+)?patients\b|\bmanag(?:e|es|ed|ing)\s+(?:the\s+|a\s+)?(?:(?:full|broad|wide|entire)\s+)?(?:range|spectrum)\s+of\s+(?:adult\s+|paediatric\s+|pediatric\s+)?(?:cardiovascular|cardiac|dermatological|respiratory|neurological|gastrointestinal|ophthalmic)\s+(?:conditions?|diseases?|disorders?)\b/i.test(clause))return true;
-    return /\b(?:undertak(?:e|es|ing)|perform(?:s|ed|ing)?|offer(?:s|ed|ing)?)\b.{0,65}\b(?:procedures?|clinics?|surgery|operations?|surgical treatment|cryotherapy|patient care|echocardiography|dermoscopy|endoscopy|bronchoscopy|angiography|ultrasound|CT|MRI|scans?|imaging|injections?|diagnostic tests?)\b|\brun(?:s|ning)?\b.{0,50}\bclinics?\b|\b(?:surgical |clinical )?procedures? undertaken\b|\b(?:I|he|she)\s+(?:only\s+)?see(?:s)?\s+(?:patients|children|adults)\b|\b(?:report(?:s|ed|ing)?|interpret(?:s|ed|ing)?|read(?:s|ing)?|supervis(?:e|es|ed|ing))\b.{0,45}\b(?:CT|MRI|scans?|images?|imaging|echocardiography|ultrasound|radiographs?|pathology|patient care)\b|\b(?:treat(?:s|ed|ing)?|diagnos(?:e|es|ed|ing))\s+(?!myself\b|himself\b|herself\b|themselves\b)[^.;]{2,70}|\bmanag(?:e|es|ed|ing)\s+(?:patients?|people|children|adults|diabetes|heart failure|cancer|pain|disease)\b|\bpracti[cs](?:e|es|ed|ing)\s+(?:as a |in )?(?:surgeon|physician|cardiolog\w*|radiolog\w*|dermatolog\w*|medicine)\b/i.test(clause);
+    if(/\bprovid(?:e|es|ed|ing)\s+(?:surgical\s+)?treatment\s+(?:for|to)\b|\b(?:carry|carries|carried|carrying)\s+out\s+(?:endoscopic|surgical)\s+(?:removal|procedures?|operations?)\b/i.test(clause))return true;
+    if(/^(?:my|his|her)\s+current\s+practice\s+involves\b.{0,100}\b(?:clinics|operating sessions)\b/i.test(clause.trim()))return true;
+    if(performedTotalActivity(clause))return true;
+    // An activity named inside a research question is not the owner's action.
+    // Bind endoscopy to an explicit performer, or to their stated service.
+    const endoscopyOwner=/\b(?:I|he|she)\s+(?:(?:have|has|had)\s+)?(?:(?:personally|routinely|regularly|currently|also|successfully)\s+){0,3}perform(?:s|ed)?\b|\b(?:Dr|Mr|Mrs|Ms|Miss|Professor)\.?\s+(?:[\p{L}’'-]+\s+){1,4}(?:(?:personally|routinely|regularly|currently|also)\s+)?performs?\b/iu.exec(clause);
+    if(endoscopyOwner&&/\b(?:colonoscop(?:y|ies)|gastroscop(?:y|ies)|sigmoidoscop(?:y|ies))\b/i.test(clause.slice(endoscopyOwner.index+endoscopyOwner[0].length,endoscopyOwner.index+endoscopyOwner[0].length+90)))return true;
+    if(/\b(?:I|he|she)\s+provid(?:e|es|ed)\s+endoscopy\s+services\b.{0,100}\bperforming\b.{0,65}\b(?:colonoscop(?:y|ies)|gastroscop(?:y|ies)|sigmoidoscop(?:y|ies))\b/i.test(clause))return true;
+    // A patient's passive diagnosis does not identify who diagnosed them.
+    // This classification shadow leaves the canonical source text untouched.
+    clause=clause.replace(/\b(?:been|being|was|were|is|are)\s+diagnosed\b|\bwith\s+(?:(?:newly|recently|previously|already)\s+)?diagnosed\b/gi,'identified');
+    const activity=/\b(?:undertak(?:e|es|ing)|perform(?:s|ed|ing)?|offer(?:s|ed|ing)?)\b.{0,65}\b(?:procedures?|clinics?|surgery|operations?|surgical treatment|cryotherapy|patient care|echocardiography|dermoscopy|endoscopy|bronchoscopy|angiography|ultrasound|CT|MRI|scans?|imaging|injections?|diagnostic tests?)\b|\brun(?:s|ning)?\b.{0,50}\bclinics?\b|\b(?:surgical |clinical )?procedures? undertaken\b|\b(?:I|he|she)\s+(?:only\s+)?see(?:s)?\s+(?:patients|children|adults)\b|\b(?:report(?:s|ed|ing)?|interpret(?:s|ed|ing)?|read(?:s|ing)?|supervis(?:e|es|ed|ing))\b.{0,45}\b(?:CT|MRI|scans?|images?|imaging|echocardiography|ultrasound|radiographs?|pathology|patient care)\b|\b(?:treat(?:s|ed|ing)?|diagnos(?:e|es|ed|ing))\s+(?!myself\b|himself\b|herself\b|themselves\b)[^.;]{2,70}|\bmanag(?:e|es|ed|ing)\s+(?:patients?|people|children|adults|diabetes|heart failure|cancer|pain|disease)\b|\bpracti[cs](?:e|es|ed|ing)\s+(?:as a |in )?(?:surgeon|physician|cardiolog\w*|radiolog\w*|dermatolog\w*|medicine)\b/i.test(clause);
+    // Keep an ordinary performed-work sentence. Hold back a practice description,
+    // an invitation, or a purpose infinitive unless this clause states that the
+    // owner performed it.
+    const practiceScope=/^(?:my|his|her)\s+(?:current\s+|clinical\s+)?practice\b/i.test(clause.trim());
+    const continuingOwner=/\b(?:I|he|she|(?:Dr|Mr|Mrs|Ms|Miss|Professor)\.?\s+[A-Z][\p{L}’'-]+)\s+continues?\s+to\s+(?:perform|treat|undertake)\b/iu.test(clause);
+    const unperformed=/\b(?:invited|asked)\s+to\s+(?:perform|treat|undertake|offer)\b/i.test(clause)||/\b(?:able|unable)\s+to\s+offer\b/i.test(clause)||!continuingOwner&&/\bto\s+(?:perform|treat|undertake)\b/i.test(clause);
+    if((practiceScope||unperformed)&&!ownerFinitePerformance(clause))return false;
+    return activity;
   });
 }
 function extractAttributes(text,context={}) {
   const field=typeof context==='string'?context:context.field||'',type=typeof context==='string'?classifyPassage(text,field):context.type;
   const clean=normalizeText(text),output=emptyAttributes();
+  if(/^EDUCATION AND TRAINING(?:\s|[A-Z]|$)/.test(clean))return output;
   if(PURE_METADATA_FIELDS.test(field)||/^professional_context\.(?!(?:condition|biography|clinical-interest|recorded-procedure|research-interest|treatment-listing)$)/.test(field)||type==='location')return output;
   // Background affiliations and qualifications can contain clinical words in
   // organisation or journal names. Keep their exact text searchable, without
@@ -257,6 +315,9 @@ function extractAttributes(text,context={}) {
   const therapeuticUltrasound=/\bultrasound\s+phacoemulsification\b|\bhigh[- ]intensity focused ultrasound\b|\btherapeutic ultrasound\b|\bHIFU\b/gi;
   for(const [key,terms]of Object.entries(ATTRIBUTES))output[key]=terms.filter(([label,re])=>re.test(key==='modality'&&label==='ultrasound'?attributable.replace(therapeuticUltrasound,''):attributable)).map(([label])=>label);
   if(therapeuticUltrasound.test(attributable))output.modality.push('therapeutic ultrasound');
+  // The past-tense total is a reviewed performed-work assertion. Do not use
+  // this repair to add a new generic activity label to unrelated profiles.
+  if(type==='clinical-practice'&&performedTotalActivity(attributable)&&directClinicalActivity(attributable)&&!output.activity.includes('clinical practice'))output.activity.push('clinical practice');
   output.activity=output.activity.filter(activity=>{
     if(activity==='teaching')return teachingActivity(clean);
     if(activity==='clinical practice')return type==='clinical-practice'&&directClinicalActivity(attributable)&&!/\b(?:medico[ -]?legal|expert witness|legal firms?)\b/i.test(clean);
@@ -270,10 +331,14 @@ function extractAttributes(text,context={}) {
 function classifyPassage(text,field='') {
   if(bibliographicReference(text,field))return 'professional-background';
   if(/publication/i.test(field)) return 'publication';
+  if(/\b(?:specialises|specializes)\s+in\s+the\s+following\s+treatments,\s+tests\s+and\s+scans\s+at\b/i.test(text))return 'treatment-listing';
+  if(/\b(?:my|his|her)\s+training\s+programme\b.{0,160}\bfor\s+(?:(?:senior|junior|medical|surgical)\s+)?trainees?\b/i.test(text))return 'professional-background';
   if(/trial|isrctn/i.test(field)) return 'trial';
   if(/research/i.test(field)) return researchActivity(text)?'research':'clinical-interest';
   if(/qualifications?|memberships?|nhs_(?:posts|base)|specialt|professional_experience/i.test(field)) return 'professional-background';
   if(/procedure/i.test(field)) return 'procedure';
+  if(/^EDUCATION AND TRAINING(?:\s|[A-Z]|$)/.test(text.trim()))return 'training';
+  if(/^Professional Membership\b/i.test(text.trim()))return 'professional-background';
   if(relationshipActivity(text))return 'relationship';
   if(degreeStatement(text)&&!researchActivity(text)&&!directClinicalActivity(text)&&!teachingActivity(text))return 'training';
   if(/\b(?:awards?|prizes?|medals?|studentships?|scholarships?|grants?|funding)\b/i.test(text)&&!researchActivity(text)&&!directClinicalActivity(text)&&!teachingActivity(text))return 'professional-background';
@@ -293,21 +358,29 @@ function classifyPassage(text,field='') {
   if(teachingActivity(text)&&!/\b(?:perform(?:s|ed|ing)?|interpret(?:s|ed|ing)?|treat(?:s|ed|ing)?|diagnos(?:e|es|ed|ing))\b/i.test(text))return 'professional-background';
   // Unscoped words such as 'practice', 'manage' or 'report' do not identify a
   // clinical action. Preserve uncertain professional prose as background.
+  // A singular owner-practice sentence is scope, not a promoted interest,
+  // unless it states performed activity or research.
+  if(/^(?:my|his|her)\s+practice\b/i.test(text.trim())&&!/\b(?:we|our|team)\b/i.test(text)&&!directClinicalActivity(text)&&!researchActivity(text))return 'professional-background';
   if(/interest|specialis|specializ|expertise/i.test(text)||/interests|areas_of_interest/i.test(field)) return 'clinical-interest';
   return 'professional-background';
 }
 function qualifiers(text,type,field='') {
   const output=[];
-  if(/\b(?:previously|formerly|retired|until\s+\d{4}|was\s+a|used\s+to)\b/i.test(text)) output.push('historical');
-  if(type==='clinical-interest'||/developing\s+interest|interested\s+in|interests?\s+in/i.test(text)) output.push('stated-interest');
+  if(/\b(?:previously|formerly|retired|until\s+\d{4}|was\s+a|used\s+to)\b|\bduring\s+(?:my|his|her|their|the)\s+tenure\b.{0,100}\b(?:participated|attended|worked|served|treated|reported|performed)\b/i.test(text)) output.push('historical');
+  if((type==='clinical-interest'||/developing\s+interest|interested\s+in|interests?\s+in/i.test(text))&&!(type==='professional-background'&&/^(?:my|his|her)\s+practice\b/i.test(text.trim())&&!/\b(?:we|our|team)\b/i.test(text))) output.push('stated-interest');
   if(type==='clinical-interest'&&/research|trial|stud(?:y|ies)/i.test(text))output.push('research-interest-not-study-experience');
   if(bibliographicReference(text,field))output.push('bibliographic-reference-not-training-or-authorship');
   if(/\b(?:medico[ -]?legal|expert witness|legal firms?)\b/i.test(text))output.push('legal-work-not-clinical-care');
   if(type==='training') output.push('training-not-practice');
-  if(/\b(?:currently|routinely|regularly|weekly|full[ -]time)\b/i.test(text)&&type==='clinical-practice') output.push('reported-current-practice');
+  if(type==='clinical-practice'&&supervisedPerformance(text))output.push('historical','clinical-experience-during-training');
+  if(type==='treatment-listing') output.push('listed-treatment-not-performed-activity');
+  if(type==='clinical-practice'&&trainingExperienceScope(text))output.push('clinical-experience-during-training');
+  if(statedCapability(text))output.push('capability-not-performed-activity');
+  if(/\b(?:currently|routinely|regularly|weekly|full[ -]time)\b/i.test(text)&&type==='clinical-practice'&&!output.includes('historical')) output.push('reported-current-practice');
   if(/\b(?:no|not|never|without|do not|does not|did not)\b/i.test(text)) output.push('contains-negation');
   if(type==='relationship') output.push('relationship-not-conflict-determination');
-  if(/\b(?:(?:more than|over|approximately|around|up to)\s+)?\d[\d,]*\s+(?:(?:peer[- ]reviewed|clinical|surgical|diagnostic|medical)\s+){0,2}(?:procedures|operations|scans|cases|patients|publications|articles)\b/i.test(text)) output.push('self-reported-activity');
+  if(/\bfirst[- ]ever\b/i.test(text))output.push('source-reported-first-claim-not-independently-verified');
+  if(annualJointReplacements(text)||reportedProcedureTotals(text)||/\b(?:(?:more than|over|approximately|around|up to)\s+)?\d[\d,]*\s+(?:(?:peer[- ]reviewed|clinical|surgical|laparoscopic|diagnostic|medical)\s+){0,2}(?:procedures|operations|hysterectomies|hysteroscopies|scans|cases|patients|publications|articles)\b/i.test(text)) output.push('self-reported-activity');
   return output;
 }
 function sourceStatements(value) {
@@ -321,7 +394,7 @@ function sourceStatements(value) {
   // The glued professional-title boundary is deliberately case-sensitive:
   // /i would read the tail of "problems and has" as "Ms And has", changing
   // the original word. Other sentence/pronoun boundaries remain insensitive.
-  const parts=text.split(/(?<=[a-z])(?=(?:Dr|Mr|Mrs|Ms|Miss|Professor)\s+[A-Z][a-z’'-]+\s+(?:is|has|provides|performs|reports)\b)/).flatMap(part=>part.split(/(?<=\.)(?=(?:Dr |Mr |Mrs |Ms |Miss |Prof |Professor |He |She |His |Her |I |My |Aside |After |During |Currently\b|Presently\b|Previously\b|Today\b|Now\b|At present\b|[A-Z][a-z]{2,} (?:enjoys?|is |has |was )))|(?<=;)\s*(?=(?:I|he|she|we|they|currently|presently|at present)\b)|\n+(?=(?:Currently|Presently|Previously|Today|Now|At present)\b)|\s+(?=(?:and|but)\s+(?:I|he|she|we|they)\b)/i));
+  const parts=text.split(/(?=EDUCATION AND TRAINING(?:\s|[A-Z]|$))|\n[\t ]*\n(?=(?:Professional Membership|Research Interests)\b)|(?<=[a-z])(?=(?:Dr|Mr|Mrs|Ms|Miss|Professor)\s+[A-Z][a-z’'-]+\s+(?:is|has|provides|performs|reports)\b)/).flatMap(part=>/^(?:EDUCATION AND TRAINING|Professional Membership\b|Research Interests\b)/.test(part.trim())?[part]:part.split(/(?<=\.)(?=(?:Dr\.? |Mr\.? |Mrs\.? |Ms\.? |Miss |Prof\.? |Professor |He |She |His |Her |I |My |Aside |After |During |Prior |Having |Recognised |Recognized |As (?:a|an) |Currently\b|Presently\b|Previously\b|Today\b|Now\b|At present\b|[A-Z][a-z]{2,} (?:enjoys?|is |has |was )))|(?<=;)\s*(?=(?:I|he|she|we|they|currently|presently|at present)\b)|\n+(?=(?:Currently|Presently|Previously|Today|Now|At present)\b)|\n[\t ]*\n(?=(?:Dr|Mr|Mrs|Ms|Miss|Prof|Professor)\.?\s+[\p{L}’'-]+\s+(?:studied|trained|completed|graduated|qualified|was|is|has)\b)|\s+(?=(?:and|but)\s+(?:I|he|she|we|they)\b)/iu));
   const sentenceSegments=parts.flatMap(part=>{
     // Intl treats every newline as a sentence boundary, including soft wraps
     // inside "running\ninjuries" and "Chris is\npassionate". Segment a
@@ -333,12 +406,19 @@ function sourceStatements(value) {
     for(const unit of units){
       // Intl sentence segmentation treats Dr. and St. as sentence ends in some
       // runtimes. Keep abbreviations and initials attached to their source text.
-      if(joined.length&&/\b(?:Dr|Mr|Mrs|Ms|Prof|St|Mt|Rd|Jr|Sr|[A-Z])\.\s*$/.test(joined.at(-1)))joined[joined.length-1]+=unit;
+      if(joined.length&&(/\b(?:Dr|Mr|Mrs|Ms|Prof|St|Mt|Rd|Jr|Sr|[A-Z]|MR)\.\s*$/.test(joined.at(-1))||/\bFRCS \(Tr\.\s*$/.test(joined.at(-1))&&/^Orth\.\)/.test(unit)||/\bNew\.\s*$/.test(joined.at(-1))&&/^Victoria Hospital\b/.test(unit)))joined[joined.length-1]+=unit;
       else joined.push(unit);
     }
     return joined.map(line=>line.trim()).filter(Boolean);
   });
-  return sentenceSegments;
+  // A following explicit reporting period qualifies the preceding totals.
+  // Keep that context in one passage rather than making counts look current.
+  const bound=[];
+  for(const sentence of sentenceSegments){
+    if(bound.length&&/^This\s+(?:has been|was)\s+over\s+(?:a\s+)?\d+\s+year\s+period\b/i.test(sentence)&&reportedProcedureTotals(bound.at(-1)))bound[bound.length-1]+='\n'+sentence;
+    else bound.push(sentence);
+  }
+  return bound;
 }
 function negativeList(text){return /(?:^|\n|[•*])\s*No\s*[:.!]?\s*(?=$|\n|[•*])/i.test(text)||/\b(?:do not|does not|did not|never|no longer)\b[^\n]*:\s*(?:\n|[•*])/i.test(text);}
 function splitPassages(value) {
@@ -349,7 +429,11 @@ function splitPassages(value) {
   const sentenceSegments=sourceStatements(value);
   const output=[];
   for(const sentence of sentenceSegments) {
-    let rest=sentence.trim(); while(rest.length>900) {
+    let rest=sentence.trim();
+    // A flattened provider heading/list has no safe word-level claim boundary.
+    // Preserve its complete literal source span as one neutral listing.
+    if(/\b(?:specialises|specializes)\s+in\s+the\s+following\s+treatments,\s+tests\s+and\s+scans\s+at\b/i.test(rest)&&rest.length<=5000){output.push(rest);continue;}
+    while(rest.length>900) {
       let at=rest.lastIndexOf('; ',900); if(at<200) at=rest.lastIndexOf(' ',900); if(at<1) at=900;
       // A boundary created here must not leave a tiny tail that the biography
       // noise filter would discard. Rebalance using an original word boundary.
@@ -394,10 +478,31 @@ function otherPersonScope(text,source,ownerName=''){
   const normalized=normalizeText(source),offset=normalized.indexOf(text);
   if(offset<=0)return false;
   const preceding=normalized.slice(0,offset);
-  return relationship.test(preceding)||/\b(?:alongside|with)\s+(?:(?:Dr|Mr|Ms|Professor)\.?\s+)?[A-Z][a-z]+\s+[A-Z][a-z]+/.test(preceding);
+  if(relationship.test(preceding))return true;
+  const colleague=/\b(?:alongside|with)\s+(?:(?:Dr|Mr|Ms|Professor)\.?\s+)?[A-Z][a-z]+\s+[A-Z][a-z]+/g;
+  const mentions=[...preceding.matchAll(colleague)];if(!mentions.length)return false;
+  const last=mentions.at(-1).index,ownerFamily=nameTokens(ownerName).at(-1);
+  if(ownerFamily){
+    const namedOwner=new RegExp('\\b(?:Mr|Mrs|Ms|Dr|Professor)\\.?\\s+(?:[A-Z][a-z]+\\s+)?'+ownerFamily+'\\s+(?:is|was|has|then)\\b','i');
+    const afterColleague=preceding.slice(last);
+    const immediate=(afterColleague.split(/(?<=[.!?])\s+/).filter(Boolean).at(-1)||'');
+    // Only the immediately previous sentence can hand the narrative back to the
+    // owner. An earlier name does not clear every later pronoun sentence.
+    if(namedOwner.test(immediate))return false;
+    // A named owner's post-accreditation fellowships remain the narrative
+    // subject when colleagues are introduced only as people worked alongside.
+    if(/^he\s+was\s+appointed\s+as\s+a\s+consultant\b/i.test(text)&&/\bfellowship\b/i.test(preceding.slice(Math.max(0,last-450),last))&&namedOwner.test(preceding.slice(Math.max(0,last-650),last))&&/\bwork(?:ed|ing)\s+(?:with|alongside)\b/i.test(preceding.slice(Math.max(0,last-60),last+12)))return false;
+  }
+  return true;
 }
 function collectiveContext(text,source,sourceContexts){
   const plural=/^(?:(?:and|but|together|in addition)[, ]+)?(?:we\b|our\b|(?:the|this|his|her|my|their)\s+(?:(?:clinical|specialist|multidisciplinary|medical)\s+)?(?:team|service|clinic|practice|hospital|department|unit)\b)/i;
+  // A mixed leadership/team-care statement preserves the team limitation.
+  // A named individual clinical practice is not itself a collective subject.
+  if(/\bwe\s+(?:(?:routinely|regularly|currently|also|jointly)\s+)?(?:treat|perform|report|diagnose|manage|offer|provide)\b/i.test(text))return true;
+  if(/^(?:my|his|her)\s+clinical\s+practice\s+(?:incorporates|includes|covers|encompasses)\b/i.test(text.trim()))return false;
+  if(/^(?:my|his|her)\s+current\s+practice\s+involves\b.{0,100}\b(?:clinics|operating sessions)\b/i.test(text.trim()))return false;
+  if(/^(?:my|his|her)\s+practice\b/i.test(text.trim())&&!/\b(?:we|our|team)\b/i.test(text))return false;
   if(plural.test(text.trim()))return true;
   if(!/\b(?:we|our|team|service|clinic|practice|hospital|department|unit)\b/i.test(source))return false;
   // A long sentence may be split for display; its trailing chunk retains the
@@ -427,6 +532,7 @@ function useful(text,field,{reviewedContext=false,reviewedShort=false}={}) {
   if(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text)) return false;
   if(contactDetails(text)) return false;
   if(/\b(?:my\s+(?:wife|husband|children|family)|spare\s+time|outside\s+(?:of\s+)?(?:work|medicine|my professional life)|hobbies|enjoy\s+(?:golf|ski|travel|music)|married\s+with|golf\s+club)\b/i.test(text)) return false;
+  if(/\b(?:my|his|her|their)\s+(?:current\s+)?sports?\s+interests?\s+include\b/i.test(text))return false;
   if(/\benjoys?\s+(?:running|strength training|playing|skiing|golf|tennis|travel|music|cycling|walking)\b/i.test(text))return false;
   if(/about/.test(field)&&/^(?:(?:I|he|she)\s+(?:was|am|is)\s+)?(?:born|brought up)\b|\b(?:I was|he was|she was)\s+born\b|^(?:(?:Dr\.?|Mr\.?|Mrs\.?|Ms\.?)\s+)?[A-Z][A-Za-z’'-]+(?:\s+[A-Z][A-Za-z’'-]+){0,2}\s+was\s+born\b|\b(?:I am|he is|she is)\s+(?:married|a (?:mother|father) of)\b|\b(?:I|he|she)\s+ha(?:ve|s)\s+(?:one|two|three|four|five|\d+)\s+children\b/i.test(text)&&!directClinicalActivity(text)&&!researchActivity(text)&&!receivedTraining(text))return false;
   if(/^(?:please see|refer to|see)\s+(?:the\s+)?(?:list|below|above|website)\b/i.test(text)&&!/[;:]/.test(text))return false;
@@ -676,4 +782,4 @@ function buildCorpus(input,{enrichments=[],identityReviews=[]}={}) {
   const fingerprint=createHash('sha256');for(const c of candidates) fingerprint.update(JSON.stringify(c));for(const p of passages) fingerprint.update(JSON.stringify(p));
   return {candidates,passages,audit,identityLedger,version:`${VERSION}-${fingerprint.digest('hex').slice(0,20)}`};
 }
-module.exports={buildCorpus,extractAttributes,classifyPassage,normalizeRegistration,normalizeText,splitPassages,activityClauses,compatibleNames,safeUrl,repairProvenance,administrativeText,contactDetails,VERSION};
+module.exports={buildCorpus,extractAttributes,classifyPassage,normalizeRegistration,normalizeText,splitPassages,activityClauses,trainingExperienceScope,compatibleNames,safeUrl,repairProvenance,administrativeText,contactDetails,VERSION};
