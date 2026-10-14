@@ -1,0 +1,6 @@
+.private/
+.env*
+node_modules/
+supabase/.temp/
+!package.json
+!package-lock.json
