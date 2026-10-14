@@ -3,6 +3,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {buildCorpus,normalizeRegistration,extractAttributes,classifyPassage,splitPassages}=require('./data.cjs');
 const row=(overrides={})=>({id:'source-1',name:'Dr Alex Example',gmc_number:'1234567',specialty:'Consultant Cardiologist',about:'I routinely report cardiac CT in adults with coronary artery disease.',merge_date:'2026-02-15T00:00:00Z',...overrides});
+const ownedAbout=text=>{const source=text.replace(/\s/g,'');return buildCorpus([row({about:text})]).passages.filter(p=>p.field==='about').sort((a,b)=>source.indexOf(a.text.replace(/\s/g,''))-source.indexOf(b.text.replace(/\s/g,'')));};
 test('builds source-backed clinical passages without inventing current verification',()=>{
   const c=buildCorpus([row()]);const p=c.passages.find(p=>p.field==='about');
   assert.equal(c.candidates[0].id,'expert-gmc-1234567');assert.equal(p.sourceUrl,null);assert.equal(p.attribution,'source-record');
@@ -281,6 +282,31 @@ test('explicit patient care and procedures are retained without equating learned
   assert.equal(classifyPassage('His fellowship taught him how to undertake endoscopic surgical procedures.','about'),'training');
 });
 
+test('degree-derived knowledge and insight do not establish clinical practice',()=>{
+  const examples=[
+    'More recently, I obtained a Diploma in Sport and Exercise Medicine, which broadened my knowledge of treating and rehabilitating sports injuries around the knee.',
+    "Achieving a Master's degree in sports medicine, exercise and health at University College London allows a greater insight into the unique care involved in treating and rehabilitating athletes and those with greater demands on their manual dexterity.",
+    "Additionally, Dr Example has a Master's degree in sports medicine, exercise, and health, which has given her a greater insight into treating and rehabilitating athletes.",
+    'I completed a diploma which improved my understanding of reporting cardiac CT.',
+  ];
+  for(const text of examples){
+    assert.equal(classifyPassage(text,'about'),'training');
+    const c=buildCorpus([row({about:text})]),p=c.passages.find(p=>p.field==='about');
+    assert.equal(p.text,text);assert.equal(p.type,'training');assert.ok(p.qualifiers.includes('training-not-practice'));
+    assert.ok(!p.attributes.activity.includes('clinical practice'));assert.ok(!p.attributes.activity.includes('image interpretation'));
+  }
+});
+
+test('a separate explicit clinical assertion survives credential capability framing',()=>{
+  for(const text of [
+    'My diploma allows me to report cardiac CT. I routinely report cardiac CT in adults.',
+    'My diploma allows me to report cardiac CT but I routinely report cardiac CT in adults.',
+    'My diploma allows me to report cardiac CT and I routinely report cardiac CT in adults.',
+    'She obtained a diploma that broadened her knowledge and she regularly treats sports injuries.',
+    'I hold a Diploma in Sport and Exercise Medicine and I treat knee injuries.',
+  ])assert.equal(classifyPassage(text,'about'),'clinical-practice',text);
+});
+
 test('all named provider profiles, including HCA and Ramsay, are checked within an upstream row',()=>{
   for(const sourceUrl of ['https://www.ramsayhealth.co.uk/specialists/mr-alex-exemplar','https://www.hcahealthcare.co.uk/finder/stepconsultantprofile/mr-alex-exemplar']) {
     const c=buildCorpus([row({profile_urls:{provider:sourceUrl}})]);
@@ -390,4 +416,119 @@ test('therapeutic ultrasound in cataract procedures is distinct from diagnostic 
   assert.ok(mixed.modality.includes('therapeutic ultrasound'));assert.ok(mixed.modality.includes('ultrasound'));
   const c=buildCorpus([row({procedures:['Ultrasound phacoemulsification of cataracts, with lens implant - bilateral']})]);
   const p=c.passages.find(p=>p.field==='procedures');assert.match(p.text,/Ultrasound phacoemulsification/);assert.deepEqual(p.attributes.modality,['therapeutic ultrasound']);
+});
+
+test('credential capability keeps ordinary degree wording and separate appointments distinct',()=>{
+  const choice='I allow my patients the opportunity to choose to what degree they want to engage in decision making about the treatment available for them at that time.';
+  assert.equal(classifyPassage(choice,'about'),'professional-background');
+  const appointment='He achieved his Certificate of Completion of Training in 2006, and was appointed as a Consultant General and Colorectal Surgeon at York and Scarborough Teaching Hospitals NHS Foundation Trust the same year.';
+  assert.deepEqual(extractAttributes(appointment,{field:'about',type:classifyPassage(appointment,'about')}).setting,['teaching hospital','NHS']);
+});
+
+test('a board qualification for performing imaging is not a record of performed imaging',()=>{
+  const text='I am Level III qualified by both the American and the European Boards for performing advanced Heart MRI scans in adults.';
+  const type=classifyPassage(text,'about');assert.equal(type,'training');
+  assert.deepEqual(extractAttributes(text,{field:'about',type}).activity,[]);
+  const actual=text+' I routinely perform cardiac MRI scans in adults.';
+  assert.equal(classifyPassage(actual,'about'),'clinical-practice');
+  assert.ok(extractAttributes(actual,{field:'about',type:'clinical-practice'}).activity.includes('clinical practice'));
+});
+
+test('credential titles cannot consume an independent statement of performed clinical activity',()=>{
+  const examples=[
+    'I am a trained and certified robotic surgeon, with experience in performing advanced procedures using the da Vinci Xi surgical platform.',
+    'Miss Nair is a trained and certified robotic surgeon, with experience in performing advanced procedures using the da Vinci Xi surgical platform.',
+    'Miss Annette Reid is a highly qualified Consultant Gynaecologist with vast experience in treating common gynaecological problems, including pelvic pain, ovarian cysts, abnormal bleeding, fibroids, early pregnancy problems and vulva conditions.',
+    'Mr. Fernando is also accredited as a Specialist in Urogynaecology (Specialised in treating patients with urinary incontinence, vaginal prolapse, bladder and bowel problems during pregnancy and after childbirth).',
+    'She is certified by the European Board, with experience in performing cardiac MRI.',
+  ];
+  for(const text of examples){
+    const type=classifyPassage(text,'about');assert.equal(type,'clinical-practice',text);
+    assert.ok(extractAttributes(text,{field:'about',type}).activity.includes('clinical practice'),text);
+  }
+});
+
+test('credentials for performing activity still do not assert that it was performed',()=>{
+  for(const text of [
+    'She is certified in performing cardiac MRI.',
+    'She is accredited for reporting cardiac CT.',
+    'She is qualified by the American and European Boards for performing cardiac MRI.',
+    'He holds full JAG accreditation to perform colonoscopies.',
+    'Dr Mohan is JAG accredited (paediatric) to perform gastroscopy (OGD) and colonoscopy in infants and children.',
+    'In January 2023, she received a Certificate of competency to perform Screening for Colonoscopy and Bowel Cancer.',
+    'I have been formally assessed as competent to a standard commensurate with specialist practice to perform Screening Derived Colonoscopy approved by the Joint Advisory Group (JAG) on Gastrointestinal Endoscopy.',
+  ]){
+    const type=classifyPassage(text,'about');assert.equal(type,'training',text);
+    assert.deepEqual(extractAttributes(text,{field:'about',type}).activity,[],text);
+  }
+});
+
+test('explicit treatment and counted endoscopy survive neighbouring credential statements',()=>{
+  for(const text of [
+    'I provide treatment for the following: General surgery: appendicitis; bowel obstruction and perforation. I am fully accredited by JAG for performing colonoscopy.',
+    'I am fully accredited by JAG for performing colonoscopy. I carry out endoscopic removal of large polyps of the bowel (EMR/ESD).',
+    'I am JAG-certified for performing diagnostic and therapeutic gastroscopy and colonoscopy. I have performed more than 1,000 colonoscopies, near 2,000 gastroscopies and over 400 flexible sigmoidoscopies.',
+  ])assert.equal(classifyPassage(text,'about'),'clinical-practice',text);
+  for(const text of [
+    'I trained to provide treatment for appendicitis.',
+    'My training taught me to carry out endoscopic removal of polyps.',
+    'I am certified for performing colonoscopies.',
+  ])assert.equal(classifyPassage(text,'about'),'training',text);
+});
+
+test('a definition of an imaging test is background rather than an owner activity',()=>{
+  const text='Heart MRI is a non-invasive test, which involves no radiation and help to diagnose several heart diseases including the cause of chest pain.';
+  assert.equal(classifyPassage(text,'about'),'professional-background');
+  assert.equal(classifyPassage('I routinely use cardiac MRI to diagnose heart disease.','about'),'clinical-practice');
+});
+
+test('weekly participation during past tenure cannot claim current practice',()=>{
+  const text='During his tenure, Dr Example participated at the weekly skin cancer multidisciplinary meeting to discuss patients who had been diagnosed with high-risk skin cancers.';
+  const corpus=buildCorpus([row({about:text})]),p=corpus.passages.find(p=>p.field==='about');assert.ok(p);
+  assert.ok(!p.qualifiers.includes('reported-current-practice'));assert.ok(p.qualifiers.includes('historical'));
+  assert.equal(p.type,'professional-background');
+});
+
+test('an endoscopy research project is not the profile owner performing endoscopy',()=>{
+  const text='One such project interrogated national endoscopy data to determine the average learning curve to competency in performing colonoscopy.';
+  assert.equal(classifyPassage(text,'about'),'professional-background');
+  assert.equal(classifyPassage('He provides endoscopy services to both in and out patients, performing NHS colonoscopies and gastroscopies.','about'),'clinical-practice');
+  assert.equal(classifyPassage('Dr Example performs colonoscopies each year.','about'),'clinical-practice');
+});
+
+test('explicit fused sentence boundaries retain independent credential, role and research meaning',()=>{
+  for(const [text,types] of [
+    ['I have performed around 2,000 gastroscopies and 1,000 gall bladder surgeries.Prior to my consultant role, I was trained as a general surgeon.', ['clinical-practice','training']],
+    ['He has conducted research in bowel cancer, and published in endoscopy and inflammatory bowel disease.As a screening programme accredited endoscopist, Dr Dhillon performs regular screening colonoscopy lists.', ['research','clinical-practice']],
+    ['Dr. Rees served as Medical Officer to Team GB at the 2008 Paralympics and as a Sports Medicine Consultant for the London 2012 Olympic Games.Dr. Rees is certified in performing musculoskeletal ultrasound examinations.', ['professional-background','training']],
+  ]){
+    const entries=ownedAbout(text);
+    assert.deepEqual(entries.map(p=>p.type),types,text);
+    assert.equal(entries.map(p=>p.text).join('').replace(/\s/g,''),text.replace(/\s/g,''));
+  }
+});
+test('a blank source paragraph before a named training sentence cannot consume an expertise list',()=>{
+  const text='Mr Furtado is an expert in the management of complex spinal conditions including:\n\n• Spine trauma\n\n• Adult spinal deformity\n\nMr. Furtado studied at Imperial College and completed neurosurgical training. He has a postgraduate degree in Biomechanical Engineering which gave him a better understanding of treating spinal problems.';
+  const entries=ownedAbout(text);
+  assert.equal(entries[0].type,'professional-background');assert.ok(entries[0].text.includes('Adult spinal deformity'));
+  assert.ok(!entries[0].text.includes('studied'));assert.ok(entries.slice(1).every(p=>p.type==='training'));
+});
+test('a recorded counting period remains attached to its self-reported procedure totals',()=>{
+  const text='To date, I have performed Gastroscopy (>7,000), Colonoscopy (>6,000) and Capsule Endoscopy (>25,000) procedures. This has been over a 24 year period in both my NHS and Private Practice.';
+  const entries=ownedAbout(text);
+  assert.equal(entries.length,1);assert.ok(entries[0].text.includes('24 year period'));
+  assert.ok(entries[0].qualifiers.includes('self-reported-activity'));
+});
+test('a procedure definition within explicit owner work does not erase that work',()=>{
+  assert.equal(classifyPassage('Other advanced therapeutic work I undertake includes EMR, which is a procedure for removing bowel polyps.','about'),'clinical-practice');
+});
+
+test('credential knowledge belongs to its recipient and clause, not course contributors or neighbouring statements',()=>{
+  for(const text of [
+    'Dr Example contributes to an oral cancer diploma programme designed to provide knowledge about treating cancer.',
+    'Operative work gave him extensive knowledge. The centre was accredited nine years ago.',
+    "The nutrition research followed a Master's in Public Health. Being fluent in French allows personalised care.",
+    'She is an accredited menopause specialist. NHS GP work gives her an understanding of primary care.',
+    'Her clinical background enhances her understanding of genital tract diseases. As a certified colposcopist she manages abnormal smear tests.',
+  ])assert.notEqual(classifyPassage(text,'about'),'training',text);
 });

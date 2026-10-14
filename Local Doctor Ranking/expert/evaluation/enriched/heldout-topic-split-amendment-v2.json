@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "heldout-topic-split-v2",
+  "recordedAt": "2026-10-08T18:25:45.155Z",
+  "approvedBy": "Root instruction before any held-out interpretation/retrieval",
+  "reason": "One original bounded reference reused a development person, source passage and clinical topic. Replace that one case with a distinct topic and source population to meet the prospectively required topic split.",
+  "originalHeldoutSha256": "a71f7a0073f0b0778dc3d0ea71f6a5d0c11397812939b6942c78e30558a05e5c",
+  "heldoutSha256": "4d8ce1758f7bb8f6489f0129398efed5ab634a0e9e69a5e6d8c86e78c3de54b8",
+  "originalCases": 64,
+  "cases": 64,
+  "changedQuestionCount": 1,
+  "changedCaseId": "hel-research-07",
+  "otherQuestionsAndExpectationsUnchanged": true,
+  "developmentSha256": "c25660553ae4a42b44bf5e10bc5882761781d56e80ac665aa8f70e1983d3aee1",
+  "contractSha256": "42380cf54e9bf7cef2a050cc28ac0134ddc15bd8343c6bb1dfc8be5c480c679e",
+  "thresholdsAndGradesUnchanged": true,
+  "beforeHeldoutInterpretation": true,
+  "beforeHeldoutRetrieval": true,
+  "sourceReferencePreparation": {
+    "reviewedProposals": 45,
+    "acceptedReferences": 28,
+    "distinctPeople": 26,
+    "boundedCases": 12,
+    "selection": "Source phrase leads followed by deterministic SHA sampling; no ranked retrieval pool inspected; accept only two independent source-support approvals.",
+    "disagreements": 0
+  },
+  "previousFreezeSha256": "2313738bb4985c964465bf41872c86cd0086ce0a44c72783ec07de112147e495",
+  "originalHeldoutStorage": "Preserved privately as heldout.json; amended pack stored separately as heldout-v2.json",
+  "identityExposureDisclosure": "Factual reference preparation involved explicit names for reviewer A and one name for reviewer B before names were removed. Graded pooled relevance review remains separately blinded to names, identifiers, release, retrieval method and ranking position."
+}

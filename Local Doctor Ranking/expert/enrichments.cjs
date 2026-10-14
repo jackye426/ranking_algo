@@ -17,7 +17,7 @@ module.exports = Object.freeze([
     sourceRecordId: 'spire_668',
     text: 'The profile describes research into detecting skin cancer with dermoscopy, computer imaging, telemedicine and artificial intelligence, including helping non-specialists assess lesions.',
     excerpt: 'dermoscopy, computer imaging, telemedicine and artificial intelligence',
-    field: 'targeted_public_research', type: 'research',
+    field: 'targeted_public_research', type: 'clinical-interest',
     sourceUrl: 'https://www.spirehealthcare.com/spire-cambridge-lea-hospital/consultants/mr-per-hall-c2866413/',
     sourceLabel: 'Spire professional profile', sourceDate: null, observedAt: '2026-10-06', verified: true,
     review: {method: 'public-page-review', identityBasis: 'Exact existing profile URL and corroborated professional identity.', limitations: ['Research interests do not establish formal assessment approval or a particular device-study role.']}
@@ -35,7 +35,7 @@ module.exports = Object.freeze([
     sourceRecordId: 'bupa_12291', registration: {body: 'GMC', identifier: '2720966'},
     text: 'The professional profile describes dermoscopy and the diagnosis and screening of skin cancer.',
     excerpt: 'use of dermoscopy in skin cancer diagnosis',
-    field: 'targeted_public_profile', type: 'clinical-practice',
+    field: 'targeted_public_profile', type: 'clinical-interest',
     sourceUrl: 'https://www.spirehealthcare.com/spire-cambridge-lea-hospital/consultants/dr-paul-norris-c2720966/',
     sourceLabel: 'Spire professional profile', sourceDate: null, observedAt: '2026-10-06', verified: true,
     review: {method: 'public-page-review', identityBasis: 'Exact GMC-linked existing profile; name and dermatology role agree.', limitations: ['The undated page does not confirm current engagement availability or regulatory-assessment experience.']}

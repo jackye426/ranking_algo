@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "version": "expert-enriched-prospective-v1",
+  "frozenAt": "2026-10-08",
+  "development": {
+    "cases": 32,
+    "sha256": "c25660553ae4a42b44bf5e10bc5882761781d56e80ac665aa8f70e1983d3aee1"
+  },
+  "heldout": {
+    "cases": 64,
+    "sha256": "a71f7a0073f0b0778dc3d0ea71f6a5d0c11397812939b6942c78e30558a05e5c",
+    "storage": "private; deliberately not committed"
+  },
+  "contractSha256": "57501b76651b8912e0760052bc6d190a06320197d71d23257b6b1c60ea2f7378",
+  "unchangedLegacyPacks": {
+    "scenarios.cjs": "6d6c027df35d145246e0dfa88427ac4186aaba905638719f4938271a4f59d629",
+    "holdout-round-two.cjs": "f38bb01a968ee72dde01c5f8355fa999495119c104665b0367b841f9e3da0c7f",
+    "holdout-final.cjs": "71be71def63932d4faa63a0e50f221ad61f4fdbbaf92d1ec905904f1b2a941b7"
+  },
+  "seedSelection": "Hand-authored by evaluation owner before any current release search runs; not selected from ranking winners. Source anchors are separate, independently reviewed factual references.",
+  "unblindingPolicy": "Do not print heldout prompts or labels to ranking implementer. Freeze implementation revision before heldout execution; reveal only aggregate outcomes until decision to consume failures is recorded."
+}

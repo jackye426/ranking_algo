@@ -4,11 +4,22 @@
   // retrieval scores, qualification decisions or the source text.
   const list=value=>Array.isArray(value)?value:[];
   const normal=value=>String(value||'').replace(/\s+/g,' ').trim();
+  const profileSections=Object.freeze([
+    ['about','About'],['professions','Professional roles'],['clinicalInterests','Clinical interests'],
+    ['procedures','Treatments and procedures'],['research','Research'],['populations','Patient populations'],
+    ['languages','Languages'],['services','Consultation and professional services'],
+    ['affiliations','Memberships and relationships'],['qualifications','Qualifications and academic background']
+  ].map(([key,label])=>Object.freeze({key,label})));
   const contextKinds=new Set(['question','technology','workflow','manufacturer','independence','timing','availability']);
-  const typeNames={'clinical-practice':'Recorded activity','clinical-interest':'Listed interest',procedure:'Listed procedure',research:'Recorded research',trial:'Recorded study contribution',publication:'Recorded publication','research-context':'Research context',training:'Recorded training',relationship:'Recorded relationship','professional-background':'Recorded background',location:'Recorded location',registration:'Recorded identifier'};
-  const typeStrength={'clinical-practice':6,research:5,trial:5,publication:4,'clinical-interest':3,procedure:2,training:1,'professional-background':0,location:0,registration:0,relationship:0};
+  const typeNames={'clinical-practice':'Recorded activity','clinical-interest':'Listed interest',procedure:'Listed procedure',research:'Recorded research',trial:'Recorded study contribution',publication:'Recorded publication','research-context':'Research context',training:'Recorded training',relationship:'Recorded relationship','professional-background':'Recorded background',location:'Recorded location',registration:'Recorded identifier',qualification:'Recorded qualification',affiliation:'Recorded affiliation','activity-volume':'Reported activity','treatment-listing':'Recorded treatment listing'};
+  const typeStrength={'clinical-practice':6,research:5,trial:5,publication:4,'clinical-interest':3,procedure:2,training:1,'professional-background':0,location:0,registration:0,relationship:0,qualification:0,affiliation:0,'activity-volume':0,'treatment-listing':2};
   const typeOf=value=>typeof value==='string'?value:value?.evidenceType||value?.type||'';
-  const typeLabel=value=>typeNames[typeOf(value)]||'Recorded evidence';
+  const typeLabel=value=>{
+    if(value&&typeof value==='object'&&list(value.qualifiers).includes('team-context-not-individual-activity'))return 'Recorded team context';
+    if(value&&typeof value==='object'&&(value.field==='professional_context.research-background'||list(value.qualifiers).includes('profile-reported-research-not-verified-authorship')))return 'Reported research background';
+    if(value&&typeof value==='object'&&value.field==='professional_context.professional-body')return 'Recorded professional context';
+    return typeNames[typeOf(value)]||'Recorded evidence';
+  };
   const requirementLabel=requirement=>(requirement?.polarity==='exclude'?'Exclude: ':requirement?.strictRole?'Allowed role: ':'')+(requirement?.label||'Requirement');
   const sourceType=item=>typeOf(item.support)||typeOf(item.evidence);
   const sourceIsListing=evidence=>list(evidence?.qualifiers).some(q=>/publication-listing-link-not-authorship|bibliographic-reference-not-training-or-authorship/i.test(q));
@@ -17,11 +28,26 @@
   const activeRequirement=(row,brief)=>list(brief?.requirements).find(r=>r.id===row?.requirementId)||row||{};
   function safeUrl(value){try{const u=new URL(value);return /^https?:$/.test(u.protocol)&&!u.username&&!u.password?u.href:null;}catch{return null;}}
   const evidenceAnchor=id=>typeof id==='string'&&id?'evidence-'+id:null;
-  function recordUrl(candidateId,evidenceId,baseUrl){
+  function recordUrl(candidateId,evidenceId,baseUrl,{corpusVersion,profileVersion,dataReleaseId}={}){
     const base=safeUrl(baseUrl);if(!base||typeof candidateId!=='string'||!candidateId)return null;
     const url=new URL('/api/expert/sources/'+encodeURIComponent(candidateId),base);
     if(typeof evidenceId==='string'&&evidenceId){url.searchParams.set('evidence',evidenceId);url.hash=evidenceAnchor(evidenceId);}
+    if(typeof corpusVersion==='string'&&corpusVersion)url.searchParams.set('corpusVersion',corpusVersion);
+    if(typeof profileVersion==='string'&&profileVersion)url.searchParams.set('profileVersion',profileVersion);
+    if(typeof dataReleaseId==='string'&&dataReleaseId)url.searchParams.set('dataReleaseId',dataReleaseId);
     return url.href;
+  }
+  function volumeSummary(evidence){
+    const volumes=list(evidence?.volumes).length?evidence.volumes:evidence?.volume?[evidence.volume]:[];
+    const text=value=>typeof value==='string'?value.slice(0,500):'';
+    return volumes.map(v=>[
+      text(v.activity),v.reportedRange?'Reported range: '+text(v.reportedRange):null,
+      Number.isFinite(v.reportedAdmissions)?'Reported admissions: '+v.reportedAdmissions:null,
+      Number.isFinite(v.countNumeric)?'Derived estimate: '+v.countNumeric+' (not an observed count)':null,
+      'Reporting period: '+(text(v.reportingPeriod)||'not recorded'),
+      v.hospital?'Hospital: '+text(v.hospital):null,v.procedureCode?'Procedure code: '+text(v.procedureCode):null,
+      v.sourceDate?'Source date: '+text(v.sourceDate):null,'Not comparable across sources or periods'
+    ].filter(Boolean).join(' · '));
   }
   function sourceLinks(evidence){
     const links=new Map();
@@ -106,7 +132,7 @@
     const r=requirement||row||{},proof=supportFor(candidate,row,{requirements:[{...r,id:r.id||row?.requirementId}]}),status=presentedStatus(candidate,row,proof),unavailable=sourceClaimStatuses.has(row?.status)&&!proof.length;
     if(r.polarity==='exclude')return {label:'Role exclusion filter',status,evidenceType:null,meaning:'An explicit role restriction, not a positive qualification.',note:status==='documented'?'The excluded role is recorded; review this candidate against your restriction.':['mismatch','needs-review'].includes(status)?'A source qualification or negative role statement needs scope and date review. This is not a positive role claim.':'No excluded role is established in the retained records. Incomplete role data does not prove absence; confirm directly.'};
     const evidenceType=proof[0]?sourceType(proof[0]):null;
-    const meanings={'clinical-practice':'The source records clinical activity. Its scope and current relevance still need confirmation.','clinical-interest':'The source lists an interest in this area; this does not establish performed clinical work.',procedure:'A procedure listing does not by itself establish personal performance or current practice.',research:'The source records research involvement; its stated contribution and date define the evidence.',trial:'The source records a study contribution. The stated role and date should be retained.',publication:'The source records a publication or authorship contribution. It is distinct from clinical activity.',training:'Training does not establish current or independent practice.',location:'A recorded practice location does not establish residence, current practice or availability.',registration:'A recorded identifier is not a live registration check.',relationship:'A recorded relationship requires scope and date review; it is not a conflict determination.'};
+    const meanings={'clinical-practice':'The source records clinical activity. Its scope and current relevance still need confirmation.','clinical-interest':'The source lists an interest in this area; this does not establish performed clinical work.',procedure:'A procedure listing does not by itself establish personal performance or current practice.',research:'The source records research involvement; its stated contribution and date define the evidence.',trial:'The source records a study contribution. The stated role and date should be retained.',publication:'The source records a publication or authorship contribution. It is distinct from clinical activity.',training:'Training does not establish current or independent practice.',location:'A recorded practice location does not establish residence, current practice or availability.',registration:'A recorded identifier is not a live registration check.',relationship:'A recorded relationship requires scope and date review; it is not a conflict determination.',qualification:'The source records a qualification; it is not a live verification or evidence of current practice.',affiliation:'The source records an affiliation or membership, with its recorded scope and date; it does not establish current membership or independence.','activity-volume':'The source reports historical activity. Recorded ranges, reporting periods and any derived estimates remain distinct from observed counts or current practice.','treatment-listing':'The source lists a treatment or condition topic. A listing does not by itself establish personal performance or current practice.'};
     const meaning=status==='unknown'?'The available sources do not establish this search detail; this is not evidence that the person lacks it.':evidenceType==='research-context'?'This source discusses research; it does not establish this person\'s contribution.':meanings[evidenceType]||'The recorded scope describes what this source establishes.';
     const labels={potential:'Potential relevance',unknown:'Not found in sources','needs-review':'Source qualification to review',mismatch:'Recorded limitation',context:'Engagement context'};
     const label=status==='documented'?(r.kind==='role'?'Recorded role':typeLabel(evidenceType)):labels[status]||'Not found in sources';
@@ -178,6 +204,6 @@
     }
     return {lead,secondary:secondaryLimit<=0?[]:secondary,gaps:gaps(candidate,brief)};
   }
-  const api={typeLabel,requirementLabel,outcome,supportFor,cardProofs,cardRelevance,relatedProofs,gaps,safeUrl,sourceLinks,recordUrl,evidenceAnchor,displayBlocks};
+  const api={typeLabel,requirementLabel,outcome,supportFor,cardProofs,cardRelevance,relatedProofs,gaps,safeUrl,sourceLinks,recordUrl,evidenceAnchor,displayBlocks,volumeSummary,profileSections};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.DocMapEvidence=api;
 })(globalThis);

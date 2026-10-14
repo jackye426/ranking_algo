@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "pool-depth-amendment-v2",
+  "recordedAt": "2026-10-08T17:04:27.304Z",
+  "authorization": "Root explicitly approved on 2026-10-08 before any prospective held-out run: union top ten across all three retrieval methods and both releases, plus independently reviewed source anchors. No brief, relevance grade, acceptance threshold or source expectation is changed.",
+  "priorContractId": "expert-enriched-evaluation-v1",
+  "priorContractSha256": "57501b76651b8912e0760052bc6d190a06320197d71d23257b6b1c60ea2f7378",
+  "priorFreezeManifestSha256": "139b2c5bb85f8720ff668b4fa3ed5394815390d96925ef146c7fbdc564c7c2d4",
+  "newContractId": "expert-enriched-evaluation-v2",
+  "poolDepth": 10,
+  "rationale": "Complete independent review of every scored top-ten candidate is required. Actual R1 development union: 335 candidate-brief pairs at top ten versus 613 at top twenty; two changed evidence versions approximately double that workload before new enriched-only entrants. This amendment prioritises complete source review over a larger partly unjudged pool.",
+  "knownReferenceRecall": "Retain actual ranking positions through twenty; always include independently accepted source anchors in review, whether retrieved or absent. Unreviewed rank11-20 candidates receive no relevance grade and cannot enter nDCG/precision as assumed negatives.",
+  "requiredAdditionalReviews": [
+    "R2 cardiac-CT displaced candidates and entrants",
+    "R2 skin-lesion displaced candidates and entrants",
+    "R2 relationship-review displaced candidates and entrants"
+  ],
+  "unchanged": {
+    "developmentSha256": "c25660553ae4a42b44bf5e10bc5882761781d56e80ac665aa8f70e1983d3aee1",
+    "heldoutSha256": "a71f7a0073f0b0778dc3d0ea71f6a5d0c11397812939b6942c78e30558a05e5c",
+    "gradesSha256": "2fa5f678302b7981c87d88af71287a1f786c03930ec6ce06a44a0c16ba54edaa",
+    "thresholdsSha256": "57180d2fce88eb2d9b5203991f4eecc6147ae0e7939574778fcd0ccf46fe386e"
+  },
+  "limitation": "Pool-relative nDCG values under v2 must not be described as directly comparable with a larger v1 judged pool or exhaustive corpus relevance."
+}

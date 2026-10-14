@@ -1,0 +1,441 @@
+{
+  "schemaVersion": 1,
+  "version": "research-role-review-v1",
+  "mode": "offline-source-role-review",
+  "sourceFiles": [
+    {
+      "path": "Hospital + insurance/ISRCTN UK Trials/output/trials_merged_20260209_215240.json",
+      "sha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217"
+    },
+    {
+      "path": "Hospital + insurance/ISRCTN UK Trials/output/trial_practitioner_links_20260215_212218.json",
+      "sha256": "95c6bd2933d651b4946612e86bf30d5bf3a9a0fe3ac0b79d561b26ce22d53874"
+    }
+  ],
+  "method": "Twelve distinct archived trials selected by exact recorded contact-role shapes and known failure modes. No clinician identity or literal HTML source role has been independently reviewed; derived principal_investigator is never accepted as proof.",
+  "counts": {
+    "cases": 12,
+    "withheld": 12,
+    "eligible": 0
+  },
+  "cases": [
+    {
+      "caseId": "ethics-reference-is-not-registration",
+      "trialId": "ISRCTN35233331",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN35233331",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Public, Principal investigator",
+      "proposedRole": "Public, Principal investigator",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "arbitrary-seven-digit-number",
+      "ethicsReferenceMatch": true
+    },
+    {
+      "caseId": "public-contact-is-not-pi",
+      "trialId": "ISRCTN38776134",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN38776134",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Public",
+      "proposedRole": "Principal investigator",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recorded-contact-role"
+    },
+    {
+      "caseId": "scientific-contact-is-not-pi",
+      "trialId": "ISRCTN42617850",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN42617850",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Scientific",
+      "proposedRole": "Principal investigator",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recorded-contact-role"
+    },
+    {
+      "caseId": "later-pi-does-not-promote-first-contact",
+      "trialId": "ISRCTN57139038",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN57139038",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Scientific, Public",
+      "proposedRole": "Principal investigator",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recorded-contact-role"
+    },
+    {
+      "caseId": "explicit-pi-needs-person-review",
+      "trialId": "ISRCTN10840798",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN10840798",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Principal investigator",
+      "proposedRole": "Principal investigator",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recorded-contact-role"
+    },
+    {
+      "caseId": "combined-scientific-public-pi-needs-person-review",
+      "trialId": "ISRCTN14365105",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN14365105",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Scientific, Principal investigator, Public",
+      "proposedRole": "Scientific, Principal investigator, Public",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recorded-contact-role"
+    },
+    {
+      "caseId": "public-pi-needs-person-review",
+      "trialId": "ISRCTN92289230",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN92289230",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Public, Principal investigator",
+      "proposedRole": "Public, Principal investigator",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recorded-contact-role"
+    },
+    {
+      "caseId": "scientific-pi-needs-person-review",
+      "trialId": "ISRCTN78360465",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN78360465",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Scientific, Principal investigator",
+      "proposedRole": "Scientific, Principal investigator",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recorded-contact-role"
+    },
+    {
+      "caseId": "public-scientific-is-contact-only",
+      "trialId": "ISRCTN24846895",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN24846895",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Public, Scientific",
+      "proposedRole": "Public, Scientific",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recorded-contact-role"
+    },
+    {
+      "caseId": "generic-contact-is-not-investigator",
+      "trialId": "ISRCTN18290337",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN18290337",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Contact",
+      "proposedRole": "Principal investigator",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recorded-contact-role"
+    },
+    {
+      "caseId": "institution-is-a-lead-only",
+      "trialId": "ISRCTN94815142",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN94815142",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Principal investigator, Public, Scientific",
+      "proposedRole": "Principal investigator, Public, Scientific",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "institution-only"
+    },
+    {
+      "caseId": "recruiting-study-is-not-personal-availability",
+      "trialId": "ISRCTN13387811",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN13387811",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "sourceField": "contacts[0].role",
+      "recordedRole": "Principal investigator, Scientific",
+      "proposedRole": "Principal investigator, Scientific",
+      "sourceChecked": false,
+      "identity": {
+        "state": "unreviewed",
+        "reviewed": false
+      },
+      "matchMethod": "recruitment-status-only"
+    }
+  ],
+  "assessments": [
+    {
+      "caseId": "ethics-reference-is-not-registration",
+      "trialId": "ISRCTN35233331",
+      "status": "withheld",
+      "reasons": [
+        "registration-like-number-is-not-an-identity-field",
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Public, Principal investigator",
+      "proposedRole": "Public, Principal investigator",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN35233331",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "research",
+      "limits": [
+        "An explicit registry investigator role does not establish every trial task, authorship or current activity.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "public-contact-is-not-pi",
+      "trialId": "ISRCTN38776134",
+      "status": "withheld",
+      "reasons": [
+        "first-contact-is-not-an-explicit-investigator-role",
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Public",
+      "proposedRole": "Principal investigator",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN38776134",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "professional-background",
+      "limits": [
+        "A registry contact role does not establish investigator responsibility or performed research.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "scientific-contact-is-not-pi",
+      "trialId": "ISRCTN42617850",
+      "status": "withheld",
+      "reasons": [
+        "first-contact-is-not-an-explicit-investigator-role",
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Scientific",
+      "proposedRole": "Principal investigator",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN42617850",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "professional-background",
+      "limits": [
+        "A registry contact role does not establish investigator responsibility or performed research.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "later-pi-does-not-promote-first-contact",
+      "trialId": "ISRCTN57139038",
+      "status": "withheld",
+      "reasons": [
+        "first-contact-is-not-an-explicit-investigator-role",
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Scientific, Public",
+      "proposedRole": "Principal investigator",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN57139038",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "professional-background",
+      "limits": [
+        "A registry contact role does not establish investigator responsibility or performed research.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "explicit-pi-needs-person-review",
+      "trialId": "ISRCTN10840798",
+      "status": "withheld",
+      "reasons": [
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Principal investigator",
+      "proposedRole": "Principal investigator",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN10840798",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "research",
+      "limits": [
+        "An explicit registry investigator role does not establish every trial task, authorship or current activity.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "combined-scientific-public-pi-needs-person-review",
+      "trialId": "ISRCTN14365105",
+      "status": "withheld",
+      "reasons": [
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Scientific, Principal investigator, Public",
+      "proposedRole": "Scientific, Principal investigator, Public",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN14365105",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "research",
+      "limits": [
+        "An explicit registry investigator role does not establish every trial task, authorship or current activity.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "public-pi-needs-person-review",
+      "trialId": "ISRCTN92289230",
+      "status": "withheld",
+      "reasons": [
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Public, Principal investigator",
+      "proposedRole": "Public, Principal investigator",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN92289230",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "research",
+      "limits": [
+        "An explicit registry investigator role does not establish every trial task, authorship or current activity.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "scientific-pi-needs-person-review",
+      "trialId": "ISRCTN78360465",
+      "status": "withheld",
+      "reasons": [
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Scientific, Principal investigator",
+      "proposedRole": "Scientific, Principal investigator",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN78360465",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "research",
+      "limits": [
+        "An explicit registry investigator role does not establish every trial task, authorship or current activity.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "public-scientific-is-contact-only",
+      "trialId": "ISRCTN24846895",
+      "status": "withheld",
+      "reasons": [
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Public, Scientific",
+      "proposedRole": "Public, Scientific",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN24846895",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "professional-background",
+      "limits": [
+        "A registry contact role does not establish investigator responsibility or performed research.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "generic-contact-is-not-investigator",
+      "trialId": "ISRCTN18290337",
+      "status": "withheld",
+      "reasons": [
+        "first-contact-is-not-an-explicit-investigator-role",
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Contact",
+      "proposedRole": "Principal investigator",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN18290337",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "professional-background",
+      "limits": [
+        "A registry contact role does not establish investigator responsibility or performed research.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "institution-is-a-lead-only",
+      "trialId": "ISRCTN94815142",
+      "status": "withheld",
+      "reasons": [
+        "institution-does-not-establish-trial-participation",
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Principal investigator, Public, Scientific",
+      "proposedRole": "Principal investigator, Public, Scientific",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN94815142",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "research",
+      "limits": [
+        "An explicit registry investigator role does not establish every trial task, authorship or current activity.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    },
+    {
+      "caseId": "recruiting-study-is-not-personal-availability",
+      "trialId": "ISRCTN13387811",
+      "status": "withheld",
+      "reasons": [
+        "study-status-does-not-establish-personal-availability-or-activity",
+        "person-identity-not-independently-reviewed",
+        "literal-registry-source-role-not-reviewed"
+      ],
+      "recordedRole": "Principal investigator, Scientific",
+      "proposedRole": "Principal investigator, Scientific",
+      "sourceUrl": "https://www.isrctn.com/ISRCTN13387811",
+      "sourceFileSha256": "eb11ebdb23378f6c3100185efafed567b4ceb609bc30d1c151cf25b12a9dc217",
+      "eligibleEvidenceType": "research",
+      "limits": [
+        "An explicit registry investigator role does not establish every trial task, authorship or current activity.",
+        "Trial conditions, interventions and recruitment status describe the study, not this person's clinical practice or availability."
+      ],
+      "candidateId": null
+    }
+  ]
+}

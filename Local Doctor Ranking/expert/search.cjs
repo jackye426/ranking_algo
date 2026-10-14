@@ -5,7 +5,7 @@ const path=require('node:path');
 const {createHash}=require('node:crypto');
 const {embed,EMBEDDING_MODEL}=require('../demo/models.cjs');
 const {CONCEPTS,sufficient}=require('./brief.cjs');
-const {activityClauses,classifyPassage}=require('./data.cjs');
+const {activityClauses,classifyPassage,trainingExperienceScope}=require('./data.cjs');
 const clean=value=>String(value||'').replace(/\s+/g,' ').trim();
 const STOP=new Set('a an the and or to of in for with we us our their this that these those is are be been have has had would could should find need help expert experts specialist specialists clinical assessment assess software device purpose question current previous experience documented only useful optional essential practice outputs relevant relevance effects consequences incorrect results support supporting'.split(' '));
 const aliases={computed:'computed',tomography:'tomography',scans:'scan',images:'image',imaging:'image',studies:'study',researcher:'research',researchers:'research',radiologists:'radiologist',cardiologists:'cardiologist',adults:'adult',lesions:'lesion'};
@@ -44,19 +44,19 @@ function requirementQueries(r){
 // Exact metadata still participates in BM25 and structured requirement checks.
 // It should not spend vector capacity on registration/address/degree strings.
 function semanticEligible(p){if(p.type==='location'||p.qualifiers?.includes('publication-listing-link-not-authorship'))return false;if(p.type!=='professional-background')return true;if(/^(?:qualifications|detailed_qualifications)$/.test(p.field))return p.text.length>=100||Object.values(p.attributes||{}).some(values=>values.length>0);return !/^(?:specialty|specialty_alternatives|specialties|professional_memberships|nhs_posts|nhs_base|registration|locations)$/.test(p.field);}
-function negative(text){return /\b(?:does not|do not|doesn['’]t|don['’]t|not currently|no longer|no experience|without experience|never)\b/i.test(text);}
+function negative(text){return /\b(?:does not|do not|doesn['’]t|don['’]t|not currently|no longer|no experience|without experience|never)\b/i.test(text)||/(?:^|\n|[•*])\s*No\s*[:.!]?\s*(?=$|\n|[•*])/i.test(text);}
 // Imported biographies sometimes lose sentence spaces and bullet separators.
 // Recover only literal boundaries before deciding which activity a topic
 // belongs to; otherwise CT training can borrow an unrelated research verb.
 const segments=text=>activityClauses(text).flatMap(part=>part.split(/[•●]|(?<=[.!?])(?=(?:I|He|She|His|Her|My|Our|The|Their|Research|Whether|Clinical|Professional|In|After|Since|This|Dr|Mr|Professor)\b)/)).map(part=>part.trim()).filter(Boolean);
-const evidenceStrength=p=>({'clinical-practice':6,research:5,trial:5,publication:4,'clinical-interest':3,procedure:2,training:1})[p.type]||0;
+const evidenceStrength=p=>({'clinical-practice':6,research:5,trial:5,publication:4,'clinical-interest':3,procedure:2,'treatment-listing':2,training:1})[p.type]||0;
 const researchAttributed=p=>!p.qualifiers?.some(q=>/publication-listing-link-not-authorship|bibliographic-reference-not-training-or-authorship/i.test(q))&&classifyPassage(p.text,'about')==='research';
 const explicitResearchDescription=text=>!negative(text)&&/\b(?:my|his|her|our)\s+(?:field|area|focus|topic)\s+of\s+research\s+(?:was|is|has been)\s+(?:the\s+)?(?:investigation|investigating|evaluation|evaluating|examination|examining|study|studying)\b/i.test(text);
 // This exception is for optional source presentation only. Do not feed it into
 // matrix qualification or ranking: imported interests keep their original type.
 const optionalResearchAttributed=p=>!negative(p.text)&&!/\b(?:did not|was not|were not)\s+(?:participat|contribut|author|research)\w*/i.test(p.text)&&(researchAttributed(p)||(p.type==='clinical-interest'&&explicitResearchDescription(p.text)));
 function intentEvidenceStrength(requirement,p){
-  if(requirement.matchIntent==='interest')return ({'clinical-interest':6,'clinical-practice':5.8,research:5.2,trial:5.2,publication:4.8,procedure:3,training:1})[p.type]||0;
+  if(requirement.matchIntent==='interest')return ({'clinical-interest':6,'clinical-practice':5.8,research:5.2,trial:5.2,publication:4.8,procedure:3,'treatment-listing':3,training:1})[p.type]||0;
   if(requirement.matchIntent==='research')return ({research:6,trial:6,publication:5.8,'clinical-interest':/\bresearch|stud(?:y|ies)|trials?\b/i.test(p.text)?4:1,'clinical-practice':1,training:.5})[p.type]||0;
   return evidenceStrength(p);
 }
@@ -75,7 +75,9 @@ function baseScopes(passage,source=passage.text){
   if(slot&&cached[slot])return cached[slot];
   const reviewedResearch=passage.attribution==='verified-source'&&passage.reviewedParaphrase&&['research','trial','publication'].includes(passage.type)&&source===passage.text;
   const clauses=reviewedResearch?[source]:segments(source);
-  const descriptors=clauses.map(text=>{
+  const descriptors=clauses.flatMap(text=>{
+    const placement=trainingExperienceScope(text);
+    if(placement&&passage.type==='clinical-practice')return [{text:placement.trainingText,type:'training'},{text:placement.clinicalText,type:'clinical-practice'}];
     let type=passage.type;
     if(type==='clinical-practice'){
       const localType=classifyPassage(text,passage.field||'about');
@@ -86,7 +88,7 @@ function baseScopes(passage,source=passage.text){
       if(['training','clinical-interest'].includes(localType)||(clauses.length>1&&passage.attribution!=='verified-source'))type=localType;
     }
     if(['research','trial','publication'].includes(type)&&clauses.length>1&&passage.attribution!=='verified-source')type=classifyPassage(text,'about');
-    return {text,type};
+    return [{text,type}];
   });
   if(slot)cached[slot]=descriptors;
   return descriptors;
@@ -125,17 +127,18 @@ function populationDomainRelation(requirement,scope,parent,passages,brief){
   const hasOtherPopulation=p=>populations.some(([kind,label,re])=>label!==requirement.label&&re.test(p.text))&&!directMatch(requirement,p);
   return supported.length>0&&!supported.some(hasOtherPopulation);
 }
-function populationModalityConflict(requirement,parent,passages,brief){
+function populationModalityConflict(requirement,parent,individualPassages,brief){
   if(requirement.kind!=='population'||!parent.sourceRecordId)return false;
   const populations=CONCEPTS.filter(([kind])=>kind==='population');
   return brief.requirements.filter(r=>r.kind==='modality').some(modality=>{
-    const scopes=passages.filter(p=>p.candidateId===parent.candidateId&&p.sourceRecordId===parent.sourceRecordId).flatMap(p=>requirementScopes(modality,p)).filter(p=>p.type==='clinical-practice'&&!negative(p.text));
+    const scopes=individualPassages.filter(p=>p.candidateId===parent.candidateId&&p.sourceRecordId===parent.sourceRecordId).flatMap(p=>requirementScopes(modality,p)).filter(p=>p.type==='clinical-practice'&&!negative(p.text));
     if(scopes.some(p=>directMatch(requirement,p)))return false;
     return scopes.some(p=>populations.some(([kind,label,re])=>label!==requirement.label&&re.test(p.text)));
   });
 }
 function rolePattern(label){
-  const known={Radiologist:/\bradiolog(?:ists?|y)\b/i,Cardiologist:/\bcardiolog(?:ists?|y)\b/i,Dermatologist:/\bdermatolog(?:ists?|y)\b/i,'General practitioner':/\b(?:general practi(?:tioners?|ce)|family (?:medicine|physicians?)|GPs?)\b/i,'Clinical researcher':/\b(?:clinical researchers?|research specialists?)\b/i}[label];
+  if(label==='Dietitian')return /\bdieti(?:ti|ci)ans?\b/i;
+  const known={Radiologist:/\bradiolog(?:ists?|y)\b/i,Cardiologist:/\bcardiolog(?:ists?|y)\b/i,Dermatologist:/\bdermatolog(?:ists?|y)\b/i,Haematologist:/\bh(?:ae|e)matolog(?:ists?|y)\b/i,Oncologist:/\boncolog(?:ists?|y)\b/i,Ophthalmologist:/\bophthalmolog(?:ists?|y)\b/i,Gastroenterologist:/\bgastroenterolog(?:ists?|y)\b/i,Gynaecologist:/\bgyn(?:ae|e)colog(?:ists?|y)\b/i,'General practitioner':/\b(?:general practi(?:tioners?|ce)|family (?:medicine|physicians?)|GPs?)\b/i,'Clinical researcher':/\b(?:clinical researchers?|research specialists?)\b/i}[label];
   if(known)return known;
   const words=clean(label).split(/\s+/).filter(Boolean);if(!words.length)return null;
   // Unknown but explicitly supplied professional roles get the same identity
@@ -144,13 +147,49 @@ function rolePattern(label){
   words[words.length-1]=words.at(-1).replace(/s$/i,'');
   return new RegExp('\\b'+words.map(word=>word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('\\s+')+'s?\\b','i');
 }
-function explicitRole(requirement,passage){
+function explicitRole(requirement,passage,candidate={},parent=passage){
   const pattern=rolePattern(requirement.label);if(!pattern)return false;
-  const match=pattern.exec(passage.text);if(!match||negative(passage.text))return false;
-  if(/^(?:specialt|professional_role|role$|registration)/.test(passage.field||''))return true;
+  // Names of professional bodies and qualifications are background evidence.
+  // A plural job word in an organisation title does not identify its member's
+  // profession. Retain the passage for discovery without certifying the role.
+  if(/professional_context\.(?:professional-body|membership|qualification|academic-background)$|(?:^|[._])(?:memberships?|qualifications?|awards?|publications?)(?:$|[._])/i.test(passage.field||''))return false;
+  // Specialty metadata can use a discipline noun (Cardiology). In prose and
+  // explicit profession fields, that discipline may instead modify a different
+  // profession: a gastroenterology dietitian is not a gastroenterologist.
+  const professionPattern=/^specialt/.test(passage.field||'')?pattern:
+    ({Radiologist:/\bradiologists?\b/i,Cardiologist:/\bcardiologists?\b/i,Dermatologist:/\bdermatologists?\b/i,Haematologist:/\bh(?:ae|e)matologists?\b/i,Oncologist:/\boncologists?\b/i,Ophthalmologist:/\bophthalmologists?\b/i,Gastroenterologist:/\bgastroenterologists?\b/i,Gynaecologist:/\bgyn(?:ae|e)cologists?\b/i,'General practitioner':/\b(?:general practitioners?|family physicians?|GPs?)\b/i}[requirement.label]||pattern);
+  const match=professionPattern.exec(passage.text);if(!match||negative(passage.text))return false;
+  if(/\b(?:not|never|formerly|previously|former)\b[^.!?;\n]*$/i.test(passage.text.slice(0,match.index)))return false;
+  if(/^(?:specialt|professional_role|role$|registration|professional_context\.profession$)/.test(passage.field||''))return true;
   // GP referrals, teaching radiologists and working with a dermatologist do not
   // establish the profile owner's role. Keep generic mentions as potential.
-  return /\b(?:I am|he is|she is|works? as|practi[cs](?:e|es) as|(?:my|his|her|their) (?:professional )?role is|(?:Dr\.?|Mr\.?|Ms\.?|Professor)\s+[\p{L}’'-]+(?:\s+[\p{L}’'-]+){0,2}\s+is|consultant)\s+(?:(?:an?|consultant|general|adult|paediatric|pediatric|clinical|practising|practicing|senior|registered|chartered|licensed)\s+){0,5}$/iu.test(passage.text.slice(0,match.index));
+  const preceding=parent.text.slice(0,Math.max(0,parent.text.indexOf(passage.text)));
+  if(/^(?:and\s+)?(?:he|she|they|his|her|their)\b/i.test(passage.text)&&(/\b(?:my|his|her|their)\s+(?:colleague|wife|husband|partner|assistant)/i.test(preceding)||/\b(?:alongside|with)\s+(?:(?:Dr|Mr|Ms|Professor)\.?\s+)?[A-Z][a-z]+\s+[A-Z][a-z]+/.test(preceding)))return false;
+  const before=passage.text.slice(0,match.index).trimStart(),modifiers='(?:(?:an?|consultant|general|adult|paediatric|pediatric|clinical|practising|practicing|senior|registered|chartered|licensed|knowledgeable|experienced|HCPC|and|(?:multi[ -])?award[ -]winning)\\s+){0,9}';
+  if(!before&&/s$/i.test(match[0]))return false;
+  if(new RegExp('^and\\s+I am\\s+'+modifiers+'$','iu').test(before))return true;
+  // Anchor the subject. A trailing "consultant" inside "with Jamie Brown,
+  // consultant physiotherapist" is the collaborator's title, not the owner.
+  if(new RegExp('^(?:(?:I am|he is|she is|(?:I |he |she )?works? as|(?:I |he |she )?practi[cs](?:e|es) as|(?:my|his|her|their) (?:professional )?role is)\\s+)?'+modifiers+'$','i').test(before))return true;
+  const owner=String(candidate.name||'').replace(/^(?:(?:Dr|Mr|Mrs|Ms|Miss|Prof|Professor|Sir)\.?\s+)+/i,'').trim();
+  if(!owner||owner.split(/\s+/).length<2)return false;
+  const escaped=owner.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+');
+  const namedSelfIntro=new RegExp('^My name is '+escaped+'\\s*\\n(?:and\\s+)?I am\\s+'+modifiers+'$','iu');
+  if(namedSelfIntro.test(before))return true;
+  // A literal role/name apposition in a founded-by clause identifies the
+  // named owner's profession, not every member's activity at that service.
+  // Require the exact owner immediately after the role; a collaborator's
+  // name, an unnamed team or merely founding a clinic cannot supply a role.
+  const after=passage.text.slice(match.index+match[0].length);
+  const namedApposition=new RegExp('^(?:\\s*,\\s*|\\s+)(?:(?:Dr|Mr|Mrs|Ms|Miss|Prof|Professor|Sir)\\.?\\s+)?'+escaped+'(?=\\s*(?:[.,;:]|$))','iu');
+  const foundedBy=new RegExp('\\b(?:founded|established)\\b[^.!?;\\n]{0,120}\\bby\\s+'+modifiers+'$','iu');
+  const negatedFounding=/\b(?:not|never|wasn['’]t|isn['’]t|weren['’]t)\b[^.!?;\n]{0,80}\b(?:founded|established|by)\b/i.test(before);
+  if(namedApposition.test(after)&&foundedBy.test(before)&&!negatedFounding)return true;
+  // A short organisation apposition does not change the named subject of
+  // "is a dietitian". Do not allow relative clauses or a different person’s
+  // predicate here. Promotional adjectives supply no additional rank signal.
+  const organisationApposition=',\\s*(?:co[- ]?)?(?:founder|director)\\s+of\\s+[^,;.!?\\n]{1,100},\\s*is\\s+';
+  return new RegExp('^(?:(?:Dr|Mr|Mrs|Ms|Miss|Prof|Professor|Sir)\\.?\\s+)?'+escaped+'\\s*(?:is\\s+|,\\s*|'+organisationApposition+')'+modifiers+'$','iu').test(before);
 }
 function interpretationSupportsModality(modality,scope){
   for(const match of scope.text.matchAll(/\b(?:report(?:s|ed|ing)?|interpret(?:s|ed|ing)?|read(?:s|ing)?)\b([^.;:\n]{0,160})/gi)){
@@ -166,7 +205,7 @@ function activityRelevant(requirement,scope,brief){
   const modalities=brief.requirements.filter(r=>r.kind==='modality');
   return !modalities.length||modalities.some(a=>interpretationSupportsModality(a,scope));
 }
-function supportingSpan(requirement,passage,status,brief={requirements:[]}){
+function supportingSpan(requirement,passage,status,brief={requirements:[]},candidate={}){
   const literal=passage.sourceQuote||passage.text;
   const literalSupports=!!passage.sourceQuote&&directMatch(requirement,{...passage,text:passage.sourceQuote,attributes:{}})&&(!(passage.reviewedParaphrase&&['interest','research'].includes(requirement.matchIntent)&&['research','trial','publication'].includes(passage.type))||researchAttributed({...passage,text:passage.sourceQuote}));
   const reviewedSummary=!!passage.reviewedParaphrase&&!literalSupports;
@@ -184,7 +223,7 @@ function supportingSpan(requirement,passage,status,brief={requirements:[]}){
     const listField=passage.type==='clinical-interest'||/clinical_interests|areas_of_interest|procedures/i.test(passage.field||'');
     return listField&&!negative(part)&&['modality','condition','procedure'].includes(requirement.kind)?part.split(/;|\n|(?<=[a-z0-9)])(?=(?:Cardiac|Coronary|Cardiovascular|Echocardiogra\w*|Dermoscopy|MRI|CT)\b)/):[part];
   }).map(part=>part.trim()).filter(Boolean));
-  const matches=sourceSegments.filter(text=>directMatch(requirement,{...passage,text,attributes:{}})&&(!(status==='documented'&&requirement.kind==='activity')||activityRelevant(requirement,{...passage,text},brief)));
+  const matches=sourceSegments.filter(text=>directMatch(requirement,{...passage,text,attributes:{}})&&(!(status==='documented'&&requirement.kind==='activity')||activityRelevant(requirement,{...passage,text},brief))&&(!(status==='documented'&&requirement.kind==='role')||explicitRole(requirement,{...passage,text},candidate,passage)));
   const sourceScopes=requirementScopes(requirement,passage,source);
   matches.sort((a,b)=>{
     const localStrength=text=>{const original=sourceScopes.filter(p=>p.text===text);return original.length?Math.max(0,...original.map(p=>intentEvidenceStrength(requirement,p))):intentEvidenceStrength(requirement,{text,type:classifyPassage(text,passage.field||'about')});};
@@ -200,7 +239,7 @@ function supportingSpan(requirement,passage,status,brief={requirements:[]}){
   // retain the original passage type and ranking so this is not a new claim of
   // current activity, a particular investigator role, or clinical practice.
   const scopedType=effectiveEvidenceType(requirement,passage),describedResearch=scopedType==='clinical-interest'&&explicitResearchDescription(text);
-  const evidenceType=describedResearch?'research':scopedType,researchContext=['research','trial','publication'].includes(evidenceType)&&!describedResearch&&!researchAttributed({...passage,text});
+  const evidenceType=reportedActivityRequest(requirement)?'activity-volume':describedResearch?'research':scopedType,researchContext=['research','trial','publication'].includes(evidenceType)&&!describedResearch&&!researchAttributed({...passage,text});
   return {evidenceId:passage.id,text,kind:reviewedSummary?'reviewed-summary':'source-quote',evidenceType,...(researchContext?{evidenceScope:'research-context'}:{}),sourceQuote:passage.sourceQuote||null,sourceQuoteSupportsRequirement:literalSupports,limits:[...(passage.review?.limitations||[])],sourceDate:passage.dates?.sourceDate||null};
 }
 function deviceAssessment(text,requirement,{activityRequired=true}={}){
@@ -215,8 +254,40 @@ function deviceAssessment(text,requirement,{activityRequired=true}={}){
   const wanted=tokens(specific),present=new Set(tokens(text));
   return wanted.every(term=>present.has(term));
 }
+const reportedActivityRequest=r=>r.kind==='activity'&&['Reported procedure activity','Reported range of seven or fewer'].includes(r.label);
+function literalServiceOffer(passage){
+  if(!/^(?:about|about_alternatives|professional_context\.biography)$/.test(passage.field||''))return null;
+  // Require an explicit personal offering in its own clause. A research topic,
+  // colleague, team, training goal or intention cannot supply this assertion.
+  return activityClauses(passage.text).find(text=>/^(?:I|he|she)\s+(?:(?:also|currently|regularly)\s+)?(?:offer(?:s)?|provid(?:e|es))\s+/i.test(text.trim())&&!negative(text))||null;
+}
+function reportedVolumes(p,requirement){
+  if(!['procedure','activity-volume'].includes(p.type)||!/^(?:procedures(?:_completed)?|procedure_volumes_phin|professional_context\.reported-activity)$/.test(p.field||''))return [];
+  return (p.volumes||(p.volume?[p.volume]:[])).filter(v=>{
+    const raw=clean(v.reportedRange),range=raw.match(/^(?:<=|≤)\s*(\d+)$/)||raw.match(/^less than or equal to\s+(\d+)$/i),interval=raw.match(/^(\d+)\s*[-–]\s*(\d+)$/),strict=raw.match(/^<\s*(\d+)$/);
+    const upper=range?Number(range[1]):interval?Number(interval[2]):strict?Number(strict[1])-1:null;
+    const validRange=upper!==null&&Number.isSafeInteger(upper)&&upper>=0&&(!interval||Number(interval[1])<=upper);
+    const lowerBound=raw.match(/^(?:>=|>|≥)\s*(\d+)$/);
+    const exact=Number.isSafeInteger(v.reportedAdmissions)&&v.reportedAdmissions>=0;
+    // A derived midpoint is never a source count. A <=7 bucket includes zero;
+    // this establishes a reported range, not positive performed activity.
+    return requirement.label==='Reported range of seven or fewer'?validRange&&upper<=7:(validRange||exact||!!lowerBound||/^\d+$/.test(raw));
+  });
+}
 function directMatch(requirement,passage){
+  if(reportedActivityRequest(requirement))return reportedVolumes(passage,requirement).length>0;
+  if(['language','service'].includes(requirement.kind)){
+    const offering=requirement.kind==='service'?literalServiceOffer(passage):null;
+    if(passage.field!=='professional_context.'+requirement.kind&&!offering)return false;
+    const normalize=value=>tokens(value).map(token=>({services:'service',consultations:'consultation',speaking:'speak',speaks:'speak',fluently:'fluent'}[token]||token));
+    const wanted=normalize(requirement.text||requirement.label).filter(token=>!['service','speak','recorded','documented'].includes(token)),present=new Set(normalize(offering||passage.text));
+    return wanted.length>0&&wanted.every(token=>present.has(token));
+  }
   const text=passage.text||'',label=requirement.label||requirement.text;
+  // Reported volumes may insert numbers and qualifiers before a coordinated
+  // list of scans. Bind the reporting predicate to its own imaging objects;
+  // the short query-recognition pattern is not a source-evidence grammar.
+  if(requirement.kind==='activity'&&label==='Image interpretation'&&interpretationSupportsModality({kind:'modality',label:'Medical imaging'},passage))return true;
   if(requirement.kind==='activity'&&label==='Implanted cardiac device monitoring'){
     const pattern=CONCEPTS.find(([kind,name])=>kind==='activity'&&name===label)[2];
     // Monitoring one condition cannot borrow an unrelated implant procedure
@@ -232,6 +303,8 @@ function directMatch(requirement,passage){
     return /\b(?:ultrasound|echocardiograph\w*)\b/i.test(diagnosticText);
   }
   if(requirement.kind==='research'&&label==='Clinical research')return ['research','trial','publication'].includes(passage.type)&&/\b(?:research|trials?|stud(?:y|ies)|investigator|coauthor|authored|publications?)\b/i.test(text)&&!passage.qualifiers?.includes('publication-listing-link-not-authorship');
+  if(requirement.kind==='population'&&label==='Children'&&/\b(?:under|below|younger than)\s+(?:the\s+)?(?:age\s+(?:of\s+)?)?(?:18|eighteen)\b/i.test(text))return true;
+  if(requirement.kind==='procedure'&&label==='Knee surgery'&&/\bknee\s+(?:(?:ligament|joint|primary|revision)\s+)?(?:replacement|reconstruction|arthroscopy|osteotomy|repair|surgery)\b/i.test(text))return true;
   if(requirement.kind==='regulatory')return deviceAssessment(text,requirement,{activityRequired:false});
   if(requirement.kind==='role'&&rolePattern(label)?.test(text))return true;
   const concept=CONCEPTS.find(([kind,name])=>kind===requirement.kind&&name.toLowerCase()===label.toLowerCase());
@@ -249,6 +322,7 @@ function UKLocation(candidate){
   return (candidate.locations||[]).find(item=>/\b(?:United Kingdom|UK|England|Scotland|Wales|Northern Ireland)\b/i.test([item.country,item.region,item.address].filter(Boolean).join(' '))||/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i.test(item.postcode||item.address||''));
 }
 function questionFor(requirement){
+  if(reportedActivityRequest(requirement))return 'Can you confirm the procedure, hospital and reporting period for these recorded figures? A range may include zero and does not establish current practice.';
   if(requirement.kind==='currentPractice')return 'Do you currently practise in the relevant clinical pathway, and when did you last interpret these scans or perform this activity?';
   if(requirement.kind==='regulatory')return 'What medical-device clinical evaluation or regulatory assessment work have you undertaken, and in what scope?';
   if(requirement.kind==='research')return `Can you describe your role in ${requirement.label.toLowerCase()}, including the study methods and evidence you evaluated?`;
@@ -258,6 +332,7 @@ function questionFor(requirement){
 }
 function matrixFor(candidate,passages,brief){
   passages=passages.filter(p=>p.candidateId===candidate.id);
+  const isCollective=p=>(p.qualifiers||[]).includes('team-context-not-individual-activity'),isOtherPerson=p=>(p.qualifiers||[]).some(q=>/colleague|uncertain-identity/i.test(q)),individualPassages=passages.filter(p=>!isCollective(p)&&!isOtherPerson(p));
   return brief.requirements.map(requirement=>{
     const base={requirementId:requirement.id,label:requirement.label,kind:requirement.kind,importance:requirement.importance,...(requirement.matchIntent?{matchIntent:requirement.matchIntent}:{}),...(requirement.polarity?{polarity:requirement.polarity}:{}),...(requirement.strictRole?{strictRole:true}:{}),evidenceIds:[]};
     if(['question','technology','workflow'].includes(requirement.kind))return {...base,status:'context',note:'This describes the engagement. Clinical applicability must be discussed with the expert.'};
@@ -268,39 +343,52 @@ function matrixFor(candidate,passages,brief){
       return {...base,status:supported?'documented':'unknown',evidenceIds:supported?evidence.slice(0,2).map(p=>p.id):[],note:supported?'A recorded UK practice location supports geography; residence and availability are not established.':'Country of current practice needs confirmation.'};
     }
     if(requirement.kind==='currentPractice')return {...base,status:'unknown',note:'A professional profile does not verify current activity for this engagement.'};
+    if(reportedActivityRequest(requirement)){
+      const anchors=brief.requirements.filter(r=>r.polarity!=='exclude'&&['modality','condition','procedure'].includes(r.kind));
+      const volumeMatches=(p,a)=>reportedVolumes(p,requirement).some(v=>directMatch(a,{...p,text:v.activity||'',attributes:{}}));
+      const proof=individualPassages.filter(p=>reportedVolumes(p,requirement).length&&(!anchors.length||anchors.some(a=>volumeMatches(p,a))));
+      const complete=proof.length&&anchors.every(a=>proof.some(p=>volumeMatches(p,a)));
+      return {...base,status:complete?'documented':proof.length?'potential':'unknown',evidenceIds:proof.slice(0,3).map(p=>p.id),note:proof.length?'Source-reported procedure figures only. Ranges may include zero; derived estimates, reporting periods and present practice remain separate.':'No source-reported figures were found for the requested procedure; this is not evidence of no experience.'};
+    }
     if(requirement.kind==='role'&&requirement.label==='Practising clinician')return {...base,status:'unknown',note:'The panel needs a practising clinical perspective; current activity must be confirmed directly.'};
+    if(['language','service'].includes(requirement.kind)){
+      const field='professional_context.'+requirement.kind,proof=individualPassages.filter(p=>(p.field===field||requirement.kind==='service'&&literalServiceOffer(p))&&!negative(p.text)&&directMatch(requirement,p));
+      return {...base,status:proof.length?'documented':'unknown',evidenceIds:proof.slice(0,3).map(p=>p.id),note:proof.length?(requirement.kind==='language'?'Recorded language and any stated proficiency; this is not clinical expertise.':'Recorded service offering; present availability is not established.'):'Not established in the attributable professional records.'};
+    }
     const scoped=new Map(),scopes=p=>{if(!scoped.has(p))scoped.set(p,requirementScopes(requirement,p));return scoped.get(p);};
     const strength=p=>Math.max(0,...scopes(p).map(scope=>intentEvidenceStrength(requirement,scope)));
-    const matched=passages.filter(p=>p.type!=='location'&&directMatch(requirement,p)).sort((a,b)=>strength(b)-strength(a));
+    const matched=passages.filter(p=>p.type!=='location'&&!isOtherPerson(p)&&directMatch(requirement,p)).sort((a,b)=>strength(b)-strength(a));
     const negativeFor=p=>{const related=scopes(p);return related.length>0&&related.every(s=>negative(s.text));};
-    const positive=matched.filter(p=>!negativeFor(p)&&!(p.qualifiers||[]).some(q=>/colleague|uncertain-identity/i.test(q)));
-    const direct=positive.filter(parent=>scopes(parent).filter(p=>!negative(p.text)).some(p=>{
+    const positive=matched.filter(p=>!negativeFor(p));
+    const direct=positive.filter(parent=>!isCollective(parent)&&scopes(parent).filter(p=>!negative(p.text)).some(p=>{
       if(['population','setting'].includes(requirement.kind)){
-        if(populationModalityConflict(requirement,parent,passages,brief))return false;
+        if(populationModalityConflict(requirement,parent,individualPassages,brief))return false;
         const anchors=brief.requirements.filter(r=>['modality','condition','procedure'].includes(r.kind));
-        if(anchors.length&&!segments(p.text).some(text=>directMatch(requirement,{...p,text,attributes:{}})&&anchors.some(a=>directMatch(a,{...p,text,attributes:{}})))&&!populationDomainRelation(requirement,p,parent,passages,brief))return false;
+        if(requirement.kind==='population'&&parent.field==='professional_context.population'&&!anchors.length)return true;
+        if(anchors.length&&!segments(p.text).some(text=>directMatch(requirement,{...p,text,attributes:{}})&&anchors.some(a=>directMatch(a,{...p,text,attributes:{}})))&&!populationDomainRelation(requirement,p,parent,individualPassages,brief))return false;
       }
       if(requirement.kind==='regulatory')return ['clinical-practice','research','relationship','professional-background'].includes(p.type)&&!p.qualifiers?.some(q=>/interest|training/.test(q))&&deviceAssessment(p.text,requirement);
       if(requirement.kind==='research'){
+        if(requirement.matchIntent==='interest')return ['research','trial','publication'].includes(p.type)&&researchAttributed(p)||p.type==='clinical-interest'&&(/research_interests|professional_context\.research-interest/.test(p.field)||/\bresearch\b/i.test(p.text));
         if(!['research','trial','publication'].includes(p.type)||/(?:interest in research|hopes to|plans to)/i.test(p.text))return false;
         if(requirement.label==='Diagnostic study evaluation')return /\b(?:evaluat(?:ed|es|ing)|apprais(?:ed|es|ing)|validat(?:ed|es|ing)|(?:principal|chief) investigator|led (?:the |a )?(?:diagnostic|validation) study)\b/i.test(p.text)&&!p.review?.limitations?.some(x=>/not a specific investigator task|not.*appraisal/i.test(x));
         return true;
       }
-      if(requirement.kind==='role')return /professional-background|registration|clinical-practice/.test(p.type)&&explicitRole(requirement,p);
+      if(requirement.kind==='role')return /professional-background|registration|clinical-practice/.test(p.type)&&explicitRole(requirement,p,candidate,parent);
       if(requirement.kind==='activity'){
         if(!activityRelevant(requirement,p,brief))return false;
         return p.type==='clinical-practice'&&!p.qualifiers?.includes('historical')&&!p.qualifiers?.includes('stated-interest');
       }
       if(requirement.matchIntent==='activity')return p.type==='clinical-practice'&&!p.qualifiers?.includes('historical')&&!p.qualifiers?.includes('stated-interest');
       if(requirement.matchIntent==='research')return (['research','trial','publication'].includes(p.type)&&researchAttributed(p))||(p.type==='clinical-interest'&&/\b(?:research|stud(?:y|ies)|trials?)\b/i.test(p.text));
-      if(requirement.matchIntent==='interest')return ['clinical-practice','clinical-interest','procedure'].includes(p.type)||(['research','trial','publication'].includes(p.type)&&researchAttributed(p));
-      return ['clinical-practice','clinical-interest','procedure'].includes(p.type);
+      if(requirement.matchIntent==='interest')return ['clinical-practice','clinical-interest','procedure','treatment-listing'].includes(p.type)||(['research','trial','publication'].includes(p.type)&&researchAttributed(p));
+      return ['clinical-practice','clinical-interest','procedure','treatment-listing'].includes(p.type);
     }));
     if(direct.length)return {...base,status:'documented',evidenceIds:direct.slice(0,3).map(p=>p.id),note:'Supported by the recorded text; scope and current activity require qualification.'};
     if(positive.length)return {...base,status:'potential',evidenceIds:positive.slice(0,2).map(p=>p.id),note:'Related evidence is recorded, but it does not directly establish this requirement.'};
-    if(matched.some(negativeFor)){const explicit=matched.filter(p=>segments(p.text).some(text=>/\b(?:does not|do not|no experience (?:in|of|with))\b/i.test(text)&&directMatch(requirement,{...p,text,attributes:{}})));return {...base,status:explicit.length?'mismatch':'needs-review',evidenceIds:(explicit.length?explicit:matched.filter(negativeFor)).slice(0,2).map(p=>p.id),note:explicit.length?'The source explicitly states a limitation relevant to this requirement. Confirm the scope and date before a decision.':'The source contains a qualification or negative statement that needs review.'};}
+    if(matched.filter(p=>!isCollective(p)).some(negativeFor)){const explicit=matched.filter(p=>!isCollective(p)).filter(p=>segments(p.text).some(text=>/\b(?:does not|do not|no experience (?:in|of|with))\b/i.test(text)&&directMatch(requirement,{...p,text,attributes:{}})));return {...base,status:explicit.length?'mismatch':'needs-review',evidenceIds:(explicit.length?explicit:matched.filter(p=>!isCollective(p)).filter(negativeFor)).slice(0,2).map(p=>p.id),note:explicit.length?'The source explicitly states a limitation relevant to this requirement. Confirm the scope and date before a decision.':'The source contains a qualification or negative statement that needs review.'};}
     return {...base,status:'unknown',note:'Not established by the available records; this is not evidence of absence.'};
-  }).map(row=>({...row,supportingEvidence:row.evidenceIds.map(id=>passages.find(p=>p.id===id)).filter(Boolean).map(p=>supportingSpan(brief.requirements.find(r=>r.id===row.requirementId),p,row.status,brief))}));
+  }).map(row=>({...row,supportingEvidence:row.evidenceIds.map(id=>passages.find(p=>p.id===id)).filter(Boolean).map(p=>supportingSpan(brief.requirements.find(r=>r.id===row.requirementId),p,row.status,brief,candidate))}));
 }
 class ExpertSearchEngine{
   constructor({embedQuery=embed,cacheDir=process.env.EXPERT_CACHE_DIR||path.join(__dirname,'.cache'),onProgress=()=>{},semanticThreshold=.4}={}){this.embedQuery=embedQuery;this.cacheDir=cacheDir;this.onProgress=onProgress;this.semanticThreshold=semanticThreshold;this.ready=false;this.status='Preparing expert evidence';}
@@ -313,6 +401,7 @@ class ExpertSearchEngine{
     this.progress(`Indexing ${this.passages.length} sourced passages`);this.bm25=new BM25Index(this.passages);
     const texts=[...new Set(this.passages.filter(semanticEligible).map(p=>clean(p.text)))].sort((a,b)=>a.length-b.length||a.localeCompare(b));this.textIndices=new Map(texts.map((t,i)=>[t,i]));
     this.fingerprint=createHash('sha256').update(EMBEDDING_MODEL+'\n'+JSON.stringify(texts)).digest('hex');
+    if(this.verifiedCache&&(this.verifiedCache.fingerprint!==this.fingerprint||this.verifiedCache.count!==texts.length||this.verifiedCache.model!==EMBEDDING_MODEL))throw Error('Prepared release cache does not match the normalized evidence and model');
     const metadataFile=path.join(this.cacheDir||'.','passage-embeddings.meta.json');
     const binaryFile=path.join(this.cacheDir||'.','passage-embeddings.f32'),keysFile=path.join(this.cacheDir||'.','passage-embeddings.keys.json');let cached={},completed=0;
     const keys=texts.map(t=>createHash('sha256').update(t).digest('hex')),prepared=new Uint8Array(texts.length);
@@ -323,9 +412,10 @@ class ExpertSearchEngine{
     if(!this.vectors&&this.cacheDir&&cached.model===EMBEDDING_MODEL&&Number.isInteger(cached.dimensions)&&cached.dimensions>0&&cached.dimensions<=4096){
       try{const previous=JSON.parse(await fs.readFile(keysFile,'utf8'));if(previous.fingerprint===cached.fingerprint&&previous.keys.length===cached.count){const bytes=await fs.readFile(binaryFile);if(bytes.length===cached.count*cached.dimensions*4){const old=new Float32Array(bytes.buffer,bytes.byteOffset,bytes.length/4),indices=new Map(previous.keys.slice(0,cached.completed).map((k,i)=>[k,i]));this.dimensions=cached.dimensions;this.vectors=new Float32Array(texts.length*this.dimensions);let reused=0;keys.forEach((key,i)=>{if(indices.has(key)){const offset=indices.get(key)*this.dimensions;this.vectors.set(old.subarray(offset,offset+this.dimensions),i*this.dimensions);prepared[i]=1;reused++;}});this.progress(`Reusing ${reused}/${texts.length} unchanged semantic passages`);}}}catch{}
     }
+    if(this.verifiedCache&&(!this.vectors||completed!==texts.length||this.dimensions!==this.verifiedCache.dimensions))throw Error('Prepared release cache is incomplete; refusing on-demand replacement');
     let handle;
     try{
-      if(this.cacheDir){await fs.mkdir(this.cacheDir,{recursive:true});await fs.writeFile(keysFile+'.tmp',JSON.stringify({fingerprint:this.fingerprint,keys}));await fs.rename(keysFile+'.tmp',keysFile);handle=await fs.open(binaryFile,completed?'r+':'w+');if(this.vectors&&!completed)await handle.truncate(this.vectors.byteLength);}
+      if(this.cacheDir&&!this.verifiedCache){await fs.mkdir(this.cacheDir,{recursive:true});await fs.writeFile(keysFile+'.tmp',JSON.stringify({fingerprint:this.fingerprint,keys}));await fs.rename(keysFile+'.tmp',keysFile);handle=await fs.open(binaryFile,completed?'r+':'w+');if(this.vectors&&!completed)await handle.truncate(this.vectors.byteLength);}
       for(let start=completed;start<texts.length;start+=48){
         this.progress(`Preparing semantic evidence ${start}/${texts.length}`);
         const end=Math.min(start+48,texts.length),missing=[];for(let i=start;i<end;i++)if(!prepared[i])missing.push(i);
@@ -345,6 +435,7 @@ class ExpertSearchEngine{
   health(){return {ready:this.ready,status:this.status,candidateCount:this.candidates?.size||0,passageCount:this.passages?.length||0,corpusVersion:this.corpus?.version,embeddingModel:EMBEDDING_MODEL,keywordMethod:'BM25 (k1=1.5, b=0.75)'};}
   async search(brief,{documentedOnly=false,retrievalMode='hybrid'}={}){
     if(!this.ready)throw new Error('Expert search is still preparing');
+    documentedOnly=documentedOnly||brief.documentedOnly===true;
     if(!sufficient(brief))return {results:[],brief,corpusVersion:this.corpus.version,needsClarification:true,diagnostics:{bm25Candidates:0,semanticCandidates:0}};
     if(!['hybrid','bm25','semantic'].includes(retrievalMode))throw new Error('Invalid retrieval mode');
     const anchorRequirements=brief.requirements.filter(r=>['modality','condition','procedure'].includes(r.kind));
@@ -434,6 +525,10 @@ class ExpertSearchEngine{
       const complementaryPanel=permittedRoles.length>1&&permittedRoles.some(perspectiveRole);
       const discoveryRoles=complementaryPanel?[]:permittedRoles.filter(r=>['focus','essential'].includes(r.importance)&&!perspectiveRole(r));
       if(discoveryRoles.length&&!discoveryRoles.some(r=>r.status==='documented'))continue;
+      // Explicit metadata searches use their own recorded fields, never an
+      // incidental language/service word in a medical biography. Preferences
+      // remain optional; an unknown value is not a negative credential claim.
+      if(matrix.some(r=>['language','service'].includes(r.kind)&&r.importance!=='preferred'&&r.status!=='documented'))continue;
       const anchorMatches=matrix.filter(m=>anchorRequirements.some(r=>r.id===m.requirementId)&&['documented','potential'].includes(m.status));
       // Expanded broad-imaging queries are deliberately generous for recall.
       // A general cardiology biography can be semantically close to all of
@@ -521,7 +616,7 @@ class ExpertSearchEngine{
         let strength=0;
         for(const p of matching){
           const related=anchors.some(a=>directMatch(a,p));
-          let value=({'clinical-practice':1,'clinical-interest':.38,procedure:.3,research:.7,trial:.7,publication:.55,training:.12,'professional-background':.15})[effectiveEvidenceType(requirement,p)]||.1;
+          let value=({'clinical-practice':1,'clinical-interest':.38,procedure:.3,'treatment-listing':.3,research:.7,trial:.7,publication:.55,training:.12,'professional-background':.15})[effectiveEvidenceType(requirement,p)]||.1;
           if(requirement.matchIntent==='interest'||requirement.matchIntent==='research')value=intentEvidenceStrength(requirement,{...p,type:effectiveEvidenceType(requirement,p)})/6;
           if(['research','population','setting'].includes(m.kind)&&!related)value*=.2;
           if(m.status==='potential')value*=.4;
