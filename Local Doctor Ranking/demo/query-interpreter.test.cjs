@@ -129,6 +129,7 @@ test('a same-joint sports expertise preference keeps the established concern and
   assert.equal(result.criteria.location,'London');assert.equal(result.criteria.insurance,'Bupa');
   assert.match(result.criteria.clinicalContext,/get back to running.*physiotherapy has not helped my knee/);
   assert.match(result.criteria.clinicalContext,/focus on sports knee injuries/);
+  assert.equal(result.criteria.clinicalContext,'I want to get back to running, but physiotherapy has not helped my knee. I prefer a consultant with a focus on sports knee injuries.');
   assert.equal(calls.length,0);
   const {clinicalRetrievalQuery,lexicalClinicalQuery}=require('./search.cjs');
   const retrieval=clinicalRetrievalQuery(result.criteria),lexical=lexicalClinicalQuery(retrieval);

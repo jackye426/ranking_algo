@@ -124,6 +124,29 @@ test('procedure listings cannot acquire benefits or inferred experience even if 
   assert.equal(validateDraft({...draft,reasons:[{...draft.reasons[0],title:'Experience with knee replacement'}]},saved),false);
 });
 
+test('failed physiotherapy and a request for sports-knee expertise do not turn listed surgery into patient treatment options',async()=>{
+  const patientCriteria={topic:'knee',specialty:null,procedures:[],clinicalContext:'I want to get back to running, but physiotherapy has not helped my knee. I prefer a consultant with a focus on sports knee injuries.'};
+  const patientResult={name:'Mr Vishal R Rajput',specialty:'Consultant Orthopaedic Surgeon',evidenceUrl:'/sources/rajput',clinicalInterests:['My expertise includes sports knee injuries, arthroscopic knee surgery, anterior cruciate ligament reconstruction surgery.'],personalizedMatch:{citations:[
+    {text:'My expertise includes sports knee injuries, arthroscopic knee surgery, anterior cruciate ligament reconstruction surgery.',sourceUrl:'/sources/rajput',criterion:'Knee'},
+  ],caveats:[]}};
+  const saved=explanationSnapshot(patientCriteria,patientResult);
+  const observed={summary:"Mr Vishal R Rajput is a consultant orthopaedic surgeon whose profile describes a focus on sports knee injuries. This could be relevant as you've mentioned physiotherapy hasn't helped your knee and you want to get back to running. His listed practice includes keyhole (arthroscopic) surgery and ligament reconstruction, which are treatments you could discuss with him.",reasons:[
+    {title:'Focus on sports knee injuries',text:'The profile lists a specific interest in sports knee injuries, which aligns with your search for a consultant with this focus and your goal of returning to running.',evidenceIds:['e1']},
+    {title:'Listed knee procedures',text:'This gives you specific treatments to ask about for your knee concern.',evidenceIds:['e1']},
+  ]};
+  const repaired={summary:'Mr Vishal R Rajput is a consultant orthopaedic surgeon whose profile describes a focus on sports knee injuries. That recorded interest directly matches the expertise you asked for and relates to your goal of returning to running. The profile cannot establish which care would be right for you.',reasons:[
+    {title:'Focus on sports knee injuries',text:'The profile lists a specific interest in sports knee injuries, matching the focus in your request.',evidenceIds:['e1']},
+  ]};
+  assert.equal(validateDraft(observed,saved),false);
+  assert.equal(validateDraft(repaired,saved),true);
+  const calls=[];const answer=await createMatchExplainer({client:clientFor([observed,repaired,{unsupportedClaims:[]}],calls),provider:'openai'})(saved);
+  assert.equal(answer.summary,repaired.summary);assert.equal(calls.length,3);
+  assert.match(calls[0].body.instructions,/do not frame them as treatments or options for this person/i);
+  assert.match(JSON.parse(calls[1].body.input).repair.feedback[0],/unrequested treatment offered as a patient option/);
+  assert.match(calls[2].body.instructions,/reject wording that offers listed operations as treatments or options/i);
+  assert.equal(validateDraft({...draft,reasons:[{...draft.reasons[0],text:'The listed knee replacement is a treatment you could discuss with the consultant.'}]},explanationSnapshot(criteria,result)),true,'an explicitly requested procedure remains discussable');
+});
+
 test('provider timeout or failure returns retryable evidence and never exposes errors or credentials',async()=>{
   const answer=await createMatchExplainer({client:clientFor([new Error('SECRET api key provider detail')]),provider:'openai'})(explanationSnapshot(criteria,result));
   assert.equal(answer.provider,'evidence');assert.equal(answer.retryable,true);assert.match(answer.notice,/temporarily unavailable/);assert.doesNotMatch(JSON.stringify(answer),/SECRET/);
