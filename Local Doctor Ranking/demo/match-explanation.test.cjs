@@ -179,6 +179,39 @@ test('failed physiotherapy and a request for sports-knee expertise keep unreques
   assert.equal(validateDraft({...draft,reasons:[{...draft.reasons[0],text:'The listed knee replacement is a treatment you could discuss with the consultant.'}]},explanationSnapshot(criteria,result)),true,'an explicitly requested procedure remains discussable');
 });
 
+test('fallback prefers Rajput’s documented sports-knee interest over an earlier generic knee fact',async()=>{
+  const patientCriteria={topic:'knee',procedures:[],clinicalContext:'I want to get back to running, but physiotherapy has not helped my knee. I prefer a consultant with a focus on sports knee injuries.'};
+  const sourceUrl='/sources/rajput';
+  const patientResult={name:'Mr Vishal R Rajput',specialty:'Consultant Orthopaedic Surgeon',evidenceUrl:sourceUrl,personalizedMatch:{citations:[
+    {text:'I specialise in simple and complex knee conditions.',sourceUrl,criterion:'Knee'},
+    {text:'My expertise includes sports knee injuries, arthroscopic knee surgery, anterior cruciate ligament reconstruction surgery, meniscal surgery and cartilage surgery.',sourceUrl,criterion:'Relevant patient context'},
+  ],caveats:[]}};
+  const saved=explanationSnapshot(patientCriteria,patientResult);
+  const answer=await createMatchExplainer({client:clientFor([new Error('Provider unavailable')]),provider:'openai'})(saved);
+  assert.equal(answer.provider,'evidence');
+  assert.match(answer.summary,/sports knee injuries/);
+  assert.match(answer.reasons[0].text,/sports knee injuries/);
+  assert.deepEqual(answer.reasons[0].evidenceIds,['e2']);
+  assert.doesNotMatch(answer.summary+' '+answer.reasons.map(reason=>reason.text).join(' '),/arthroscop|reconstruction|surgery|procedure/i);
+  assert.deepEqual(answer.citations.slice(0,2),saved.citations.slice(0,2).map(({id,text,sourceUrl})=>({id,text,sourceUrl})));
+  assert.match(answer.citations[1].text,/arthroscopic knee surgery/,'the full cited profile remains available');
+  assert.equal(answer.citations[1].sourceUrl,sourceUrl);
+});
+
+test('fallback keeps an earlier exact interest ahead of a weaker clinical excerpt',async()=>{
+  const patientCriteria={topic:'knee',procedures:[],clinicalContext:'I prefer a consultant with a focus on sports knee injuries.'};
+  const sourceUrl='/sources/example';
+  const saved=explanationSnapshot(patientCriteria,{name:'Mr Example',specialty:'Consultant Orthopaedic Surgeon',evidenceUrl:sourceUrl,personalizedMatch:{citations:[
+    {text:'Sports knee injuries',sourceUrl,criterion:'Knee'},
+    {text:'My expertise includes knee education, arthroscopic knee surgery.',sourceUrl,criterion:'Knee'},
+  ],caveats:[]}});
+  const answer=await createMatchExplainer({client:null})(saved);
+  assert.match(answer.summary,/sports knee injuries/i);
+  assert.match(answer.reasons[0].text,/sports knee injuries/i);
+  assert.deepEqual(answer.reasons[0].evidenceIds,['e1']);
+  assert.doesNotMatch(answer.summary+' '+answer.reasons[0].text,/knee education|arthroscop|surgery/i);
+});
+
 test('ambiguous or procedure-only profile lists use a sourced fallback without a model call',async()=>{
   const patientCriteria={topic:'knee',procedures:[],clinicalContext:'I prefer a consultant with a focus on sports knee injuries.'};
   for(const text of [
