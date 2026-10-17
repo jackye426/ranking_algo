@@ -66,7 +66,7 @@ function accumulatedContext(previous,current,raw) {
   if(!previous || !current || /\b(?:instead|rather|replace|forget|no longer|changed)\b/i.test(raw)) return current;
   if(previous.toLowerCase().includes(current.toLowerCase())) return previous;
   if(current.toLowerCase().includes(previous.toLowerCase())) return current;
-  return previous+'; '+current;
+  return previous+(/[.!?]$/.test(previous)?' ':'; ')+current;
 }
 function normalizedPrevious(previous) {
   return {...updateCriteria(previous,'').criteria,clinicalContext:typeof previous?.clinicalContext==='string' && previous.clinicalContext.trim()?tidy(previous.clinicalContext).slice(0,CONTEXT_LIMIT):null};
