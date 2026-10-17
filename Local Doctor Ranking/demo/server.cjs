@@ -22,11 +22,17 @@ function createApp(engine,{explainMatch=createMatchExplainer(),explainComparison
   const app=express(); const sessions=new Map(); const requests=new Map();
   const budget={concurrent:2,concurrentSearches:2,sessionGenerations:24,ipGenerationsPerHour:60,globalGenerationsPerHour:200,cardAttempts:3,sessionInterpretations:40,ipInterpretationsPerHour:120,globalInterpretationsPerHour:400,...limits};
   let activeGenerations=0; let activeSearches=0; let globalWindow={start:clock(),count:0,interpretations:0};
-  const configuredOrigins=new Set([publicOrigin,...String(publicOrigins || '').split(',')].filter(value=>value?.trim()).map(value=>{
-    const url=new URL(value.trim());
-    if(!['http:','https:'].includes(url.protocol)) throw new Error('Public origins must use HTTP or HTTPS.');
-    return url.origin;
-  }));
+  const configuredOrigins=new Set(['https://search.docmap.co.uk','https://demo.docmap.co.uk',
+    'https://docmap-search-production.up.railway.app',
+    'https://docmap-london-clinic-production.up.railway.app',
+    'https://id-preview--cb29d28c-6b46-4988-a3fa-7346e074fb97.lovable.app',
+    publicOrigin,...String(publicOrigins || '').split(',')]
+    .filter(value=>value?.trim()).map(value=>{
+      const origin=value.trim(),url=new URL(origin);
+      if(!['http:','https:'].includes(url.protocol) || url.origin!==origin || url.username || url.password)
+        throw new Error('Public origins must be exact HTTP or HTTPS origins without paths, credentials or wildcards.');
+      return origin;
+    }));
   if(trustProxy) app.set('trust proxy',1);
   app.disable('x-powered-by');
   app.use((req,res,next)=>{
@@ -34,8 +40,24 @@ function createApp(engine,{explainMatch=createMatchExplainer(),explainComparison
       'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"});
     next();
   });
+  const allowedOrigin=req=>{
+    const origin=req.get('origin');
+    return !origin || configuredOrigins.has(origin) || origin===`${req.protocol}://${req.get('host')}`;
+  };
+  app.use('/api',(req,res,next)=>{
+    const origin=req.get('origin');
+    res.vary('Origin');
+    if(!allowedOrigin(req)) return res.status(403).json({error:'This request must be sent from the demo page.'});
+    if(origin) {
+      res.set('Access-Control-Allow-Origin',origin);
+      res.set('Access-Control-Allow-Methods','GET, POST, OPTIONS');
+      res.set('Access-Control-Allow-Headers','Content-Type');
+    }
+    if(req.method==='OPTIONS') return res.status(204).end();
+    next();
+  });
   app.use(express.json({limit:'8kb'}));
-  app.get('/api/health',(req,res)=>res.status(engine.ready?200:503).json({...engine.health(),explanationProvider:explainMatch.provider || (explainMatch.configured?'openai':'evidence'),explanationModel:explainMatch.model || null,queryInterpreterProvider:interpretQuery.provider || (interpretQuery.configured?'openrouter':'deterministic'),queryInterpreterModel:interpretQuery.model || null}));
+  app.get('/api/health',(req,res)=>res.status(engine.ready?200:503).json({...engine.health(),explanationProvider:explainMatch.provider || (explainMatch.configured?'openrouter':'evidence'),explanationModel:explainMatch.model || null,queryInterpreterProvider:interpretQuery.provider || (interpretQuery.configured?'openrouter':'deterministic'),queryInterpreterModel:interpretQuery.model || null}));
   app.get('/sources/:id',(req,res)=>{
     const record=engine.records?.find(r=>r.id===req.params.id);
     if(!record) return res.status(404).type('text').send('Profile source not found.');
@@ -43,7 +65,7 @@ function createApp(engine,{explainMatch=createMatchExplainer(),explainComparison
   });
   const prepare=(req,res,kind)=>{
     const origin=req.get('origin');
-    if(origin && !(configuredOrigins.size ? configuredOrigins.has(origin) : origin===`${req.protocol}://${req.get('host')}`)) {res.status(403).json({error:'This request must be sent from the demo page.'});return null;}
+    if(origin && !allowedOrigin(req)) {res.status(403).json({error:'This request must be sent from the demo page.'});return null;}
     const now=clock();
     for(const [k,v] of sessions) if(now-v.updated>7200000) sessions.delete(k);
     for(const [k,v] of requests) if(now-v.hourStart>3600000) requests.delete(k);
@@ -86,8 +108,12 @@ function createApp(engine,{explainMatch=createMatchExplainer(),explainComparison
       const response=await timed(res,'search',()=>engine.search(parsed.criteria));
       session.criteria=parsed.criteria; session.updated=now;
       const searchId=randomUUID();
-      const snapshot={searchSnapshot:response.searchSnapshot,criteria:structuredClone(parsed.criteria),total:response.total,cursors:new Map(),pages:new Map(),pagePending:new Map(),results:new Map(response.results.slice(0,6).map(result=>[result.id,explanationSnapshot(parsed.criteria,result)])),cache:new Map(),pending:new Map(),attempts:new Map()};
+      const firstSearch=!session.initialSearchId;
+      const snapshot={searchSnapshot:response.searchSnapshot,criteria:structuredClone(parsed.criteria),total:response.total,
+        initialQuery:firstSearch?message.trim():null,baseline:null,baselinePending:null,
+        cursors:new Map(),pages:new Map(),pagePending:new Map(),results:new Map(response.results.slice(0,6).map(result=>[result.id,explanationSnapshot(parsed.criteria,result)])),cache:new Map(),pending:new Map(),attempts:new Map()};
       session.snapshots.set(searchId,snapshot);
+      if(firstSearch) session.initialSearchId=searchId;
       while(session.snapshots.size>10) session.snapshots.delete(session.snapshots.keys().next().value);
       let nextCursor=null;
       if(response.searchSnapshot && response.total>6) {nextCursor=randomUUID();snapshot.cursors.set(nextCursor,6);}
@@ -98,6 +124,28 @@ function createApp(engine,{explainMatch=createMatchExplainer(),explainComparison
         clarifications:parsed.notices,notices:[...parsed.notices,...response.notices],sourceLabel:engine.sourceLabel});
     } catch(e) { console.error('[DocMap] Search failed:',e.name); res.status(500).json({error:'Search couldn’t complete. Please try again; your previous criteria are preserved.'}); }
     finally {session.busy=false;activeSearches--;}
+  });
+  app.post('/api/keyword-baseline',async(req,res)=>{
+    const state=prepare(req,res,'chat'); if(!state) return;
+    const body=req.body;
+    if(!body || typeof body!=='object' || Array.isArray(body) || Object.keys(body).sort().join(',')!=='searchId,sessionId'
+      || Object.values(body).some(value=>typeof value!=='string' || !value || value.length>200))
+      return res.status(400).json({error:'Provide identifiers from the initial search.'});
+    const session=sessions.get(body.sessionId),snapshot=session?.snapshots.get(body.searchId);
+    if(!snapshot || session.initialSearchId!==body.searchId || !snapshot.initialQuery
+      || snapshot.searchSnapshot?.records!==engine.records)
+      return res.status(410).json({error:'The initial comparison has expired. Start a new search.'});
+    session.updated=state.now;
+    if(snapshot.baseline) return res.json(snapshot.baseline);
+    if(!snapshot.baselinePending) {
+      if(activeSearches>=budget.concurrentSearches) return res.set('Retry-After','5').status(429).json({error:'Other searches are running. Please retry in a few seconds.'});
+      activeSearches++;
+      snapshot.baselinePending=Promise.resolve().then(()=>engine.keywordBaseline(snapshot.searchSnapshot,snapshot.initialQuery))
+        .then(result=>{snapshot.baseline={...result,sourceLabel:engine.sourceLabel};return snapshot.baseline;})
+        .finally(()=>{snapshot.baselinePending=null;activeSearches--;});
+    }
+    try {res.json(await timed(res,'keyword',()=>snapshot.baselinePending));}
+    catch {res.status(503).json({error:'The keyword comparison could not be prepared. Please retry.'});}
   });
   app.post('/api/search-results',async(req,res)=>{
     const state=prepare(req,res,'chat'); if(!state) return;

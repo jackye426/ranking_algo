@@ -127,7 +127,7 @@ test('patient narrative becomes explicit endometriosis/excision criteria with st
   const result=await interpreter({message:request});
   assert.equal(result.mode,'openrouter');assert.equal(result.criteria.topic,'endometriosis');assert.equal(result.criteria.specialty,null);assert.deepEqual(result.criteria.procedures,['Endometriosis excision']);assert.equal(result.criteria.clinicalContext,'Stage 3 endometriosis');
   assert.ok(result.notices.some(notice=>/patient context.*not a verified filter/.test(notice)));
-  assert.equal(calls.length,1);const body=calls[0].body;assert.equal(body.response_format.json_schema.strict,true);assert.deepEqual(body.reasoning,{enabled:false});assert.deepEqual(body.provider,{require_parameters:true,data_collection:'deny',sort:'throughput',preferred_max_latency:3,max_price:{prompt:0.6,completion:1.7}});assert.ok(calls[0].options.signal);
+  assert.equal(calls.length,1);const body=calls[0].body;assert.equal(body.response_format.json_schema.strict,true);assert.deepEqual(body.reasoning,{enabled:false});assert.deepEqual(body.provider,{require_parameters:true,data_collection:'deny',zdr:true,sort:'throughput',preferred_max_latency:3,max_price:{prompt:0.6,completion:1.7}});assert.ok(calls[0].options.signal);
   assert.ok(body.response_format.json_schema.schema.properties.procedures.properties.values.items.enum.includes('Endometriosis excision'));
 });
 
