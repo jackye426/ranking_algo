@@ -32,6 +32,15 @@ test('only official Spire consultant affiliation is accepted, never lookalike do
   assert.equal(normalizeRecord({...row,affiliationEvidence:{sourceUrl:'https://spirehealthcare.com.attacker.test/consultants/x'},profileUrl:null}),null);
   assert.equal(normalizeRecord({...row,blacklisted:true}),null);
 });
+test('unambiguous allied-only roles are not presented as consultant doctors',()=>{
+  const doctor={...rows[0],gmc:null,specialty:'Consultant Orthopaedic Surgeon'};
+  assert.ok(normalizeRecord(doctor),'a consultant doctor with a missing GMC field is retained');
+  for(const specialty of ['Physiotherapy Manager','Senior Physiotherapist','Bariatric nurse','Specialist Bariatric Dietitian','Clinical scientist (audiology)','Hand Therapist']) {
+    assert.equal(normalizeRecord({...doctor,specialty}),null,specialty);
+  }
+  assert.ok(normalizeRecord({...doctor,gmc:'7043233',specialty:'Physiotherapist'}),'medical registration evidence outranks a noisy specialty string');
+  assert.ok(normalizeRecord({...doctor,specialty:'Consultant Neurophysiologist'}),'the allied-role check must not match neurophysiology');
+});
 test('insurance filtering requires consultant-specific source evidence',()=>{
   const row=normalizeRecord({...rows[0],insuranceEvidence:[]});
   assert.deepEqual(row.insurers,[]); assert.equal(matchesFilters(row,{insurance:'Bupa'}),false);
@@ -153,6 +162,16 @@ test('clinical retrieval preserves explicit anchors before bounded patient conte
   assert.equal(long.clinicalContext,'instability '.repeat(100)+'LATE_CONTEXT_MARKER','the original context is retained for explanations');
   assert.equal(clinicalRetrievalQuery({...criteria,clinicalContext:' \n '}),'knee pain. Orthopaedics. Knee arthroscopy');
   assert.equal(clinicalRetrievalQuery({}),'consultant specialist');
+});
+
+test('failed treatment remains patient context but cannot boost that treatment in retrieval',()=>{
+  const clinicalContext='I want to get back to running, but physiotherapy has not helped my knee.';
+  const query=clinicalRetrievalQuery({topic:'knee',clinicalContext});
+  assert.match(query,/^knee\. /);
+  assert.match(query,/running/);
+  assert.doesNotMatch(query,/physiotherap|helped/i);
+  assert.equal(clinicalContext,'I want to get back to running, but physiotherapy has not helped my knee.');
+  assert.match(clinicalRetrievalQuery({topic:'knee',clinicalContext:'I am looking for physiotherapy for my knee'}),/physiotherapy/,'a positive request is still searchable');
 });
 
 test('unconfirmed diagnosis context cannot add positive retrieval terms while explicit anchors remain intact',()=>{

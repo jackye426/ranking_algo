@@ -2,7 +2,7 @@ const { rankPractitionersBM25 } = require('../bm25Service.cjs');
 const { embed, cosine, getGenerator, EMBEDDING_MODEL, GENERATION_MODEL } = require('./models.cjs');
 const { initGeo, enrichLocations, resolveLocation, distanceTo } = require('./geo.cjs');
 const { loadRecords } = require('./data-source.cjs');
-const {matchesClinicalCriteria,matchClinicalCriteria,positiveClinicalText,PROCEDURES,findProcedureEvidence} = require('./clinical-filters.cjs');
+const {matchesClinicalCriteria,matchClinicalCriteria,positiveRelevanceText,PROCEDURES,findProcedureEvidence} = require('./clinical-filters.cjs');
 const {createPersonalizedMatch} = require('./personalized-match.cjs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -38,7 +38,7 @@ function clinicalRetrievalQuery(criteria,{forEvidence=false}={}) {
   const anchors=forEvidence && clinical.length?clinical:[topic,specialty,...procedures].filter(Boolean);
   // Patient context is a bounded relevance signal, not consultant evidence or a
   // new hard criterion. Keep explicit anchors first even for a long narrative.
-  let context=text(positiveClinicalText(criteria.clinicalContext));
+  let context=text(positiveRelevanceText(criteria.clinicalContext));
   if(context.length>320) context=context.slice(0,320).replace(/\s+\S*$/,'').trim();
   return [...anchors,context].filter(Boolean).join('. ') || 'consultant specialist';
 }

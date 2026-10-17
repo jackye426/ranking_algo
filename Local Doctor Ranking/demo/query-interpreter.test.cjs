@@ -68,6 +68,32 @@ test('common failed-care wording accumulates original history without becoming e
   assert.equal(negativeFilter.mode,'clarification');assert.deepEqual(negativeFilter.criteria,p,'a real unsupported exclusion is still rejected');
 });
 
+test('failed physiotherapy for a named body area does not turn prior care into the search topic',async()=>{
+  const message='I want to get back to running, but physiotherapy has not helped my knee.';
+  const inventedPain=patch({topic:{operation:'set',value:'knee pain',evidence:'my knee'},
+    clinicalContext:{operation:'set',value:message,evidence:message}});
+  for(const client of [null,fakeClient([new Error('ProviderUnavailable')]),fakeClient([inventedPain])]) {
+    const result=await createQueryInterpreter({client})({message});
+    assert.equal(result.criteria.topic,'knee');
+    assert.equal(result.criteria.specialty,null);
+    assert.deepEqual(result.criteria.procedures,[]);
+    assert.equal(result.criteria.clinicalContext,message);
+    assert.equal(result.mode,'deterministic','an inferred symptom cannot be accepted merely because the body area was named');
+  }
+  const grounded=patch({topic:{operation:'set',value:'knee',evidence:'my knee'},
+    clinicalContext:{operation:'set',value:message,evidence:message}});
+  const verified=await createQueryInterpreter({client:fakeClient([grounded])})({message});
+  assert.equal(verified.mode,'openrouter');assert.equal(verified.criteria.topic,'knee');
+  const labelled=patch({topic:{operation:'set',value:'knee',evidence:'my knee'},
+    clinicalContext:{operation:'set',value:'Goal: get back to running. History: physiotherapy has not helped.',evidence:message}});
+  const labelledResult=await createQueryInterpreter({client:fakeClient([labelled])})({message});
+  assert.equal(labelledResult.mode,'openrouter');assert.equal(labelledResult.criteria.clinicalContext,message,'model-added section labels are discarded');
+  const inventedContext=patch({topic:{operation:'set',value:'knee',evidence:'my knee'},
+    clinicalContext:{operation:'set',value:'Goal: get back to running. History: endometriosis.',evidence:message}});
+  const rejected=await createQueryInterpreter({client:fakeClient([inventedContext])})({message});
+  assert.equal(rejected.mode,'deterministic');assert.equal(rejected.criteria.clinicalContext,message,'unquoted clinical terms remain rejected');
+});
+
 test('explicit new clinical focus clears old context and oversized narrative asks instead of dropping meaning',async()=>{
   const interpret=createQueryInterpreter({client:null});
   const p={...updateCriteria({},'Knee pain in London accepting Bupa').criteria,clinicalContext:'I want to return to running'};

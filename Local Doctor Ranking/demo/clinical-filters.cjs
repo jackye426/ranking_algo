@@ -7,6 +7,14 @@ function positiveClinicalText(raw) {
   return String(raw || '').replace(/[’‘]/g,"'").replace(/\b(?:i\s+)?(?:have\s+not|haven't|have\s+never|am\s+not|was\s+not|wasn't|not|never)\s+(?:been\s+)?diagnosed\b(?:\s+with\s+[^.!?;,]+?(?=\s+(?:and\s+(?:i|my|the)\b|but\b|although\b|however\b|while\b)|[.!?;,]|$))?/gi,' ');
 }
 
+// Failed prior care remains in the person's saved context for explanation, but
+// the treatment name is not a positive request for another practitioner of
+// that treatment. Strip only an explicit failure clause from retrieval input.
+const failedCarePattern=/\b(?:physio(?:therapy)?|treatment)\b[^.!?;]{0,60}?\b(?:not|never|hasn't|haven't|hadn't|didn't|doesn't|isn't|wasn't)\s+(?:help(?:ed)?|work(?:ed)?)\b/i;
+function positiveRelevanceText(raw) {
+  return positiveClinicalText(raw).replace(new RegExp(failedCarePattern.source,'gi'),' ').replace(/\s+/g,' ').trim();
+}
+
 // Shared parser/filter vocabulary. These are search labels, not diagnoses.
 const SPECIALTIES = [
   {label:'Orthopaedics',aliases:/\b(?:orthop(?:a)?edic(?:s|\s+surgeons?|\s+surgery)?|trauma\s*(?:and|&)\s*orthop(?:a)?edic\s+surgery|(?:hip|knee)(?:\s*(?:and|&)\s*(?:hip|knee))?\s+surgeons?)\b/gi},
@@ -165,4 +173,4 @@ const matchesClinicalCriteria=(record,criteria)=>matchClinicalCriteria(record,cr
 const specialtyMatches=(record,specialty)=>detectSpecialties(record.specialty||'').some(m=>m.label===specialty);
 const matchesClinicalFilters=matchesClinicalCriteria;
 const procedureEvidenceFor=findProcedureEvidence;
-module.exports={SPECIALTIES,PROCEDURES,detectSpecialties,detectProcedures,inferTopicSpecialties,matchClinicalCriteria,matchesClinicalCriteria,matchesClinicalFilters,findProcedureEvidence,procedureEvidenceFor,specialtyMatches,positiveProcedureMention,positiveClinicalText};
+module.exports={SPECIALTIES,PROCEDURES,detectSpecialties,detectProcedures,inferTopicSpecialties,matchClinicalCriteria,matchesClinicalCriteria,matchesClinicalFilters,findProcedureEvidence,procedureEvidenceFor,specialtyMatches,positiveProcedureMention,positiveClinicalText,positiveRelevanceText,failedCarePattern};

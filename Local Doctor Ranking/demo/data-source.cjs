@@ -7,9 +7,16 @@ function spireProfile(value) {
   try { const u = new URL(value); return u.protocol === 'https:' && /(^|\.)spirehealthcare\.com$/.test(u.hostname) && /\/(consultants|consultant-profiles)\//.test(u.pathname); } catch { return false; }
 }
 const strings = v => Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()) : [];
+function alliedOnlyRole(row) {
+  // A missing GMC field is common on otherwise valid consultant profiles, so
+  // exclude only an explicitly named allied role without medical registration.
+  // This check does not use the Spire URL suffix as a profession label.
+  if (row?.gmc) return false;
+  return /\b(?:physiotherap(?:y|ists?)|nurs(?:e|es|ing)|dietiti(?:ans?|cs)|dietetics|audiolog(?:y|ists?)|podiatr(?:y|ists?|ic)|chiropod(?:y|ists?)|prosthetists?|orthotists?|hand therapist|clinical psychologist|consultant psychologist)\b/i.test(String(row?.specialty || ''));
+}
 function normalizeRecord(row) {
   // Fail closed: affiliation must be evidenced by an official consultant profile.
-  if (!row || row.blacklisted === true || !row.id || !row.name || !spireProfile(row.affiliationEvidence?.sourceUrl || row.profileUrl)) return null;
+  if (!row || row.blacklisted === true || !row.id || !row.name || !spireProfile(row.affiliationEvidence?.sourceUrl || row.profileUrl) || alliedOnlyRole(row)) return null;
   const evidence = (Array.isArray(row.insuranceEvidence) ? row.insuranceEvidence : []).filter(e => e && typeof e.insurer === 'string' && safeUrl(e.sourceUrl) && typeof e.text === 'string' && e.text);
   const insurers = strings(row.insurers).filter(i => evidence.some(e => e.insurer.toLowerCase() === i.toLowerCase()));
   const locations = (Array.isArray(row.locations) ? row.locations : []).filter(l => l && typeof l.name === 'string' && /\bspire\b/i.test(l.name)).map(l => ({
@@ -40,12 +47,13 @@ async function loadRecords() {
   } else if (source === 'public-profile-snapshot') {
     rows = require('./data/public-spire-records.cjs');
   } else { throw new Error('Unknown DEMO_DATA_SOURCE.'); }
+  const excludedAlliedOnlyRecords=rows.filter(alliedOnlyRole).length;
   const normalized = rows.map(normalizeRecord).filter(Boolean);
   const records = [...new Map(normalized.map(r => [r.gmc || r.id, r])).values()];
   if (!records.length) throw new Error('No records have verifiable Spire affiliation and a Spire practice location.');
   return { records, source, fetchedAt, sourceLabel: source === 'supabase' ? 'DocMap consultant records · connected to Supabase' : 'Verified public Spire profiles · demo collection',
-    quality: { input: rows.length, accepted: records.length, excluded: rows.length - records.length, ...audit,
+    quality: { ...audit, input: audit.input ?? rows.length, accepted: records.length, excluded: (audit.input ?? rows.length) - records.length, excludedAlliedOnlyRecords,
       withInsuranceEvidence: records.filter(r => r.insurers.length).length, withGmc: records.filter(r => r.gmc).length,
       withPostcodes: records.filter(r => r.locations.some(l => l.postcode)).length } };
 }
-module.exports = { normalizeRecord, loadRecords, safeUrl, spireProfile };
+module.exports = { normalizeRecord, loadRecords, safeUrl, spireProfile, alliedOnlyRole };
