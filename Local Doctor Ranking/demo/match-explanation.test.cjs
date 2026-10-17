@@ -153,12 +153,51 @@ test('failed physiotherapy and a request for sports-knee expertise keep unreques
   const fallback=evidenceFallback(saved,'Test fallback');
   assert.doesNotMatch(fallback.summary,/surgery|arthroscop|reconstruction|procedure/i);
   assert.ok(fallback.reasons.every(reason=>!/(?:surgery|arthroscop|reconstruction|procedure)/i.test(reason.title+' '+reason.text)));
+  const projectedFallback=await createMatchExplainer({client:null})(saved);
+  assert.match(projectedFallback.summary,/sports knee injuries/);
+  assert.match(projectedFallback.reasons[0].text,/sports knee injuries/);
+  assert.equal(projectedFallback.citations[0].text,saved.citations[0].text);
   const calls=[];const answer=await createMatchExplainer({client:clientFor([observed,repaired,{unsupportedClaims:[]}],calls),provider:'openai'})(saved);
   assert.equal(answer.summary,repaired.summary);assert.equal(calls.length,3);
+  const initialInput=JSON.parse(calls[0].body.input);
+  const repairInput=JSON.parse(calls[1].body.input);
+  const checkInput=JSON.parse(calls[2].body.input);
+  for(const input of [initialInput,repairInput,checkInput]) {
+    assert.equal(input.evidence[0].id,saved.citations[0].id);
+    assert.equal(Object.hasOwn(input.evidence[0],'sourceUrl'),false,'source URLs stay in the returned citations');
+    assert.equal(input.evidence[0].text,'sports knee injuries');
+    assert.ok(saved.citations[0].text.includes(input.evidence[0].text),'excerpt is verbatim source text');
+    assert.doesNotMatch(JSON.stringify(input.evidence),/arthroscop|reconstruction|surgery/i);
+  }
+  assert.doesNotMatch(initialInput.groundedStartingPoint,/arthroscop|reconstruction|surgery/i);
+  assert.equal(Object.hasOwn(repairInput.repair,'previousDraft'),false,'rejected procedure wording does not re-enter the repair prompt');
+  assert.equal(answer.citations[0].text,saved.citations[0].text,'full source text remains available after AI success');
+  assert.equal(answer.citations[0].sourceUrl,'/sources/rajput');
   assert.match(calls[0].body.instructions,/do not mention any listed operation, procedure, surgical technique/i);
-  assert.match(JSON.parse(calls[1].body.input).repair.feedback[0],/unrequested procedure details from the summary and reasons/);
+  assert.match(repairInput.repair.feedback[0],/unrequested procedure details from the summary and reasons/);
   assert.match(calls[2].body.instructions,/reject any mention of listed operations, procedures, surgical techniques/i);
   assert.equal(validateDraft({...draft,reasons:[{...draft.reasons[0],text:'The listed knee replacement is a treatment you could discuss with the consultant.'}]},explanationSnapshot(criteria,result)),true,'an explicitly requested procedure remains discussable');
+});
+
+test('ambiguous or procedure-only profile lists use a sourced fallback without a model call',async()=>{
+  const patientCriteria={topic:'knee',procedures:[],clinicalContext:'I prefer a consultant with a focus on sports knee injuries.'};
+  for(const text of [
+    'Knee arthroscopy, ACL reconstruction',
+    'My expertise includes sports knee injuries with arthroscopic knee surgery.',
+    'not sports knee injuries, arthroscopic knee surgery',
+    "doesn't treat sports knee injuries, arthroscopic knee surgery",
+    'sports knee injuries?, arthroscopic knee surgery',
+    'sports knee injuries, but I no longer treat them, knee arthroscopy',
+  ]) {
+    const result={name:'Mr Example',specialty:'Consultant Orthopaedic Surgeon',evidenceUrl:'/sources/example',personalizedMatch:{citations:[{text,sourceUrl:'/sources/example',criterion:'Knee'}]}};
+    const saved=explanationSnapshot(patientCriteria,result);const calls=[];
+    const answer=await createMatchExplainer({client:clientFor([],calls),provider:'openai'})(saved);
+    assert.equal(calls.length,0,text);assert.equal(answer.provider,'evidence',text);
+    assert.match(answer.notice,/does not provide a clear clinical interest/,text);
+    assert.doesNotMatch(answer.summary+' '+answer.reasons.map(r=>r.text).join(' '),/arthroscop|reconstruction|surgery|sports knee injuries/i,text);
+    assert.equal(answer.citations[0].text,saved.citations[0].text,text);
+    assert.equal(answer.citations[0].sourceUrl,'/sources/example',text);
+  }
 });
 
 test('provider timeout or failure returns retryable evidence and never exposes errors or credentials',async()=>{

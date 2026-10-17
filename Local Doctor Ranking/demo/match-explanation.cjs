@@ -62,6 +62,58 @@ function evidenceFallback(snapshot,notice,retryable=false) {
   if(!reasons.length && profile[0]) reasons.push({title:'Available profile information',text:'The linked profile provides the available information about this consultant.',evidenceIds:[profile[0].id]});
   return {summary:snapshot.summary,reasons,citations:snapshot.citations.map(({id,text,sourceUrl})=>({id,text,sourceUrl})),caveats:[...snapshot.caveats],provider:'evidence',notice,retryable};
 }
+const nonClinicalCriteria=new Set(['Location','Consultant identity','Specialty','Gender','Language']);
+const uncertainExcerpt=/\b(?:no|not|never|without|except|exclude[ds]?|doesn['’]?t|can't|cannot|won't|unlikely|possible|possibly|suspected|uncertain|unclear|developing|training|research(?:ing)?|previously|former|historical)\b|[?]/i;
+function clinicalCitation(c,criteria) {
+  return c.kind!=='terminology' && !nonClinicalCriteria.has(c.criterion) && c.criterion!==criteria.insurance;
+}
+function safeClinicalExcerpt(c,criteria) {
+  // Only list delimiters produce an excerpt. Never join fragments or cut a
+  // procedure out of continuous prose: that could change the source's claim.
+  const topicWords=(clean(criteria.topic).toLowerCase().match(/[\p{L}\p{N}]+/gu)||[])
+    .filter(word=>!['pain','injury','injuries','condition','conditions','issue','issues','problem','problems','symptom','symptoms'].includes(word));
+  if(!topicWords.length) return null;
+  const contextWords=new Set((clean(criteria.clinicalContext).toLowerCase().match(/[\p{L}\p{N}]+/gu)||[])
+    .filter(word=>word.length>=4 && !['with','have','want','back','from','that','this','prefer','focus','consultant','helped'].includes(word)));
+  const source=clean(c.text).replace(/^(?:Profile lists|Record lists):\s*/i,'');
+  // A later contrast can withdraw an earlier item. Do not quote only the
+  // positive side of that statement.
+  if(/(?:^|[,;•])\s*(?:but|however|although|except|unless|no longer|not currently)\b/i.test(source)) return null;
+  const segments=source.split(/\s*[,;•]\s*/).map(clean).filter(Boolean);
+  const candidates=segments.map(part=>{
+    if(hasProcedureWording(part) || uncertainExcerpt.test(part) || /\b(?:and|or|but|with|for|of|including)\s*$/i.test(part)) return false;
+    return part.replace(/^(?:(?:my|the)\s+)?(?:expertise|clinical interests?|special interests?|practice)\s+includes?\s+|^i\s+(?:speciali[sz]e\s+in|treat|manage|focus\s+on|have\s+a\s+special\s+interest\s+in)\s+/i,'').trim();
+  }).filter(part=>{
+    if(!part || hasProcedureWording(part) || uncertainExcerpt.test(part)) return false;
+    const words=new Set((part.toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]));
+    return topicWords.every(word=>words.has(word));
+  });
+  candidates.sort((a,b)=>{
+    const score=part=>[...new Set((part.toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]))].filter(word=>contextWords.has(word)).length;
+    return score(b)-score(a) || a.length-b.length;
+  });
+  const excerpt=candidates[0];
+  return excerpt && c.text.includes(excerpt) ? excerpt : null;
+}
+function explanationEvidence(snapshot) {
+  const requestedProcedure=!!snapshot.criteria.procedures?.length;
+  return snapshot.citations.flatMap(c=>{
+    const {id,text,criterion,kind,appliesTo,sourceUrl}=c;
+    const fact={id,text,criterion,kind,appliesTo,sourceUrl};
+    if(requestedProcedure || (!hasProcedureWording(c.text) && !hasProcedureWording(c.criterion))) return [fact];
+    if(!clinicalCitation(c,snapshot.criteria)) return [];
+    const excerpt=safeClinicalExcerpt(c,snapshot.criteria);
+    return excerpt ? [{...fact,text:excerpt,criterion:'Clinical profile excerpt'}] : [];
+  });
+}
+function explanationFallback(snapshot,evidence,notice,retryable=false) {
+  if(snapshot.criteria.procedures?.length) return evidenceFallback(snapshot,notice,retryable);
+  const criteria={...snapshot.criteria,preferDocumentedInterest:evidence.some(c=>c.criterion==='Clinical profile excerpt')};
+  const restricted={...snapshot,criteria,citations:evidence,summary:patientSummary({consultant:snapshot.consultant,
+    criteria,citations:evidence,caveats:snapshot.caveats})};
+  const answer=evidenceFallback(restricted,notice,retryable);
+  return {...answer,citations:snapshot.citations.map(({id,text,sourceUrl})=>({id,text,sourceUrl}))};
+}
 function outputSchema(ids) {
   return {type:'object',additionalProperties:false,required:['summary','reasons'],properties:{
     summary:{type:'string'},reasons:{type:'array',items:{type:'object',additionalProperties:false,required:['title','text','evidenceIds'],
@@ -133,11 +185,16 @@ const UNREQUESTED_TREATMENT_CHECK='When searchPreferences.procedures is empty, r
 function createMatchExplainer({client=explanationClient(),provider='openrouter',model}={}) {
   model=model || (provider==='openrouter' ? process.env.OPENROUTER_EXPLANATION_MODEL || 'deepseek/deepseek-v3.2' : process.env.OPENAI_EXPLANATION_MODEL || 'gpt-4.1-mini');
   const explain=async (snapshot,{onTiming}={})=>{
-    if(!client) return evidenceFallback(snapshot,'AI explanations are not configured. This paragraph uses the linked profile evidence.',false);
-    if(!snapshot.citations.some(c=>c.kind!=='terminology')) return evidenceFallback(snapshot,'There is not enough linked profile evidence to generate an AI explanation.',false);
-    const evidence=snapshot.citations.map(({id,text,criterion,kind,appliesTo})=>({id,text,criterion,kind,appliesTo}));
+    const evidence=explanationEvidence(snapshot);
+    const fallback=(notice,retryable=false)=>explanationFallback(snapshot,evidence,notice,retryable);
+    if(!client) return fallback('AI explanations are not configured. This paragraph uses the linked profile evidence.',false);
+    if(!snapshot.citations.some(c=>c.kind!=='terminology')) return fallback('There is not enough linked profile evidence to generate an AI explanation.',false);
+    if(!snapshot.criteria.procedures?.length && snapshot.citations.some(c=>clinicalCitation(c,snapshot.criteria)) && !evidence.some(c=>clinicalCitation(c,snapshot.criteria))) {
+      return fallback('The linked profile does not provide a clear clinical interest to explain this request. This paragraph uses the linked profile evidence instead.',false);
+    }
+    const modelEvidence=evidence.map(({sourceUrl,...fact})=>fact);
     const context={consultant:snapshot.consultant,searchPreferences:snapshot.criteria,clinicalContextIsUserProvided:true,
-      contextCaveat:snapshot.contextCaveat,evidence,caveats:snapshot.caveats};
+      contextCaveat:snapshot.contextCaveat,evidence:modelEvidence,caveats:snapshot.caveats};
     // One initial draft/check and one repair draft/check share a single deadline.
     // A repaired draft receives exactly the same validation as the original.
     const signal=AbortSignal.timeout(40000);
@@ -149,8 +206,9 @@ function createMatchExplainer({client=explanationClient(),provider='openrouter',
         try {onTiming?.({phase,attempt:attempt+1,durationMs:Math.max(0,performance.now()-start),outcome});} catch {}
       }
     };
-    const groundedStartingPoint=patientSummary({consultant:snapshot.consultant,criteria:snapshot.criteria,
-      citations:snapshot.citations.filter(c=>c.criterion!=='Location')});
+    const groundedStartingPoint=patientSummary({consultant:snapshot.consultant,criteria:{...snapshot.criteria,
+      preferDocumentedInterest:evidence.some(c=>c.criterion==='Clinical profile excerpt')},
+      citations:evidence.filter(c=>c.criterion!=='Location')});
     let repair=null;
     for(let attempt=0;attempt<2;attempt++) {
       let draft;let feedback=[];
@@ -176,10 +234,11 @@ function createMatchExplainer({client=explanationClient(),provider='openrouter',
       } catch(error) {
         const invalid=['UnsupportedExplanation','ModelRefusal','IncompleteResponse'].includes(error.message) || error instanceof SyntaxError;
         if(attempt===0 && invalid && error.message!=='ModelRefusal' && !signal.aborted) {
-          repair={previousDraft:draft || null,feedback:feedback.length?feedback:['Return complete JSON matching the requested schema. Use only supported facts and omit any uncertain claim.']};
+          repair={...(snapshot.criteria.procedures?.length?{previousDraft:draft || null}:{}),
+            feedback:feedback.length?feedback:['Return complete JSON matching the requested schema. Use only supported facts and omit any uncertain claim.']};
           continue;
         }
-        return evidenceFallback(snapshot,invalid?'The AI wording could not be fully checked. This paragraph uses the linked profile evidence instead.':'The AI explanation service is temporarily unavailable. This paragraph uses linked profile evidence; you can retry.',true);
+        return fallback(invalid?'The AI wording could not be fully checked. This paragraph uses the linked profile evidence instead.':'The AI explanation service is temporarily unavailable. This paragraph uses linked profile evidence; you can retry.',true);
       }
     }
   };
