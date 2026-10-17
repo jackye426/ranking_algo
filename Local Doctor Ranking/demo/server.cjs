@@ -23,6 +23,7 @@ function createApp(engine,{explainMatch=createMatchExplainer(),explainComparison
   const budget={concurrent:2,concurrentSearches:2,sessionGenerations:24,ipGenerationsPerHour:60,globalGenerationsPerHour:200,cardAttempts:3,sessionInterpretations:40,ipInterpretationsPerHour:120,globalInterpretationsPerHour:400,...limits};
   let activeGenerations=0; let activeSearches=0; let globalWindow={start:clock(),count:0,interpretations:0};
   const configuredOrigins=new Set(['https://search.docmap.co.uk','https://demo.docmap.co.uk',
+    'https://docmap-search-production.up.railway.app',
     'https://docmap-london-clinic-production.up.railway.app',
     'https://id-preview--cb29d28c-6b46-4988-a3fa-7346e074fb97.lovable.app',
     publicOrigin,...String(publicOrigins || '').split(',')]

@@ -58,6 +58,7 @@ test('CORS allows fixed production and configured preview origins without creden
   const {url,post}=await setup(t,{publicOrigins:'https://docmap-preview.lovable.app'});
   for(const origin of ['https://search.docmap.co.uk','https://demo.docmap.co.uk',
     'https://id-preview--cb29d28c-6b46-4988-a3fa-7346e074fb97.lovable.app',
+    'https://docmap-search-production.up.railway.app',
     'https://docmap-london-clinic-production.up.railway.app','https://docmap-preview.lovable.app']) {
     const response=await fetch(url+'/api/chat',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type'}});
     assert.equal(response.status,204,origin);

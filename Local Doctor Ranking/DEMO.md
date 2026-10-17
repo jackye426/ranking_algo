@@ -148,7 +148,7 @@ PUBLIC_ORIGIN=https://search.docmap.co.uk
 PUBLIC_ORIGINS=https://clinic-preview.up.railway.app
 ```
 
-The homepage, public concept, existing Clinic Railway host and fixed Lovable preview (`id-preview--cb29d28c-6b46-4988-a3fa-7346e074fb97.lovable.app`) are built in. Set `PUBLIC_ORIGINS` for any additional fixed Railway preview, replacing the illustrative value above. Origins must be exact HTTP(S) origins without a path or wildcard. Browser preflight and API responses return that exact allowed origin, permit `Content-Type`, and never enable credentials. Same-origin and server-to-server requests remain possible. `TRUST_PROXY=1` trusts one reverse-proxy hop for the request scheme and client IP; leave it disabled for a direct local listener. Keep one application replica for this presentation build because conversations and explanation caches are in process memory.
+The homepage, public concept, current search and Clinic Railway hosts, and fixed Lovable preview (`id-preview--cb29d28c-6b46-4988-a3fa-7346e074fb97.lovable.app`) are built in. Set `PUBLIC_ORIGINS` for any additional fixed Railway preview, replacing the illustrative value above. Origins must be exact HTTP(S) origins without a path or wildcard. Browser preflight and API responses return that exact allowed origin, permit `Content-Type`, and never enable credentials. Same-origin and server-to-server requests remain possible. `TRUST_PROXY=1` trusts one reverse-proxy hop for the request scheme and client IP; leave it disabled for a direct local listener. Keep one application replica for this presentation build because conversations and explanation caches are in process memory.
 
 ## Verification
 
