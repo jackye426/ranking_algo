@@ -12,6 +12,24 @@ const stageNotice='The stage you shared is patient context, not a verified filte
 const CONTEXT_LIMIT=360;
 const NARRATIVE_INSTRUCTIONS='Understand everyday patient language, not just directory keywords. Separate the clinical concern from the person’s own context: activities, goals, symptom duration, previous care and whether they have a diagnosis. Keep a relevant concise topic, and preserve explicit context in clinicalContext using words from a verbatim evidence quote. For example, a runner with knee pain who wants to get back to running has topic knee pain and a running goal, not a request for knee surgery. Very painful periods without a diagnosis means painful periods, never inferred endometriosis. A history of physiotherapy not helping is patient context, not an exclusion filter or proof that surgery is appropriate. Goals and history influence retrieval relevance; they are never verified consultant attributes or promised outcomes. On a goal-only follow-up, keep the previous clinical topic and procedures. Do not silently replace previous symptoms with a lifestyle word such as running. If clinicalContext is unchanged, use keep. If setting it, use at most 360 characters of directly supported context; do not repeat location or insurance. Earlier context is preserved by the server unless the clinical focus or context is explicitly changed.';
 const commonConditions='endometriosis|migraine|eczema|diabetes|asthma|epilepsy|arthritis|psoriasis|acne|menopause|adenomyosis|fibroids|colitis|crohn[’\x27]?s(?: disease)?|irritable bowel syndrome|inflammatory bowel disease|parkinson[’\x27]?s(?: disease)?|multiple sclerosis|depression|anxiety|osteoporosis';
+const exactKnownCondition=new RegExp(`^(?:${commonConditions})$`,'i');
+function isSimpleKnownClinicalQuery(raw,prior,criteria) {
+  // Only an initial clinical label, optionally followed by a known city, can
+  // skip AI interpretation. Narratives, preferences and follow-ups still use
+  // the guarded model patch.
+  if(prior.topic || prior.specialty || prior.procedures.length || prior.location || prior.insurance || prior.gender || prior.language || prior.clinicalContext || prior.radiusMiles || prior.sortByDistance) return false;
+  if(criteria.insurance || criteria.gender || criteria.language || criteria.clinicalContext || criteria.radiusMiles || criteria.sortByDistance) return false;
+  const phrase=tidy(raw);
+  const withCity=phrase.match(/^(.+?)\s+(?:in|near)\s+(.+)$/i);
+  if(withCity ? !commonPlaces.test(withCity[2]) || criteria.location?.toLowerCase()!==withCity[2].toLowerCase() : !!criteria.location) return false;
+  const label=(withCity?withCity[1]:phrase).toLowerCase();
+  const specialty=SPECIALTIES.find(item=>item.label.toLowerCase()===label);
+  if(specialty) return criteria.specialty===specialty.label && !criteria.topic && !criteria.procedures.length;
+  const procedure=PROCEDURES.find(item=>item.label.toLowerCase()===label);
+  if(procedure) return criteria.procedures.length===1 && criteria.procedures[0]===procedure.label
+    && (!!criteria.topic || procedure.label==='Endometriosis excision');
+  return exactKnownCondition.test(label) && criteria.topic?.toLowerCase()===label && !criteria.specialty && !criteria.procedures.length;
+}
 const commonPlaces=/^(?:london|manchester|birmingham|leeds|bristol|liverpool|sheffield|nottingham|leicester|oxford|cambridge|reading|southampton|brighton|edinburgh|glasgow|cardiff|belfast|newcastle|bath|york|norwich|exeter|guildford|watford|bushey|harpenden|brentwood|harrow|windsor|chelmsford|southend|sutton|croydon|slough|woking|canterbury|st albans|milton keynes|south west london|north london|east london|west london|south london|surrey|essex|kent|hertfordshire)$/i;
 const clarification=(previous,notice)=>({criteria:previous,notices:[notice],mode:'clarification'});
 const jointPattern=/\b(?:knee|hip|shoulder|ankle|wrist|elbow)\b/gi;
@@ -155,6 +173,14 @@ function prepare({previous,message,removeCriterion}={}) {
   const ambiguousLocation=baseline.location && baseline.location!==prior.location && !commonPlaces.test(baseline.location) && !/\d/.test(baseline.location) && /\b(?:specialists?|consultants?|doctors?)\s+in\s+/i.test(text) ? baseline.location : null;
   const nonclinicalOnly=sameClinical(prior,baseline) && !stages.length;
   const removalsOnly=/\b(?:remove|clear|drop|ignore|any)\b/i.test(text) && (baseline.topic===prior.topic||!baseline.topic) && (baseline.specialty===prior.specialty||!baseline.specialty) && baseline.procedures.every(value=>prior.procedures.includes(value));
+  if(!ambiguousLocation && !notices.length && isSimpleKnownClinicalQuery(raw,prior,baseline)) {
+    // This canonical procedure names its condition verbatim. The general
+    // parser keeps the procedure but misses the explicit condition; retain
+    // both criteria as the guarded model does for this exact short request.
+    const criteria=baseline.procedures.length===1 && baseline.procedures[0]==='Endometriosis excision'
+      ? {...baseline,topic:'endometriosis'} : baseline;
+    return {prior,bypass:{criteria,notices,mode:'deterministic'}};
+  }
   if(!ambiguousLocation&&(nonclinicalOnly || removalsOnly || !text.trim())) return {prior,bypass:safeResult};
   return {prior,raw,text,topicSource,baseline,notices,stages,safeResult,endometriosis,contextCleared,ambiguousLocation,narrative};
 }

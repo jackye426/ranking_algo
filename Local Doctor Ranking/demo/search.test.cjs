@@ -2,7 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {normalizeRecord}=require('./data-source.cjs');
 const {rankPractitionersBM25}=require('../bm25Service.cjs');
-const {SearchEngine,mapToRanking,reciprocalRankFusion,matchesFilters,explicitClinicalMatch,rerankCandidates,explanationFacts,shortlistEvidence,clinicalRetrievalQuery}=require('./search.cjs');
+const {SearchEngine,RESULT_PAGE_SIZE,mapToRanking,reciprocalRankFusion,matchesFilters,explicitClinicalMatch,rerankCandidates,explanationFacts,shortlistEvidence,clinicalRetrievalQuery}=require('./search.cjs');
 const {updateCriteria}=require('./criteria.cjs');
 const rows=require('./data/public-spire-records.cjs');
 
@@ -88,6 +88,26 @@ test('reranking respects eligible IDs, relevance thresholds, and topic removal',
   const semantic=[{id:'excluded',score:1},{id:'eligible',score:0.5},{id:'low',score:0.1}];
   assert.deepEqual(rerankCandidates(records,lexical,semantic,{topic:'knee'},null).ranked.map(row=>row.record.id),['eligible']);
   assert.equal(rerankCandidates(records,lexical,semantic,{topic:''},null).ranked.length,2,'removing topic returns all consultants satisfying remaining filters');
+});
+
+test('search prepares evidence for three profiles before the response and pages through the rest without gaps',async()=>{
+  const base=normalizeRecord(rows[0]);
+  const records=Array.from({length:8},(_,index)=>({...base,id:`knee-${index}`,name:`Dr Knee ${index}`,specialty:'Orthopaedics',clinicalInterests:['Knee replacement'],procedures:[],locations:[],insurers:[],insuranceEvidence:[]}));
+  let prepared=0;
+  const engine=new SearchEngine({embedQuery:async()=>[[1,0]],personalize:async()=>{
+    prepared++;
+    return {generationMode:'extractive-fallback',selected:[],personalizedMatch:{citations:[],caveats:[]}};
+  }});
+  Object.assign(engine,{ready:true,records,documents:records.map(mapToRanking),vectors:records.map(()=>[1,0])});
+  const initial=await engine.search({topic:'knee',specialty:'Orthopaedics',procedures:[]});
+  assert.equal(RESULT_PAGE_SIZE,3);
+  assert.equal(initial.total,records.length);
+  assert.equal(initial.results.length,3);
+  assert.equal(prepared,3,'initial response does not wait for later profiles');
+  const second=await engine.resultsPage(initial.searchSnapshot,RESULT_PAGE_SIZE);
+  const last=await engine.resultsPage(initial.searchSnapshot,RESULT_PAGE_SIZE*2);
+  assert.deepEqual([...initial.results,...second.results,...last.results].map(result=>result.id),records.map(record=>record.id));
+  assert.equal(prepared,records.length);
 });
 
 test('OR semantics survive parsing into the clinical filter',()=>{

@@ -1,6 +1,35 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {createQueryInterpreter}=require('./query-interpreter.cjs');
+
+test('exact known clinical labels bypass paid interpretation, while narrative and filters do not',async()=>{
+  let calls=0;
+  const interpreter=createQueryInterpreter({client:{chat:{completions:{create:async()=>{calls++;throw new Error('Provider should not be called for an exact label');}}}}});
+  for(const [message,expected] of [
+    ['Orthopaedics',{specialty:'Orthopaedics'}],
+    ['knee replacement',{procedures:['Knee replacement']}],
+    ['endometriosis',{topic:'endometriosis'}],
+    ['Endometriosis excision near London',{topic:'endometriosis',procedures:['Endometriosis excision'],location:'London'}],
+    ['knee replacement in London',{procedures:['Knee replacement'],location:'London'}],
+  ]) {
+    assert.equal(interpreter.requiresAI({message}),false,message);
+    const result=await interpreter({message});
+    assert.equal(result.mode,'deterministic');
+    assert.deepEqual(result.notices,[]);
+    for(const [key,value] of Object.entries(expected)) assert.deepEqual(result.criteria[key],value,message);
+  }
+  assert.equal(calls,0);
+  assert.deepEqual((await interpreter({message:'endometriosis excision near London'})).criteria,{
+    topic:'endometriosis',specialty:null,procedures:['Endometriosis excision'],location:'London',
+    insurance:null,sortByDistance:false,radiusMiles:null,gender:null,language:null,clinicalContext:null,
+  });
+  for(const input of [
+    {message:'Knee replacement near SW5 accepting Bupa'},
+    {message:'endometriosis excision near London with severe pain'},
+    {message:'Find someone experienced in endometriosis excision surgery'},
+    {message:'endometriosis',previous:{topic:'knee pain'}},
+  ]) assert.equal(interpreter.requiresAI(input),true,JSON.stringify(input));
+});
 const {updateCriteria}=require('./criteria.cjs');
 const request='i have stage 3 endometriosis and i want a specialists who know how to perform excision surgery';
 const keep=()=>({operation:'keep',value:null,evidence:null});
