@@ -244,6 +244,19 @@ test('patient context changes actual BM25 relevance and reaches semantic and evi
   assert.ok(evidence.facts.every(fact=>!fact.text.includes('My knee')),'patient statements are not promoted into profile evidence');
 });
 
+test('a sports knee preference promotes documented sports knee interests over generic orthopaedics in lexical retrieval',()=>{
+  const base=normalizeRecord(rows[0]);
+  const records=[
+    {...base,id:'generic',name:'Generic Consultant',specialty:'Orthopaedics',clinicalInterests:['Knee conditions'],procedures:[]},
+    {...base,id:'sports-knee',name:'Sports Knee Consultant',specialty:'Orthopaedics',clinicalInterests:['Sports knee injuries'],procedures:[]},
+  ];
+  const criteria={topic:'knee',clinicalContext:'I want to get back to running, but physiotherapy has not helped my knee.; I prefer a consultant with a focus on sports knee injuries.'};
+  const query=clinicalRetrievalQuery(criteria),docs=records.map(mapToRanking);
+  const ranked=rankPractitionersBM25(docs,require('./search.cjs').lexicalClinicalQuery(query)).sort((a,b)=>b.bm25Score-a.bm25Score);
+  assert.equal(ranked[0].document.id,'sports-knee');
+  assert.equal(shortlistEvidence(query,explanationFacts(records[1]))[0].value,'Sports knee injuries');
+});
+
 test('patient history, negation and stage do not create or satisfy hard clinical filters',()=>{
   const kneeOnly={...normalizeRecord(rows[0]),specialty:'Orthopaedics',description:'',clinicalInterests:['Knee pain'],procedures:[]};
   const kneeReplacement={...kneeOnly,clinicalInterests:['Knee pain','Knee replacement']};
