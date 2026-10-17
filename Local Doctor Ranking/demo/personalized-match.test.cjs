@@ -26,20 +26,22 @@ test('model failure and invented facts use truthful extractive fallback without 
   }
 });
 
-test('duplicate selected and primary facts become one citation, with plain-English fallback and explicit user context',async()=>{
+test('duplicate facts stay one citation and unrequested surgery stays out of the fallback summary',async()=>{
   const evidence={text:'Profile lists: Laparoscopic excision of endometriosis +/- ureterolysis',sourceUrl:'/sources/endo'};
   let request;
   const answer=await createPersonalizedMatch({...record,name:'Dr Example',specialty:'Consultant Gynaecologist'},{topic:'endometriosis',clinicalContext:'Stage 3 endometriosis'},{facts:[evidence],selectEvidence:async(q)=>{request=JSON.parse(q);return{selected:[evidence,evidence],mode:'local-constrained-rag'}}});
   assert.equal(request.clinicalContext,'Stage 3 endometriosis');assert.equal(request.contextIsUserProvided,true);
   assert.equal(answer.personalizedMatch.citations.filter(c=>c.text===evidence.text).length,1);
-  assert.match(answer.personalizedMatch.summary,/keyhole surgery to remove endometriosis tissue/);
+  assert.match(answer.personalizedMatch.summary,/profile includes endometriosis/);
+  assert.doesNotMatch(answer.personalizedMatch.summary,/keyhole|surgery|excision/i);
   assert.doesNotMatch(answer.personalizedMatch.summary,/\+\/-|ureterolysis/);
   assert.match(answer.personalizedMatch.summary,/stage 3.*does not confirm/i);
 });
 
 test('a technique attached to a different condition does not become endometriosis expertise',()=>{
   assert.equal(plainClinicalPhrase('I specialise in laparoscopic hysterectomy, endometriosis and ovarian cysts.',{topic:'endometriosis'}),'endometriosis');
-  assert.equal(plainClinicalPhrase('Laparoscopic excision of endometriosis +/- ureterolysis',{topic:'endometriosis'}),'keyhole surgery to remove endometriosis tissue');
+  assert.equal(plainClinicalPhrase('Laparoscopic excision of endometriosis +/- ureterolysis',{topic:'endometriosis'}),'endometriosis');
+  assert.equal(plainClinicalPhrase('Laparoscopic excision of endometriosis +/- ureterolysis',{topic:'endometriosis',procedures:['Endometriosis excision']}),'keyhole surgery to remove endometriosis tissue');
 });
 
 test('an unrelated stage match and a severe-condition label do not verify stage-specific experience',()=>{

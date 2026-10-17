@@ -124,9 +124,9 @@ test('procedure listings cannot acquire benefits or inferred experience even if 
   assert.equal(validateDraft({...draft,reasons:[{...draft.reasons[0],title:'Experience with knee replacement'}]},saved),false);
 });
 
-test('failed physiotherapy and a request for sports-knee expertise do not turn listed surgery into patient treatment options',async()=>{
+test('failed physiotherapy and a request for sports-knee expertise keep unrequested procedures out of explanations',async()=>{
   const patientCriteria={topic:'knee',specialty:null,procedures:[],clinicalContext:'I want to get back to running, but physiotherapy has not helped my knee. I prefer a consultant with a focus on sports knee injuries.'};
-  const patientResult={name:'Mr Vishal R Rajput',specialty:'Consultant Orthopaedic Surgeon',evidenceUrl:'/sources/rajput',clinicalInterests:['My expertise includes sports knee injuries, arthroscopic knee surgery, anterior cruciate ligament reconstruction surgery.'],personalizedMatch:{citations:[
+  const patientResult={name:'Mr Vishal R Rajput',specialty:'Consultant Orthopaedic Surgeon',evidenceUrl:'/sources/rajput',clinicalInterests:['My expertise includes sports knee injuries, arthroscopic knee surgery, anterior cruciate ligament reconstruction surgery.'],comparisonProcedures:[{text:'ACL reconstruction is listed.',sourceUrl:'/sources/rajput',label:'ACL reconstruction'}],personalizedMatch:{citations:[
     {text:'My expertise includes sports knee injuries, arthroscopic knee surgery, anterior cruciate ligament reconstruction surgery.',sourceUrl:'/sources/rajput',criterion:'Knee'},
   ],caveats:[]}};
   const saved=explanationSnapshot(patientCriteria,patientResult);
@@ -134,16 +134,30 @@ test('failed physiotherapy and a request for sports-knee expertise do not turn l
     {title:'Focus on sports knee injuries',text:'The profile lists a specific interest in sports knee injuries, which aligns with your search for a consultant with this focus and your goal of returning to running.',evidenceIds:['e1']},
     {title:'Listed knee procedures',text:'This gives you specific treatments to ask about for your knee concern.',evidenceIds:['e1']},
   ]};
+  const observedAfterDeploy={summary:"His listed procedures include ligament reconstruction and keyhole (arthroscopic) surgery, which are relevant to knee issues that haven't improved with physiotherapy.",reasons:[
+    {title:'Focus on sports knee injuries',text:'The profile lists a specific interest in sports knee injuries, matching the focus in your request.',evidenceIds:['e1']},
+  ]};
+  const neutralProcedure={summary:'Mr Rajput lists arthroscopic knee surgery alongside sports knee injuries.',reasons:[
+    {title:'Focus on sports knee injuries',text:'The profile lists a specific interest in sports knee injuries, matching the focus in your request.',evidenceIds:['e1']},
+  ]};
   const repaired={summary:'Mr Vishal R Rajput is a consultant orthopaedic surgeon whose profile describes a focus on sports knee injuries. That recorded interest directly matches the expertise you asked for and relates to your goal of returning to running. The profile cannot establish which care would be right for you.',reasons:[
     {title:'Focus on sports knee injuries',text:'The profile lists a specific interest in sports knee injuries, matching the focus in your request.',evidenceIds:['e1']},
   ]};
   assert.equal(validateDraft(observed,saved),false);
+  assert.equal(validateDraft(observedAfterDeploy,saved),false);
+  assert.equal(validateDraft(neutralProcedure,saved),false);
   assert.equal(validateDraft(repaired,saved),true);
+  assert.match(saved.citations[0].text,/arthroscopic knee surgery/,'source evidence remains intact');
+  assert.ok(!saved.citations.some(c=>c.criterion==='ACL reconstruction'),'unrequested procedure-only citations do not prime the model');
+  assert.ok(!saved.citations.some(c=>c.kind==='terminology'),'unrequested procedure definitions do not prime the model');
+  const fallback=evidenceFallback(saved,'Test fallback');
+  assert.doesNotMatch(fallback.summary,/surgery|arthroscop|reconstruction|procedure/i);
+  assert.ok(fallback.reasons.every(reason=>!/(?:surgery|arthroscop|reconstruction|procedure)/i.test(reason.title+' '+reason.text)));
   const calls=[];const answer=await createMatchExplainer({client:clientFor([observed,repaired,{unsupportedClaims:[]}],calls),provider:'openai'})(saved);
   assert.equal(answer.summary,repaired.summary);assert.equal(calls.length,3);
-  assert.match(calls[0].body.instructions,/do not frame them as treatments or options for this person/i);
-  assert.match(JSON.parse(calls[1].body.input).repair.feedback[0],/unrequested treatment offered as a patient option/);
-  assert.match(calls[2].body.instructions,/reject wording that offers listed operations as treatments or options/i);
+  assert.match(calls[0].body.instructions,/do not mention any listed operation, procedure, surgical technique/i);
+  assert.match(JSON.parse(calls[1].body.input).repair.feedback[0],/unrequested procedure details from the summary and reasons/);
+  assert.match(calls[2].body.instructions,/reject any mention of listed operations, procedures, surgical techniques/i);
   assert.equal(validateDraft({...draft,reasons:[{...draft.reasons[0],text:'The listed knee replacement is a treatment you could discuss with the consultant.'}]},explanationSnapshot(criteria,result)),true,'an explicitly requested procedure remains discussable');
 });
 
@@ -177,6 +191,7 @@ test('concise output preserves source-supported fit and the material exception w
 });
 
 const endoCriteria={topic:'endometriosis',location:'London',clinicalContext:'Stage 3 endometriosis'};
+const endoProcedureCriteria={...endoCriteria,procedures:['Endometriosis excision']};
 const endoResult={name:'Dr Example',specialty:'Consultant Gynaecologist',evidenceUrl:'/sources/endo',insuranceEvidence:[],
   clinicalInterests:['Laparoscopic excision of endometriosis +/- ureterolysis'],personalizedMatch:{summary:'Old technical text',citations:[
     {text:'Profile lists: Laparoscopic excision of endometriosis +/- ureterolysis',sourceUrl:'/sources/endo',criterion:'endometriosis'},
@@ -185,7 +200,7 @@ const endoResult={name:'Dr Example',specialty:'Consultant Gynaecologist',evidenc
   ],caveats:[]}};
 
 test('duplicate procedure facts collapse across labels and NHS definitions remain separate from profile facts',()=>{
-  const saved=explanationSnapshot(endoCriteria,endoResult);
+  const saved=explanationSnapshot(endoProcedureCriteria,endoResult);
   assert.equal(saved.citations.filter(c=>c.kind==='profile'&&/excision/.test(c.text)).length,1);
   const terms=saved.citations.filter(c=>c.kind==='terminology');assert.equal(terms.length,2);
   assert.ok(terms.every(c=>new URL(c.sourceUrl).hostname.endsWith('nhs.uk')));
@@ -193,8 +208,28 @@ test('duplicate procedure facts collapse across labels and NHS definitions remai
   assert.equal(saved.criteria.clinicalContext,'Stage 3 endometriosis');assert.match(saved.contextCaveat,/does not confirm/);
 });
 
-test('the deterministic fallback explains the procedure in plain English and preserves unverified stage context',()=>{
+test('a condition search without a requested procedure keeps raw source facts but explains the condition',()=>{
   const saved=explanationSnapshot(endoCriteria,endoResult);
+  const answer=evidenceFallback(saved,'Test fallback');
+  assert.ok(saved.citations.some(c=>c.kind==='profile'&&/laparoscopic excision/i.test(c.text)));
+  assert.ok(!saved.citations.some(c=>c.kind==='terminology'));
+  assert.match(answer.summary,/endometriosis/);
+  assert.doesNotMatch(answer.summary,/keyhole|surgery|laparoscop|excision|procedure/i);
+  assert.ok(answer.reasons.every(reason=>!/(?:keyhole|surgery|laparoscop|excision|procedure)/i.test(reason.title+' '+reason.text)));
+  assert.equal(validateDraft({summary:'Dr Example lists keyhole surgery for endometriosis.',reasons:[{title:'Endometriosis surgery',text:'The profile lists surgery for endometriosis.',evidenceIds:[saved.citations[0].id]}]},saved),false);
+});
+
+test('a recorded surgical specialty remains a valid identity when no procedure is requested',()=>{
+  const saved=explanationSnapshot({topic:'hernia',procedures:[]},{name:'Dr Example',specialty:'General surgery',evidenceUrl:'/sources/hernia',personalizedMatch:{citations:[
+    {text:'Hernia care',sourceUrl:'/sources/hernia',criterion:'Hernia'},
+  ],caveats:[]}});
+  assert.equal(validateDraft({summary:'Dr Example is listed in general surgery, and the profile includes hernia care.',reasons:[
+    {title:'Hernia care',text:'The profile lists hernia care.',evidenceIds:['e1']},
+  ]},saved),true);
+});
+
+test('the deterministic fallback explains the procedure in plain English and preserves unverified stage context',()=>{
+  const saved=explanationSnapshot(endoProcedureCriteria,endoResult);
   const answer=evidenceFallback(saved,'Test fallback');
   assert.match(answer.summary,/Dr Example.*gynaecologist/);
   assert.match(answer.summary,/keyhole surgery to remove endometriosis tissue/);
@@ -207,7 +242,7 @@ test('the deterministic fallback explains the procedure in plain English and pre
 });
 
 test('a longer patient paragraph with paired terminology citations is accepted unchanged',async()=>{
-  const saved=explanationSnapshot(endoCriteria,endoResult);
+  const saved=explanationSnapshot(endoProcedureCriteria,endoResult);
   const clinical=saved.citations.find(c=>c.criterion==='endometriosis');
   const identity=saved.citations.find(c=>c.criterion==='Consultant identity');
   const location=saved.citations.find(c=>c.criterion==='Location');
@@ -231,7 +266,7 @@ test('stage-specific expertise cannot be borrowed from the patient context or se
 });
 
 test('a general NHS definition alone cannot support a claim about a named consultant',()=>{
-  const saved=explanationSnapshot({topic:'endometriosis'},endoResult);
+  const saved=explanationSnapshot({topic:'endometriosis',procedures:['Endometriosis excision']},endoResult);
   const term=saved.citations.find(c=>c.kind==='terminology');
   const unrelated=saved.citations.find(c=>c.criterion==='Consultant identity');
   const proposed={summary:'Dr Example performs keyhole surgery.',reasons:[{title:'Keyhole surgery',text:'This consultant performs keyhole surgery.',evidenceIds:[term.id]}]};
@@ -247,7 +282,7 @@ test('billing notation and unexplained source-label dumps are rejected before th
 });
 
 test('identity can be supported directly without duplicating it in clinical reasons',async()=>{
-  const saved=explanationSnapshot({topic:'endometriosis'},endoResult);
+  const saved=explanationSnapshot({topic:'endometriosis',procedures:['Endometriosis excision']},endoResult);
   const clinical=saved.citations.find(c=>c.criterion==='endometriosis');
   const terms=saved.citations.filter(c=>c.kind==='terminology');
   const proposed={summary:'Dr Example is a consultant gynaecologist whose profile includes keyhole surgery to remove endometriosis tissue. That is a relevant area of practice to discuss when looking for endometriosis care.',reasons:[

@@ -1,6 +1,10 @@
 const {chooseEvidence} = require('./models.cjs');
-const {positiveClinicalText}=require('./clinical-filters.cjs');
+const {positiveClinicalText,detectProcedures}=require('./clinical-filters.cjs');
 const clean=value=>String(value || '').replace(/\s+/g,' ').trim();
+// Patient-facing summaries can cite a mixed clinical-interest/source excerpt,
+// but unrequested operations in that excerpt must not become the explanation.
+const procedureWording=/\b(?:procedures?|surger(?:y|ies)|surgical|operat(?:ion|ions|ive)|arthroscop(?:y|ies|ic)|laparoscop(?:y|ic)|keyhole|reconstructions?|replacements?|excisions?|ablations?|meniscectom(?:y|ies)|arthroplast(?:y|ies)|angioplast(?:y|ies)|implant(?:ation|ations|s|ed)?|stent(?:ing|s)?|fusion|decompression|injections?|repairs?|removal|resection|transplantation|biops(?:y|ies))\b/i;
+const hasProcedureWording=value=>procedureWording.test(value||'')||detectProcedures(value).length>0;
 const sourceText=fact=>clean(fact?.value || fact?.text).replace(/^(?:Profile lists|Record lists|Specialty):\s*/i,'');
 const factKey=text=>sourceText({text}).toLowerCase().replace(/[“”"'’.,;:]+/g,'').replace(/\s+/g,' ').trim();
 
@@ -97,9 +101,10 @@ function clinicalContextCaveat(criteria,citations=[]) {
 function plainClinicalPhrase(text,criteria={}) {
   const value=sourceText({text}).replace(/\b[A-Z]\d{4}\b/g,'').replace(/^\s*[-:()]+\s*/,'').trim();
   const need=clean(criteria.topic);
-  // A direct symptom phrase wins over an unrelated diagnosis elsewhere in a
-  // long list. Required procedures retain their specific wording/translation.
-  if(need&&need.length<=70&&phraseWords(need).length>1&&!criteria.procedures?.length&&directTopicSupport(value,need))return need;
+  // Use the supported concern itself when no procedure was requested. A
+  // mixed interest/procedure list must not turn the fallback into surgery copy.
+  if(need&&need.length<=70&&!criteria.procedures?.length&&directTopicSupport(value,need))return need;
+  if(!criteria.procedures?.length&&hasProcedureWording(value))return '';
   // Link the technique to the condition only when the source actually does so.
   // A list such as “laparoscopic hysterectomy, endometriosis” does not establish
   // laparoscopic endometriosis surgery.
@@ -123,7 +128,8 @@ function consultantIdentity(record={}) {
 }
 function patientSummary({consultant={},criteria={},citations=[],caveats=[]}={}) {
   const profile=citations.filter(c=>c.kind!=='terminology');
-  const primary=profile.find(c=>!['Location','Specialty','Consultant identity','Gender','Language',criteria.insurance].filter(Boolean).includes(c.criterion));
+  const clinical=profile.filter(c=>!['Location','Specialty','Consultant identity','Gender','Language',criteria.insurance].filter(Boolean).includes(c.criterion));
+  const primary=clinical.find(c=>plainClinicalPhrase(c.text,criteria))||clinical[0];
   const phrase=primary ? plainClinicalPhrase(primary.text,criteria) : '';
   const name=clean(consultant.name).length<=100 ? clean(consultant.name) || 'This consultant' : 'This consultant';
   const specialty=clean(consultant.specialty).length<=120 ? clean(consultant.specialty) : '';
@@ -207,4 +213,4 @@ async function createPersonalizedMatch(record,criteria,{distance,facts=[],clinic
   const summary=patientSummary({consultant:consultantIdentity(record),criteria,citations,caveats});
   return {personalizedMatch:{summary,citations:[...citations,...glossary],caveats,provider:mode==='openai-constrained-rag'?'openai':mode==='local-constrained-rag'?'local-ai':'extractive'},generationMode:mode,selected};
 }
-module.exports={createPersonalizedMatch,consultantIdentity,deduplicateCitations,terminologyFor,clinicalContextCaveat,stageOf,plainClinicalPhrase,patientSummary};
+module.exports={createPersonalizedMatch,consultantIdentity,deduplicateCitations,terminologyFor,clinicalContextCaveat,stageOf,plainClinicalPhrase,patientSummary,hasProcedureWording};
