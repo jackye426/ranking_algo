@@ -1,13 +1,14 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {createApp}=require('./server.cjs');
+const {RESULT_PAGE_SIZE}=require('./search.cjs');
 const {createQueryInterpreter}=require('./query-interpreter.cjs');
 const {explanationSnapshot}=require('./match-explanation.cjs');
 const {comparisonSnapshot,validateComparison,createComparisonExplainer}=require('./comparison-explanation.cjs');
 const records=Array.from({length:14},(_,i)=>({id:`doctor-${i}`,name:`Dr ${i}`,specialty:'Sports medicine',clinicalInterests:['Knee pain','Running injuries'],locations:[{name:'Spire Test Hospital'}],insuranceEvidence:[],evidenceUrl:`/sources/doctor-${i}`,personalizedMatch:{citations:[{text:'Running injuries',sourceUrl:`/sources/doctor-${i}`,criterion:'Clinical interest'}],caveats:[]}}));
 async function api(t,options={}) {
   const calls={search:0,page:0,comparison:0};
-  const engine={ready:true,records,health:()=>({ready:true}),search:async criteria=>{calls.search++;return {results:records.slice(0,6),total:records.length,notices:[],searchSnapshot:{records,criteria}};},resultsPage:async(_snapshot,offset)=>{calls.page++;return {results:records.slice(offset,offset+6)};}};
+  const engine={ready:true,records,health:()=>({ready:true}),search:async criteria=>{calls.search++;return {results:records.slice(0,RESULT_PAGE_SIZE),total:records.length,notices:[],searchSnapshot:{records,criteria}};},resultsPage:async(_snapshot,offset)=>{calls.page++;return {results:records.slice(offset,offset+RESULT_PAGE_SIZE)};}};
   const app=createApp(engine,{interpretQuery:createQueryInterpreter({client:null}),explainMatch:Object.assign(async()=>({provider:'evidence'}),{configured:false}),explainComparison:Object.assign(async()=>{calls.comparison++;return {provider:'openrouter',differences:[],citations:[],retryable:false};},{configured:true}),...options});
   const server=await new Promise(resolve=>{const instance=app.listen(0,'127.0.0.1',()=>resolve(instance));});t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
   const root=`http://127.0.0.1:${server.address().port}`;
@@ -25,12 +26,17 @@ test('insufficient input and removing the last topic clarify without generic ran
 });
 test('snapshot pagination is idempotent, isolated, and authorises later profiles without a new search',async t=>{
   const {post,calls}=await api(t);const first=(await post('/api/chat',{message:'Knee pain'})).data;
-  assert.equal(first.results.length,6);assert.ok(first.nextCursor);assert.equal(first.searchSnapshot,undefined);assert.equal(first.diagnostics,undefined);
+  assert.equal(first.results.length,3);assert.ok(first.nextCursor);assert.equal(first.searchSnapshot,undefined);assert.equal(first.diagnostics,undefined);
+  assert.equal((await post('/api/match-explanation',{sessionId:first.sessionId,searchId:first.searchId,consultantId:'doctor-2'})).status,200);
+  assert.equal((await post('/api/match-explanation',{sessionId:first.sessionId,searchId:first.searchId,consultantId:'doctor-3'})).status,404);
   const request={sessionId:first.sessionId,searchId:first.searchId,cursor:first.nextCursor};
   const [page,again]=await Promise.all([post('/api/search-results',request),post('/api/search-results',request)]);
-  assert.deepEqual(page.data,again.data);assert.equal(calls.page,1);assert.equal(calls.search,1);assert.equal(page.data.results[0].id,'doctor-6');
-  assert.equal((await post('/api/match-explanation',{sessionId:first.sessionId,searchId:first.searchId,consultantId:'doctor-6'})).status,200);
-  const last=(await post('/api/search-results',{...request,cursor:page.data.nextCursor})).data;assert.equal(last.results.length,2);assert.equal(last.nextCursor,null);
+  assert.deepEqual(page.data,again.data);assert.equal(calls.page,1);assert.equal(calls.search,1);assert.equal(page.data.results[0].id,'doctor-3');
+  assert.equal((await post('/api/match-explanation',{sessionId:first.sessionId,searchId:first.searchId,consultantId:'doctor-3'})).status,200);
+  const pages=[first.results,page.data.results];let cursor=page.data.nextCursor;
+  while(cursor) {const next=(await post('/api/search-results',{...request,cursor})).data;pages.push(next.results);cursor=next.nextCursor;}
+  assert.deepEqual(pages.flat().map(result=>result.id),records.map(record=>record.id));
+  assert.equal(pages.at(-1).length,2);
   const other=(await post('/api/chat',{message:'Knee pain'})).data;
   assert.equal((await post('/api/search-results',{...request,searchId:other.searchId})).status,410);
   assert.equal((await post('/api/search-results',{...request,cursor:'invented'})).status,400);

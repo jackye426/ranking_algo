@@ -238,7 +238,7 @@ ISC
 ## Directory and top-options demo
 
 The same live search is available at `/directory` (also the `/` default) and `/guided`.
-The Directory retains the existing cards and conversational criteria and loads six results at a time.
+The Directory retains the existing cards and conversational criteria and loads three results at a time.
 Top options displays the first three from the same ranking. The view switch preserves the active
 conversation, draft, selected comparison, profile explanation cache and per-view reading position;
 it does not search again or call a model. Conversation state stays in the current tab, not in URLs.
@@ -251,12 +251,21 @@ clinically superior doctor or recommend treatment.
 
 The server retains the ranked candidate pool in each bounded, expiring search snapshot. The search
 response includes an opaque `nextCursor`; `POST /api/search-results` accepts `sessionId`, `searchId`
-and `cursor`, returning the next six results and continuation cursor without reinterpreting or
+and `cursor`, returning the next three results and continuation cursor without reinterpreting or
 reranking. Only served consultants can receive explanations. `POST /api/comparison-explanation`
 accepts those session/search identifiers and two or three distinct `consultantIds`. Comparison
 requests share existing generation limits, deduplicate by search and canonical selected set, and
 require local citation-ownership validation plus an independent support check. Fallback leaves
 sourced facts available. No database migration or additional model credentials are required.
+
+An initial request consisting only of one exact known specialty, procedure or common condition
+(for example, `Orthopaedics`, `knee replacement` or `endometriosis`) uses the bounded deterministic
+parser. The same labels may be followed by `in` or `near` and one recognised city, as in
+`endometriosis excision near London`. The parsed location and clinical label must match the input
+exactly. Requests with a patient narrative, negation, other preferences, unknown wording or a
+follow-up continue through guarded DeepSeek interpretation. The `Server-Timing` response header
+separates `interpretation` and `search` for latency diagnosis; the initial search prepares evidence
+for three cards and continuation pages prepare evidence when requested.
 
 Requests without a clinical anchor now return `needsClarification: true` with no generic ranked
 results. Existing meaningful context is retained for vague follow-ups. Removing the last clinical

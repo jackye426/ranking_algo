@@ -7,6 +7,7 @@ const {createPersonalizedMatch} = require('./personalized-match.cjs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {createHash} = require('node:crypto');
+const RESULT_PAGE_SIZE = 3;
 
 function mapToRanking(record) {
   return { ...record, description:'', about:'', clinical_expertise: record.clinicalInterests.join('. '),
@@ -207,7 +208,7 @@ class SearchEngine {
     const evidenceQuery=clinicalRetrievalQuery(criteria,{forEvidence:true});
     const generationModes=[];
     const results=[];
-    for(const {record:r,distance} of ranked.slice(offset,offset+6)) {
+    for(const {record:r,distance} of ranked.slice(offset,offset+RESULT_PAGE_SIZE)) {
       const availableFacts=explanationFacts(r);
       const facts=shortlistEvidence(lexicalClinicalQuery(evidenceQuery),availableFacts);
       const key=JSON.stringify([r.id,criteria]);
@@ -232,4 +233,4 @@ class SearchEngine {
   }
 
 }
-module.exports={SearchEngine,mapToRanking,reciprocalRankFusion,matchesFilters,explicitClinicalMatch,rerankCandidates,explanationFacts,shortlistEvidence,clinicalRetrievalQuery,clinicalText,lexicalClinicalQuery};
+module.exports={SearchEngine,RESULT_PAGE_SIZE,mapToRanking,reciprocalRankFusion,matchesFilters,explicitClinicalMatch,rerankCandidates,explanationFacts,shortlistEvidence,clinicalRetrievalQuery,clinicalText,lexicalClinicalQuery};

@@ -3,7 +3,7 @@ const express=require('express');
 const path=require('node:path');
 const {randomUUID}=require('node:crypto');
 const {performance}=require('node:perf_hooks');
-const {SearchEngine}=require('./search.cjs');
+const {SearchEngine,RESULT_PAGE_SIZE}=require('./search.cjs');
 const {criteriaLabels}=require('./criteria.cjs');
 const {explanationSnapshot,createMatchExplainer}=require('./match-explanation.cjs');
 const {comparisonSnapshot,createComparisonExplainer}=require('./comparison-explanation.cjs');
@@ -111,12 +111,12 @@ function createApp(engine,{explainMatch=createMatchExplainer(),explainComparison
       const firstSearch=!session.initialSearchId;
       const snapshot={searchSnapshot:response.searchSnapshot,criteria:structuredClone(parsed.criteria),total:response.total,
         initialQuery:firstSearch?message.trim():null,baseline:null,baselinePending:null,
-        cursors:new Map(),pages:new Map(),pagePending:new Map(),results:new Map(response.results.slice(0,6).map(result=>[result.id,explanationSnapshot(parsed.criteria,result)])),cache:new Map(),pending:new Map(),attempts:new Map()};
+        cursors:new Map(),pages:new Map(),pagePending:new Map(),results:new Map(response.results.slice(0,RESULT_PAGE_SIZE).map(result=>[result.id,explanationSnapshot(parsed.criteria,result)])),cache:new Map(),pending:new Map(),attempts:new Map()};
       session.snapshots.set(searchId,snapshot);
       if(firstSearch) session.initialSearchId=searchId;
       while(session.snapshots.size>10) session.snapshots.delete(session.snapshots.keys().next().value);
       let nextCursor=null;
-      if(response.searchSnapshot && response.total>6) {nextCursor=randomUUID();snapshot.cursors.set(nextCursor,6);}
+      if(response.searchSnapshot && response.total>RESULT_PAGE_SIZE) {nextCursor=randomUUID();snapshot.cursors.set(nextCursor,RESULT_PAGE_SIZE);}
       const {diagnostics,searchSnapshot,...publicResponse}=response;
       const labels=criteriaLabels(parsed.criteria);
       if(parsed.criteria.clinicalContext) labels.push({key:'clinicalContext',label:`You shared: ${parsed.criteria.clinicalContext}`});
