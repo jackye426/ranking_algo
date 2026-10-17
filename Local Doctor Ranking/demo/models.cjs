@@ -54,7 +54,7 @@ function explanationClient() {
 // Prefer generation speed while keeping DeepSeek within an inexpensive token
 // tier. Privacy and structured-output requirements also apply to fallbacks.
 function openRouterProvider(model,{check=false}={}) {
-  return {require_parameters:true,data_collection:'deny',sort:check?'latency':'throughput',
+  return {require_parameters:true,data_collection:'deny',zdr:true,sort:check?'latency':'throughput',
     preferred_max_latency:3,
     ...(model==='deepseek/deepseek-v3.2'?{max_price:{prompt:0.6,completion:1.7}}:{})};
 }

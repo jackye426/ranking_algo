@@ -95,7 +95,7 @@ The application serves only `public/` and explicit evidence routes. It never exp
 
 ## AI explanation provider
 
-The current workspace has a server-side OpenRouter key configured. Both query interpretation and explanations default to `deepseek/deepseek-v3.2`, with reasoning disabled, structured output required and provider data collection disallowed. Configure credentials only in ignored `.env.local` or the hosting service's secret variables:
+The current workspace has a server-side OpenRouter key configured. Both query interpretation and explanations default to `deepseek/deepseek-v3.2`, with reasoning disabled, structured output required, provider data collection disallowed and zero-data-retention (`provider.zdr: true`) enforced for every request. If no eligible endpoint is available, interpretation uses the bounded deterministic path and explanations show sourced profile evidence; the service does not silently switch to OpenAI. Check the actual serving endpoint and account observability settings before public launch. Configure credentials only in ignored `.env.local` or the hosting service's secret variables:
 
 ```dotenv
 OPENROUTER_API_KEY=<server-only-key>

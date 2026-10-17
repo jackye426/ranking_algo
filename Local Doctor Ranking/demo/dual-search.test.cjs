@@ -69,7 +69,7 @@ test('comparison routes DeepSeek for latency while retaining privacy and price l
   const client={chat:{completions:{create:async(body,options)=>{calls.push({body,options});return {choices:[{finish_reason:'stop',message:{content:JSON.stringify(responses.shift())}}]};}}}};
   const answer=await createComparisonExplainer({client,provider:'openrouter',model:'deepseek/deepseek-v3.2'})(context);
   assert.equal(answer.provider,'openrouter');assert.equal(calls.length,2);
-  for(const call of calls){assert.equal(call.body.provider.sort,'latency');assert.equal(call.body.provider.data_collection,'deny');assert.deepEqual(call.body.provider.max_price,{prompt:0.6,completion:1.7});assert.equal(call.options.timeout,25000);assert.ok(call.options.signal);}
+  for(const call of calls){assert.equal(call.body.provider.sort,'latency');assert.equal(call.body.provider.data_collection,'deny');assert.equal(call.body.provider.zdr,true);assert.deepEqual(call.body.provider.max_price,{prompt:0.6,completion:1.7});assert.equal(call.options.timeout,25000);assert.ok(call.options.signal);}
   const checked=JSON.parse(calls[1].body.messages[1].content).context;
   assert.ok(checked.consultants.every(p=>p.evidence.length===1));
 });

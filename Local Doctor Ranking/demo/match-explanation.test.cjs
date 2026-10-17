@@ -35,7 +35,7 @@ test('OpenRouter receives strict structured output and no-data-collection routin
   const explain=createMatchExplainer({client,provider:'openrouter',model:'deepseek/deepseek-v3.2'});
   const answer=await explain(explanationSnapshot(criteria,result));
   assert.equal(answer.provider,'openrouter');assert.equal(calls.length,2);
-  assert.equal(calls[0].response_format.json_schema.strict,true);assert.deepEqual(calls[0].provider,{require_parameters:true,data_collection:'deny',sort:'throughput',preferred_max_latency:3,max_price:{prompt:0.6,completion:1.7}});assert.equal(calls[1].provider.sort,'latency');assert.deepEqual(calls[1].provider.max_price,calls[0].provider.max_price);assert.equal(calls[0].model,'deepseek/deepseek-v3.2');assert.deepEqual(calls[0].reasoning,{enabled:false});assert.equal(explain.model,'deepseek/deepseek-v3.2');
+  assert.equal(calls[0].response_format.json_schema.strict,true);assert.deepEqual(calls[0].provider,{require_parameters:true,data_collection:'deny',zdr:true,sort:'throughput',preferred_max_latency:3,max_price:{prompt:0.6,completion:1.7}});assert.equal(calls[1].provider.sort,'latency');assert.equal(calls[1].provider.zdr,true);assert.deepEqual(calls[1].provider.max_price,calls[0].provider.max_price);assert.equal(calls[0].model,'deepseek/deepseek-v3.2');assert.deepEqual(calls[0].reasoning,{enabled:false});assert.equal(explain.model,'deepseek/deepseek-v3.2');
 });
 
 test('timing reports only phase metadata and cannot change generation or validation',async()=>{
