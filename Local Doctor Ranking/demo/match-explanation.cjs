@@ -109,8 +109,18 @@ function explanationEvidence(snapshot) {
 function explanationFallback(snapshot,evidence,notice,retryable=false) {
   if(snapshot.criteria.procedures?.length) return evidenceFallback(snapshot,notice,retryable);
   const criteria={...snapshot.criteria,preferDocumentedInterest:evidence.some(c=>c.criterion==='Clinical profile excerpt')};
-  const restricted={...snapshot,criteria,citations:evidence,summary:patientSummary({consultant:snapshot.consultant,
-    criteria,citations:evidence,caveats:snapshot.caveats})};
+  const topicWords=new Set(clean(criteria.topic).toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]);
+  const contextWords=new Set((clean(criteria.clinicalContext).toLowerCase().match(/[\p{L}\p{N}]+/gu)||[])
+    .filter(word=>word.length>=4 && !topicWords.has(word) && !['with','have','want','back','from','that','this','prefer','focus','consultant','helped'].includes(word)));
+  const specificity=c=>new Set((clean(c.text).toLowerCase().match(/[\p{L}\p{N}]+/gu)||[])
+    .filter(word=>contextWords.has(word))).size;
+  const first=evidence.find(c=>clinicalCitation(c,criteria) && plainClinicalPhrase(c.text,criteria));
+  // Put a more specific, verbatim interest ahead of a generic topic fact for
+  // fallback wording. Preserve the original citations and their source order.
+  const excerpt=evidence.find(c=>c.criterion==='Clinical profile excerpt' && plainClinicalPhrase(c.text,criteria) && specificity(c)>specificity(first||{text:''}));
+  const selected=excerpt?[excerpt,...evidence.filter(c=>c!==excerpt)]:evidence;
+  const restricted={...snapshot,criteria,citations:selected,summary:patientSummary({consultant:snapshot.consultant,
+    criteria,citations:selected,caveats:snapshot.caveats})};
   const answer=evidenceFallback(restricted,notice,retryable);
   return {...answer,citations:snapshot.citations.map(({id,text,sourceUrl})=>({id,text,sourceUrl}))};
 }
