@@ -59,7 +59,7 @@ For a patient-language demonstration, enter **I have stage 3 endometriosis and I
 - **Local evidence preparation:** retrieved consultant fields become numbered facts. Local `Xenova/flan-t5-small` receives the accumulated criteria and selects relevant evidence; selections are checked against the consultant's exact fact text and source URL. Retrieval, embeddings, filtering and evidence selection remain local; clinical-language interpretation can make a paid AI call.
 - **On-demand personalised RAG:** deliberately opening a consultant card sends only the session, search and consultant IDs to `POST /api/match-explanation`. The server retrieves the immutable search snapshot and supplies its limited criteria, consultant name/specialty, selected evidence and mandatory caveats to the configured model provider. The model writes a short paragraph (normally 60–100 words, maximum 800 characters) and up to four reasons linked to evidence IDs. NHS terminology facts can explain medical wording but cannot establish consultant experience. Material insurance exceptions and unverified stage context must appear in the paragraph. Schema, length, citation, numerical and prohibited-claim validation is followed by a separate model support check; an unverifiable answer is replaced with readable, labelled profile evidence. Duplicate source facts are removed.
 - **Explanation consistency:** local evidence selection is cached by consultant ID and the complete criteria object. Each search response also receives a separate `searchId`, and the server binds its visible consultants to immutable criteria/evidence snapshots. Opening an older card therefore explains that older search, even after subsequent refinements. Pending reveal requests are deduplicated and successful explanations are cached per consultant within that snapshot. The most recent ten search snapshots per session are retained.
-- **Truthful presentation:** validated OpenRouter or OpenAI output is labelled **AI-generated explanation**. Missing configuration, insufficient evidence, provider failures or failed support checks produce **Profile evidence** with an explicit notice. Transient or validation failures offer a retry while keeping the fallback evidence visible; missing-key fallbacks do not suggest that an AI answer was generated. All returned source citations and mandatory caveats remain available in the expanded panel.
+- **Truthful presentation:** validated DeepSeek output through OpenRouter is labelled **AI-generated explanation**. Missing configuration, insufficient evidence, provider failures or failed support checks produce **Profile evidence** with an explicit notice. Transient or validation failures offer a retry while keeping the fallback evidence visible; missing-key fallbacks do not suggest that an AI answer was generated. All returned source citations and mandatory caveats remain available in the expanded panel.
 - **Source evidence:** external field links are used where known. Aggregated facts lacking original URLs link to a readable `/sources/:id` page containing the stored facts and record provenance. A Spire identity URL is not presented as the original source of every merged field.
 
 Procedure evidence describes the recorded practice, not a guarantee that a procedure is currently available at every listed Spire site. That qualification is visible on procedure-specific matches. Insurance qualifications, including fee-assurance and referral-network limitations, remain visible alongside the personalised summary.
@@ -67,6 +67,8 @@ Procedure evidence describes the recorded practice, not a guarantee that a proce
 The mapper reuses the legacy ranking document fields, and distances reuse the repository's Haversine utility. No internal scores or algorithm controls appear in the main demo.
 
 The conversation combines conservative deterministic filters with validated AI clinical interpretation. It supports clinical topics, specialty, cumulative procedures, insurer, UK postcode/city/town, radius, nearest ordering, consultant gender and language criteria. Unsupported price, appointment availability and exclusion requests produce a notice or clarification. It is a consultant search interface, not an unrestricted medical advice chatbot.
+
+`POST /api/keyword-baseline` accepts exactly `{ "sessionId": "...", "searchId": "..." }` from the first successful `/api/chat` response. It runs lexical BM25 over that search's original, unmodified request and the same Spire record array, with no semantic retrieval, interpreted criteria, AI explanation or later refinements. Its response contains `label`, `method`, `total`, up to six minimal consultant `results`, and `sourceLabel`. The baseline can be requested again while the initial snapshot remains live; an expired or different-session snapshot returns HTTP 410. `/sources/*` links in both search responses are API-host-relative.
 
 ## Supabase connection and security
 
@@ -89,7 +91,7 @@ No existing database rows, schemas, grants or RLS policies were modified. The ex
 
 For a new environment, transfer the restricted token securely or rotate it and redeploy the matching hash. `demo/scripts/configure-reader.cjs` generates a fresh local token only when no `.env.local` exists and outputs its hash; deployment must use that same hash. Do not deploy the checked-in hash while using a different newly generated token.
 
-The application serves only `public/` and explicit evidence routes. It never exposes repository files, credentials, raw caches or ranking diagnostics through static routing. Same-origin checks, request-size/rate limits and random server-side conversation IDs protect the local demo surface.
+The application serves only `public/` and explicit evidence routes. It never exposes repository files, credentials, raw caches or ranking diagnostics through static routing. Exact-origin browser checks, request-size/rate limits and random server-side conversation IDs protect the local demo surface.
 
 ## AI explanation provider
 
@@ -101,14 +103,7 @@ OPENROUTER_QUERY_MODEL=deepseek/deepseek-v3.2
 OPENROUTER_EXPLANATION_MODEL=deepseek/deepseek-v3.2
 ```
 
-OpenRouter takes precedence when its key is present. To use OpenAI directly instead, omit the OpenRouter key and set:
-
-```dotenv
-OPENAI_API_KEY=<server-only-key>
-OPENAI_EXPLANATION_MODEL=gpt-4.1-mini
-```
-
-This is a configuration fallback, not an automatic switch to another paid provider after an outage: provider errors show labelled source evidence. Without either key, local retrieval and conversational refinement still work, and the reveal panel explains that AI generation is not configured.
+Explanations do not route to a second paid provider when OpenRouter is unconfigured or unavailable. Provider errors show labelled source evidence. Without the OpenRouter key, local retrieval and deterministic refinements still work, and the reveal panel explains that AI generation is not configured.
 
 Each clinical interpretation can make one paid model request containing the current message and previous clinical criteria; routine recognised preference refinements bypass it. Each uncached reveal normally makes two paid model requests: one to draft the explanation and one to check its source support. A rejected draft receives at most one rewrite and the same checks, for a maximum of four model requests within the overall deadline. Only an exact empty list of unsupported claims passes the source check. Unsupported benefits, quality claims, distance qualifiers and stage-specific expertise also face deterministic checks. The browser receives no credentials and sends no full consultant record or conversation history to the model provider. The server supplies only bounded search preferences, selected evidence excerpts and caveats; excerpts can contain public consultant or hospital names. The About panel discloses AI interpretation and explanations. No search messages are logged by the application.
 
@@ -150,10 +145,10 @@ For a deployed service behind Railway's reverse proxy, configure:
 HOST=0.0.0.0
 TRUST_PROXY=1
 PUBLIC_ORIGIN=https://search.docmap.co.uk
-PUBLIC_ORIGINS=https://docmap-search-production.up.railway.app
+PUBLIC_ORIGINS=https://clinic-preview.up.railway.app
 ```
 
-`PUBLIC_ORIGIN` sets the primary exact browser origin, including HTTPS. `PUBLIC_ORIGINS` adds explicitly allowed origins as a comma-separated list; the configuration above keeps the custom domain primary and permits the Railway preview without a wildcard. Other browser origins are rejected. Use the verified Railway preview while custom DNS is pending. `TRUST_PROXY=1` trusts one reverse-proxy hop for the request scheme and client IP; leave it disabled and both origin variables unset for a direct local listener. Keep one application replica for this presentation build because conversations and explanation caches are in process memory.
+The homepage, public concept, existing Clinic Railway host and fixed Lovable preview (`id-preview--cb29d28c-6b46-4988-a3fa-7346e074fb97.lovable.app`) are built in. Set `PUBLIC_ORIGINS` for any additional fixed Railway preview, replacing the illustrative value above. Origins must be exact HTTP(S) origins without a path or wildcard. Browser preflight and API responses return that exact allowed origin, permit `Content-Type`, and never enable credentials. Same-origin and server-to-server requests remain possible. `TRUST_PROXY=1` trusts one reverse-proxy hop for the request scheme and client IP; leave it disabled for a direct local listener. Keep one application replica for this presentation build because conversations and explanation caches are in process memory.
 
 ## Verification
 

@@ -44,10 +44,12 @@ async function chooseEvidence(query, facts) {
   return { selected: valid.length ? valid : facts.slice(0,2), mode: valid.length ? 'local-constrained-rag' : 'extractive-fallback' };
 }
 function explanationClient() {
-  const apiKey=process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+  // Do not silently route health-related text to another provider when the
+  // configured DeepSeek/OpenRouter service is unavailable.
+  const apiKey=process.env.OPENROUTER_API_KEY;
   if (!apiKey) return null;
   const OpenAI = require('openai');
-  return new OpenAI({apiKey, ...(process.env.OPENROUTER_API_KEY ? {baseURL:'https://openrouter.ai/api/v1'} : {}), timeout:15000, maxRetries:0});
+  return new OpenAI({apiKey,baseURL:'https://openrouter.ai/api/v1',timeout:15000,maxRetries:0});
 }
 // Prefer generation speed while keeping DeepSeek within an inexpensive token
 // tier. Privacy and structured-output requirements also apply to fallbacks.

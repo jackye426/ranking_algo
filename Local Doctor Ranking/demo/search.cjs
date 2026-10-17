@@ -149,6 +149,23 @@ class SearchEngine {
     notice: this.source === 'public-profile-snapshot' ? 'Demo collection from official Spire and insurer profiles. This is not the full Spire directory or a live Supabase connection.'
       : this.source === 'supabase' && Number.isFinite(this.quality?.withInsuranceEvidence)
         ? `Insurance evidence is verified for ${this.quality.withInsuranceEvidence} consultant${this.quality.withInsuranceEvidence===1?'':'s'}; other insurance status is unknown.` : null}; }
+  keywordBaseline(snapshot,initialQuery) {
+    if(snapshot.records!==this.records) throw new Error('Search snapshot expired');
+    // This deliberately uses the person's original words against the same
+    // catalogue. It does not use interpreted criteria, filters, embeddings,
+    // generated explanations, or the DocMap search's fused ranking.
+    const byId=new Map(this.records.map(record=>[record.id,record]));
+    const matches=rankPractitionersBM25(this.documents,initialQuery)
+      .filter(item=>item.bm25Score>0 && byId.has(item.document.id));
+    return {label:'Keyword-only baseline',method:'BM25',total:matches.length,
+      results:matches.slice(0,6).map(({document})=>{
+        const record=byId.get(document.id);
+        return {id:record.id,name:record.name,specialty:record.specialty,
+          profileUrl:record.profileUrl,evidenceUrl:record.evidenceUrl,
+          locations:record.locations.map(({name,city})=>({name,city})),
+          clinicalInterests:record.clinicalInterests.slice(0,5)};
+      })};
+  }
   async search(criteria) {
     if (!this.ready) throw new Error('Search is still preparing.');
     const notices=[];
