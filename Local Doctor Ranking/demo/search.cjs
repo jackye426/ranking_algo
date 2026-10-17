@@ -23,7 +23,7 @@ function reciprocalRankFusion(lists, k=60) {
 // those must not improve clinical matching for a patient's activity or goal.
 function clinicalText(r) { return [r.specialty,...r.clinicalInterests,...(r.procedures||[])].filter(Boolean).join('. '); }
 function lexicalClinicalQuery(query) {
-  const filler=new Set('the and with have has had been very want would like discuss find someone specialist consultant doctor for that this who what where when how from into also about can could should myself my your our they them their not does did get still already diagnosed diagnosis'.split(' '));
+  const filler=new Set('the and with have has had been very want would like discuss find someone specialist consultant doctor for that this who what where when how from into also about can could should myself my your our they them their not does did get still already diagnosed diagnosis prefer preferred focus focused special interest interests experience expertise'.split(' '));
   const terms=String(query).toLowerCase().replace(/\b(?:get|getting)\s+back\s+to\b/g,' ').match(/[a-z]+/g)||[];
   // Inflection expansion helps everyday symptom wording reach exact source
   // language. These remain query terms scored by the real BM25 implementation.

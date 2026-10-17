@@ -122,6 +122,15 @@ test('runner context adds sourced clinical interests even when FLAN selects gene
   assert.doesNotMatch(r.personalizedMatch.summary,/will.*run|return to running|faster recovery/);
 });
 
+test('sports knee preference cites the specific profile interest rather than a generic focus word',async()=>{
+  const knee=clinicalFact('Knee pain'),sports=clinicalFact('Sports knee injuries'),generic=clinicalFact('Focus on knee replacements');
+  const r=await createPersonalizedMatch(record,{topic:'knee',clinicalContext:'I prefer a consultant with a focus on sports knee injuries.'},
+    {facts:[knee],clinicalFacts:[knee,generic,sports],selectEvidence:async()=>({selected:[knee],mode:'local-constrained-rag'})});
+  assert.equal(r.personalizedMatch.citations[0].text,knee.text);
+  assert.ok(r.personalizedMatch.citations.some(c=>c.text===sports.text&&c.criterion==='Relevant patient context'));
+  assert.ok(r.personalizedMatch.citations.every(c=>c.text!==generic.text));
+});
+
 test('hobby and administrative running mentions never supplement clinical context',async()=>{
   const knee=clinicalFact('Knee pain');
   const extra=['He is a keen runner, a sport he has enjoyed since childhood','I am running our East Midlands Specialist Orthopaedic Network meeting','I enjoy running in my spare time'].map(clinicalFact);

@@ -27,7 +27,7 @@ function directTopicSupport(value,topic) {
     }));
   });
 }
-const contextNoise=new Set(['i','m','ve','am','my','me','a','an','the','and','or','but','with','without','have','has','had','been','be','to','for','of','in','on','at','is','are','was','were','want','would','like','get','back','return','can','could','still','very','not','no','haven','hasn','t','diagnosed','diagnosis','help','helped','work','worked','tried','discuss','specialist','consultant','doctor','care','treatment','previous','months','month','years','year']);
+const contextNoise=new Set(['i','m','ve','am','my','me','a','an','the','and','or','but','with','without','have','has','had','been','be','to','for','of','in','on','at','is','are','was','were','want','would','like','get','back','return','can','could','still','very','not','no','haven','hasn','t','diagnosed','diagnosis','help','helped','work','worked','tried','discuss','specialist','consultant','doctor','care','treatment','previous','months','month','years','year','prefer','preferred','focus','focused','special','interest','interests','experience','expertise']);
 function contextWords(criteria) {
   const topic=new Set(words(criteria.topic));
   return [...new Set(words(positiveClinicalText(criteria.clinicalContext)).filter(word=>!topic.has(word)&&!contextNoise.has(word)&&!/^\d+$/.test(word)))];

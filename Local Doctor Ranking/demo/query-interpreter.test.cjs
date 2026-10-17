@@ -117,6 +117,29 @@ test('everyday patient context survives fallback, follow-ups and refinement with
   assert.equal(clear.criteria.clinicalContext,null);assert.equal(clear.criteria.topic,'knee pain');assert.equal(clear.criteria.location,'London');
 });
 
+test('a same-joint sports expertise preference keeps the established concern and adds sourced retrieval context',async()=>{
+  const first=await createQueryInterpreter({client:null})({message:'I want to get back to running, but physiotherapy has not helped my knee.'});
+  const previous={...first.criteria,location:'London',insurance:'Bupa'};
+  const message='I prefer a consultant with a focus on sports knee injuries.';
+  const calls=[];const interpret=createQueryInterpreter({client:fakeClient([],calls)});
+  assert.equal(interpret.requiresAI({previous,message}),false,'a supported relevance refinement does not need a paid interpretation');
+  const result=await interpret({previous,message});
+  assert.equal(result.mode,'deterministic');assert.equal(result.criteria.topic,'knee');
+  assert.equal(result.criteria.specialty,null);assert.deepEqual(result.criteria.procedures,[]);
+  assert.equal(result.criteria.location,'London');assert.equal(result.criteria.insurance,'Bupa');
+  assert.match(result.criteria.clinicalContext,/get back to running.*physiotherapy has not helped my knee/);
+  assert.match(result.criteria.clinicalContext,/focus on sports knee injuries/);
+  assert.equal(calls.length,0);
+  const {clinicalRetrievalQuery,lexicalClinicalQuery}=require('./search.cjs');
+  const retrieval=clinicalRetrievalQuery(result.criteria),lexical=lexicalClinicalQuery(retrieval);
+  assert.match(retrieval,/^knee\. /);assert.match(retrieval,/sports knee injuries/);
+  assert.doesNotMatch(retrieval,/physiotherap|helped/i,'failed treatment cannot become a retrieval target');
+  assert.match(lexical,/sports/);assert.match(lexical,/injuries/);
+  assert.doesNotMatch(lexical,/\b(?:prefer|focus)\b/);
+  assert.equal(interpret.requiresAI({previous,message:'I prefer a consultant with a focus on sports hip injuries.'}),true,'another body concern is not silently treated as context');
+  assert.equal(interpret.requiresAI({previous,message:'I prefer a consultant with a focus on sports knee arthroscopy.'}),true,'an explicit procedure still changes the clinical criteria');
+});
+
 test('a lack of diagnosis stays patient context, while an explicit negative procedure remains an exclusion',async()=>{
   const interpret=createQueryInterpreter({client:null});
   const result=await interpret({message:'My periods are very painful and I have not been diagnosed'});
@@ -153,7 +176,7 @@ test('patient narrative becomes explicit endometriosis/excision criteria with st
   const result=await interpreter({message:request});
   assert.equal(result.mode,'openrouter');assert.equal(result.criteria.topic,'endometriosis');assert.equal(result.criteria.specialty,null);assert.deepEqual(result.criteria.procedures,['Endometriosis excision']);assert.equal(result.criteria.clinicalContext,'Stage 3 endometriosis');
   assert.ok(result.notices.some(notice=>/patient context.*not a verified filter/.test(notice)));
-  assert.equal(calls.length,1);const body=calls[0].body;assert.equal(body.response_format.json_schema.strict,true);assert.deepEqual(body.reasoning,{enabled:false});assert.deepEqual(body.provider,{require_parameters:true,data_collection:'deny',zdr:true,sort:'throughput',preferred_max_latency:3,max_price:{prompt:0.6,completion:1.7}});assert.ok(calls[0].options.signal);
+  assert.equal(calls.length,1);const body=calls[0].body;assert.equal(body.response_format.json_schema.strict,true);assert.deepEqual(body.reasoning,{enabled:false});assert.deepEqual(body.provider,{require_parameters:true,data_collection:'deny',zdr:true,sort:'latency',preferred_max_latency:3,max_price:{prompt:0.6,completion:1.7}});assert.ok(calls[0].options.signal);
   assert.ok(body.response_format.json_schema.schema.properties.procedures.properties.values.items.enum.includes('Endometriosis excision'));
 });
 
@@ -200,6 +223,17 @@ test('explicit multiple procedures remain AND criteria even if a model omits one
 test('missing key and provider failure preserve explicit stage and requested excision without pretending AI',async()=>{
   for(const interpreter of [createQueryInterpreter({client:null}),createQueryInterpreter({client:fakeClient([new Error('secret provider error')])})]) {
     const result=await interpreter({message:request});assert.equal(result.mode,'deterministic');assert.equal(result.criteria.topic,'endometriosis');assert.deepEqual(result.criteria.procedures,['Endometriosis excision']);assert.equal(result.criteria.clinicalContext,'Stage 3 endometriosis');assert.ok(result.notices.length);assert.doesNotMatch(JSON.stringify(result),/secret provider error/);
+  }
+});
+
+test('interpretation fallbacks report only static reason categories',async()=>{
+  const timeout=Object.assign(new Error('private provider diagnostic'),{name:'APIConnectionTimeoutError'});
+  const rateLimit=Object.assign(new Error('private rate-limit diagnostic'),{status:429});
+  for(const [response,expected] of [[timeout,'timeout'],[rateLimit,'provider-rate-limit'],[patch({topic:{operation:'set',value:'invented diagnosis',evidence:'endometriosis'}}),'unverified-response']]) {
+    const kinds=[];
+    const result=await createQueryInterpreter({client:fakeClient([response]),reportFallback:kind=>kinds.push(kind)})({message:request});
+    assert.equal(result.mode,'deterministic');assert.deepEqual(kinds,[expected]);
+    assert.doesNotMatch(kinds.join(' '),/private|diagnosis|endometriosis/);
   }
 });
 
