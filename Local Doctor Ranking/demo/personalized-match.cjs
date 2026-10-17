@@ -101,6 +101,12 @@ function clinicalContextCaveat(criteria,citations=[]) {
 function plainClinicalPhrase(text,criteria={}) {
   const value=sourceText({text}).replace(/\b[A-Z]\d{4}\b/g,'').replace(/^\s*[-:()]+\s*/,'').trim();
   const need=clean(criteria.topic);
+  // Explanation-only source excerpts can preserve a specific recorded
+  // clinical interest instead of reducing it to the broad search topic.
+  if(criteria.preferDocumentedInterest && need && need.length<=70 && value.length<=100 &&
+    !hasProcedureWording(value) && !/[?;:]/.test(value) &&
+    !/\b(?:i|my|we|our|not|never|without|possible|suspected|research)\b/i.test(value) &&
+    directTopicSupport(value,need)) return value.replace(/[.。]$/,'');
   // Use the supported concern itself when no procedure was requested. A
   // mixed interest/procedure list must not turn the fallback into surgery copy.
   if(need&&need.length<=70&&!criteria.procedures?.length&&directTopicSupport(value,need))return need;
